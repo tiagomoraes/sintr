@@ -1,0 +1,33 @@
+{
+  "name": "@sintr/core",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./auth": "./src/auth/index.ts",
+    "./db": "./src/db/index.ts",
+    "./schema": "./src/db/schema/index.ts",
+    "./runtime": "./src/runtime/index.ts",
+    "./runtime/base": "./src/runtime/base.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "tsx src/db/migrate-cli.ts"
+  },
+  "dependencies": {
+    "@node-rs/argon2": "2.2.2",
+    "better-auth": "1.7.10",
+    "drizzle-orm": "0.45.4",
+    "postgres": "3.4.9",
+    "zod": "4.6.7"
+  },
+  "devDependencies": {
+    "drizzle-kit": "0.31.11",
+    "tsx": "4.23.15",
+    "vite": "8.3.4",
+    "vitest": "5.0.5"
+  }
+}

@@ -1,0 +1,10 @@
+@import "tailwindcss";
+@import "@sintr/ui/styles.css";
+@source "../../../packages/ui/src";
+
+@utility wrap {
+  width: 100%;
+  max-width: var(--container-page);
+  margin-inline: auto;
+  padding-inline: var(--spacing-gutter);
+}

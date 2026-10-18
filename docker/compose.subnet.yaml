@@ -1,0 +1,8 @@
+# Applied by make only when SINTR_DOCKER_SUBNET is set: gives the stack's
+# network an explicit subnet, for hosts where Docker has no free address
+# pool left (a VPN routing 10.0.0.0/8 or 172.16.0.0/12 causes this).
+networks:
+  default:
+    ipam:
+      config:
+        - subnet: ${SINTR_DOCKER_SUBNET}

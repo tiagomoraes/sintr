@@ -1,0 +1,20 @@
+{
+  "$schema": "https://ui.shadcn.com/schema.json",
+  "style": "new-york",
+  "rsc": true,
+  "tsx": true,
+  "tailwind": {
+    "config": "",
+    "css": "src/styles/sintr.css",
+    "baseColor": "neutral",
+    "cssVariables": true
+  },
+  "iconLibrary": "lucide",
+  "aliases": {
+    "components": "@sintr/ui/components",
+    "ui": "@sintr/ui/components",
+    "utils": "@sintr/ui/lib/cn",
+    "lib": "@sintr/ui/lib",
+    "hooks": "@sintr/ui/hooks"
+  }
+}

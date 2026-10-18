@@ -1,0 +1,291 @@
+/*
+ * The sintr design system for the app (docs/DESIGN.md). A white consulting
+ * room wall: plaster white, graphite ink, hairlines and black pill controls.
+ * The only color is window light and its faint echoes on paper.
+ *
+ * Import after Tailwind:  @import "tailwindcss"; @import "@sintr/ui/styles.css";
+ */
+
+/* Fonts are self-hosted (SIL OFL 1.1, see ../../fonts/OFL.txt). */
+@font-face {
+  font-family: "Source Serif 4";
+  src: url("../../fonts/source-serif-4-roman.woff2") format("woff2");
+  font-weight: 200 600;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Source Serif 4";
+  src: url("../../fonts/source-serif-4-italic.woff2") format("woff2");
+  font-weight: 200 600;
+  font-style: italic;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Hanken Grotesk";
+  src: url("../../fonts/hanken-grotesk.woff2") format("woff2");
+  font-weight: 300 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+@theme {
+  /* Palette */
+  --color-ink: #16171a;
+  --color-ink-pressed: #000000;
+  --color-ink-confirm: #23302a;
+  --color-ink-2: #474a51;
+  --color-ink-3: #6b6e75;
+  --color-ink-soft: #82858c;
+  --color-paper: #ffffff;
+  --color-rule: #e8e6e1;
+  --color-rule-strong: #d4d2cc;
+  --color-wash: #f5f4f1;
+  --color-verbatim: #fbe0cd;
+  --color-notebook-margin: #f2cdb9;
+  --color-notebook-rule: #e5edf4;
+  --color-draft: #e09a76;
+  --color-light-sky: #d4e6f4;
+  --color-light-linen: #f1e8df;
+  --color-light-peach: #f8dcc8;
+  --color-leaf: #a9b9a3;
+
+  /* Type */
+  --font-serif: "Source Serif 4", "Iowan Old Style", Charter, Georgia, serif;
+  --font-sans: "Hanken Grotesk", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+
+  --text-display: clamp(2.75rem, 1.35rem + 4.7vw, 5.75rem);
+  --text-display--line-height: 1.02;
+  --text-display--letter-spacing: -0.028em;
+  --text-headline: clamp(2.125rem, 1.3rem + 2.7vw, 3.75rem);
+  --text-headline--line-height: 1.06;
+  --text-headline--letter-spacing: -0.022em;
+  --text-title: clamp(1.875rem, 1.2rem + 2.1vw, 3.125rem);
+  --text-title--line-height: 1.1;
+  --text-title--letter-spacing: -0.02em;
+  --text-doc-heading: clamp(2rem, 1.4rem + 1.8vw, 2.875rem);
+  --text-doc-heading--line-height: 1.08;
+  --text-doc-heading--letter-spacing: -0.02em;
+  --text-title-small: 1.375rem;
+  --text-title-small--line-height: 1.25;
+  --text-title-small--letter-spacing: -0.01em;
+  --text-lede: clamp(1.125rem, 1rem + 0.4vw, 1.3125rem);
+  --text-lede--line-height: 1.55;
+  --text-body: 1.0625rem;
+  --text-body--line-height: 1.65;
+  --text-label: 0.9375rem;
+  --text-label--line-height: 1;
+  --text-label--letter-spacing: 0.005em;
+  --text-caption: 0.8125rem;
+  --text-caption--line-height: 1.45;
+
+  /* Shape */
+  --radius-pill: 999px;
+  --radius-bubble: 20px;
+  --radius-panel: 18px;
+  --radius-file: 14px;
+  --radius-command: 12px;
+  --radius-paper: 6px;
+  --radius-tick: 4px;
+
+  /* Depth: hairline first; shadows only for artifacts resting in the light */
+  --shadow-card: 0 1px 2px rgba(22, 23, 26, 0.04), 0 18px 40px -22px rgba(22, 23, 26, 0.22);
+  --shadow-lift: 0 2px 4px rgba(22, 23, 26, 0.05), 0 26px 50px -24px rgba(22, 23, 26, 0.28);
+  --shadow-ink: 0 1px 1px rgba(22, 23, 26, 0.2), 0 10px 26px -10px transparent;
+  --shadow-ink-hover: 0 1px 1px rgba(22, 23, 26, 0.2), 0 16px 30px -12px rgba(232, 168, 130, 0.55);
+
+  /* Layout and motion */
+  --spacing-gutter: clamp(20px, 5vw, 72px);
+  --spacing-section: clamp(88px, 10vw, 148px);
+  --container-page: 1360px;
+  --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-slow: cubic-bezier(0.45, 0.05, 0.2, 1);
+}
+
+/*
+ * shadcn/ui semantic variables, mapped onto the sintr palette, so components
+ * added with the shadcn CLI land on the same system.
+ */
+:root {
+  --background: var(--color-paper);
+  --foreground: var(--color-ink);
+  --card: var(--color-paper);
+  --card-foreground: var(--color-ink);
+  --popover: var(--color-paper);
+  --popover-foreground: var(--color-ink);
+  --primary: var(--color-ink);
+  --primary-foreground: var(--color-paper);
+  --secondary: var(--color-wash);
+  --secondary-foreground: var(--color-ink);
+  --muted: var(--color-wash);
+  --muted-foreground: var(--color-ink-3);
+  --accent: var(--color-wash);
+  --accent-foreground: var(--color-ink);
+  /* There is no alarm color in the system: errors are said in ink. */
+  --destructive: var(--color-ink);
+  --border: var(--color-rule);
+  --input: var(--color-rule-strong);
+  --ring: var(--color-ink);
+  --radius: 14px;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+}
+
+@layer base {
+  html {
+    color-scheme: light;
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+    scrollbar-color: #d6d4cf transparent;
+    scrollbar-width: thin;
+  }
+  body {
+    margin: 0;
+    background: var(--color-paper);
+    color: var(--color-ink);
+    font-family: var(--font-sans);
+    font-size: var(--text-body);
+    line-height: 1.65;
+    font-feature-settings: "kern", "liga";
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+    overflow-x: clip;
+    caret-color: var(--color-ink);
+  }
+  h1,
+  h2,
+  h3 {
+    font-family: var(--font-serif);
+    font-weight: 300;
+    font-optical-sizing: auto;
+    text-wrap: balance;
+  }
+  p {
+    text-wrap: pretty;
+  }
+  ::selection {
+    background: var(--color-verbatim);
+    color: var(--color-ink);
+  }
+  :focus-visible {
+    outline: 2px solid var(--color-ink);
+    outline-offset: 3px;
+    border-radius: 6px;
+  }
+  @media (max-width: 720px) {
+    body {
+      font-size: 1rem;
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation: none !important;
+      transition: none !important;
+    }
+  }
+}
+
+/* The window light: a projection multiplied onto the wall, never a fill. */
+@layer components {
+  .sintr-light {
+    pointer-events: none;
+    mix-blend-mode: multiply;
+  }
+  .sintr-light__s1 {
+    stop-color: var(--color-light-sky);
+  }
+  .sintr-light__s2 {
+    stop-color: var(--color-light-linen);
+  }
+  .sintr-light__s3 {
+    stop-color: var(--color-light-peach);
+  }
+  .sintr-light__leaves {
+    opacity: 0.62;
+  }
+  .sintr-light__leaves path {
+    fill: var(--color-leaf);
+  }
+  .sintr-light__stem {
+    fill: none;
+    stroke: var(--color-leaf);
+    stroke-width: 3.5;
+    stroke-linecap: round;
+  }
+  .sintr-light__branch {
+    transform-box: view-box;
+  }
+  .sintr-light__branch--a {
+    transform-origin: 1010px 40px;
+  }
+  .sintr-light__branch--b {
+    transform-origin: 1010px 520px;
+  }
+  @media (prefers-reduced-motion: no-preference) {
+    .sintr-light {
+      animation:
+        sintr-light-enter 2.8s var(--ease-slow) both,
+        sintr-light-breathe 11s ease-in-out 2.8s infinite alternate;
+    }
+    .sintr-light__branch--a {
+      animation: sintr-sway-a 13s ease-in-out infinite alternate;
+    }
+    .sintr-light__branch--b {
+      animation: sintr-sway-b 17s ease-in-out infinite alternate;
+    }
+  }
+  @keyframes sintr-light-enter {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+  @keyframes sintr-light-breathe {
+    from {
+      opacity: 1;
+    }
+    to {
+      opacity: 0.84;
+    }
+  }
+  @keyframes sintr-sway-a {
+    0% {
+      transform: rotate(-1.6deg) translate(0, 0);
+    }
+    100% {
+      transform: rotate(2.2deg) translate(-6px, 4px);
+    }
+  }
+  @keyframes sintr-sway-b {
+    0% {
+      transform: rotate(1.8deg);
+    }
+    100% {
+      transform: rotate(-2.4deg) translate(4px, -3px);
+    }
+  }
+}

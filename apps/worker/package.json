@@ -1,0 +1,22 @@
+{
+  "name": "@sintr/worker",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/main.ts",
+    "build": "node build.mjs",
+    "start": "node dist/worker.mjs",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@sintr/core": "workspace:*"
+  },
+  "devDependencies": {
+    "esbuild": "0.25.12",
+    "tsx": "4.23.15",
+    "vite": "8.3.4",
+    "vitest": "5.0.5"
+  }
+}

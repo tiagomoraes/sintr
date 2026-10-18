@@ -1,0 +1,14 @@
+**/node_modules
+**/.next
+**/dist
+**/test-results
+**/playwright-report
+**/*.tsbuildinfo
+**/next-env.d.ts
+.git
+.env
+.env.*
+!.env.example
+*-brief.md
+docker/compose*.yaml
+docker/Caddyfile

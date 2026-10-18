@@ -1,0 +1,26 @@
+# Development database for make dev, make migrate and make test.
+# Bound to 127.0.0.1 only. The self-host stack lives in compose.yaml.
+# It joins Docker's default bridge instead of creating a network, so it also
+# starts on hosts whose address pools are exhausted. make names the project
+# after the checkout, so each worktree has its own database.
+
+services:
+  db:
+    image: postgres:16-alpine
+    network_mode: bridge
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-sintr}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?run make setup to create .env}
+      POSTGRES_DB: ${POSTGRES_DB:-sintr}
+    ports:
+      - "127.0.0.1:${SINTR_DEV_DB_PORT:-54329}:5432"
+    volumes:
+      - devdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+volumes:
+  devdata:
