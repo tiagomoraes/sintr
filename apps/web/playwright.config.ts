@@ -35,7 +35,7 @@ export default defineConfig({
   use: { baseURL: url, trace: "retain-on-failure" },
   projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],
   webServer: {
-    command: `pnpm exec next build && pnpm exec next start --hostname 127.0.0.1 --port ${port}`,
+    command: `pnpm run build && pnpm exec next start --hostname 127.0.0.1 --port ${port}`,
     url,
     timeout: 240_000,
     reuseExistingServer: false,

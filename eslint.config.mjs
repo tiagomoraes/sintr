@@ -14,6 +14,8 @@ export default tseslint.config(
       "**/next-env.d.ts",
       "**/playwright-report/**",
       "**/test-results/**",
+      // The stdio bridge bundle (packages/mcp/build.mjs), copied for the app to serve.
+      "apps/web/public/sintr-mcp.mjs",
     ],
   },
   js.configs.recommended,

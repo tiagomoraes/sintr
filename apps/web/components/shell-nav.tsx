@@ -10,6 +10,7 @@ export const SECTIONS = [
   { href: "/checkins", label: "Check-ins" },
   { href: "/therapy", label: "Therapy" },
   { href: "/reports", label: "Reports" },
+  { href: "/connect", label: "Connect" },
   { href: "/settings", label: "Settings" },
 ] as const;
 

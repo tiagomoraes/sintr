@@ -1,8 +1,12 @@
+import { linkStyles } from "@sintr/ui";
 import type { Metadata } from "next";
+import Link from "next/link";
+import { KeyList } from "@/components/connect/key-list";
 import { PageHeading } from "@/components/empty-state";
 import { EmailStatus } from "@/components/account/email-status";
 import { AssistantForm } from "@/components/settings/assistant-form";
 import { PreferencesForm } from "@/components/settings/preferences-form";
+import { workingKeys } from "@/lib/server/keys";
 import { requireScope, runtime } from "@/lib/server/runtime";
 import { saveAssistant, savePreferences, testAssistant } from "./actions";
 
@@ -17,11 +21,12 @@ export default async function SettingsPage({
 }) {
   const { scope } = await requireScope();
   // Only what may be shown: the key is reduced to a hint on the server.
-  const [settings, profile, account, params] = await Promise.all([
+  const [settings, profile, account, params, keys] = await Promise.all([
     scope.agentSettings.get(),
     scope.profile.get(),
     scope.profile.account(),
     searchParams,
+    workingKeys(scope),
   ]);
   const timezones = TIMEZONES.includes(profile.timezone) ? TIMEZONES : [profile.timezone, ...TIMEZONES];
 
@@ -44,6 +49,24 @@ export default async function SettingsPage({
             test={testAssistant}
             rehearsal={runtime().config.fakeAgent}
           />
+        </div>
+      </section>
+      <section aria-labelledby="keys-title" className="mt-16 max-w-[40rem] border-t border-rule pt-12">
+        <h2 id="keys-title" className="font-serif text-title-small font-normal text-ink">
+          Assistants you connected
+        </h2>
+        <p className="mt-3 text-ink-2">
+          Claude, ChatGPT, Gemini or Hermes can keep entries here for you, each with its own key.{" "}
+          <Link href="/connect" className={linkStyles}>
+            {keys.length ? "Connect another" : "Connect one"}
+          </Link>
+        </p>
+        <div className="mt-6">
+          {keys.length ? (
+            <KeyList keys={keys} />
+          ) : (
+            <p className="text-[0.9375rem] text-ink-3">No assistant is connected.</p>
+          )}
         </div>
       </section>
       <section aria-labelledby="email-title" className="mt-16 max-w-[40rem] border-t border-rule pt-12">

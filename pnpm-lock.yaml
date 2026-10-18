@@ -50,6 +50,9 @@ importers:
       '@sintr/core':
         specifier: workspace:*
         version: link:../../packages/core
+      '@sintr/mcp':
+        specifier: workspace:*
+        version: link:../../packages/mcp
       '@sintr/ui':
         specifier: workspace:*
         version: link:../../packages/ui
