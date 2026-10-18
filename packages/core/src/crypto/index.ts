@@ -3,8 +3,11 @@ export { createFieldCipher, type FieldCipher } from "./field-cipher";
 export {
   generateDataKey,
   generateMasterKey,
+  inviteCodeHash,
   parseMasterKey,
   unwrapDataKey,
+  unwrapLinkKey,
   wrapDataKey,
+  wrapLinkKey,
   type MasterKey,
 } from "./keys";
