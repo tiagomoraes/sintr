@@ -1,6 +1,7 @@
-import { and, gt, isNotNull, or, eq } from "drizzle-orm";
+import { and, eq, gt, isNotNull, or, sql } from "drizzle-orm";
 import type { Executor } from "../db/client";
-import { profiles, therapySettings } from "../db/schema";
+import { consents, profiles, therapySettings } from "../db/schema";
+import { HEALTH_DATA_CONSENT_VERSION } from "../domain";
 import { sanitizeError } from "../errors";
 import type { SessionSchedule } from "./period";
 
@@ -12,8 +13,10 @@ export interface PersonSchedule {
 }
 
 /**
- * Everyone with a session to prepare for: a weekly day and time, or a
- * one-off date still ahead. Spans all people by nature, so it reads no
+ * Everyone with a session to prepare for (a weekly day and time, or a
+ * one-off date still ahead) whose latest consent to process their health
+ * data is granted, in its current wording: the same gate every page and
+ * route of the app applies. Spans all people by nature, so it reads no
  * content: days, times, time zones and the lead, all kept in the clear.
  */
 export async function reportSchedules(db: Executor, now: Date = new Date()): Promise<PersonSchedule[]> {
@@ -30,9 +33,19 @@ export async function reportSchedules(db: Executor, now: Date = new Date()): Pro
       .from(therapySettings)
       .innerJoin(profiles, eq(profiles.userId, therapySettings.userId))
       .where(
-        or(
-          and(isNotNull(therapySettings.sessionDay), isNotNull(therapySettings.sessionTime)),
-          gt(therapySettings.nextSessionAt, now),
+        and(
+          or(
+            and(isNotNull(therapySettings.sessionDay), isNotNull(therapySettings.sessionTime)),
+            gt(therapySettings.nextSessionAt, now),
+          ),
+          sql`(
+            select ${consents.granted} and ${consents.version} = ${HEALTH_DATA_CONSENT_VERSION}
+            from ${consents}
+            where ${consents.userId} = ${therapySettings.userId}
+              and ${consents.purpose} = 'health_data_processing'
+            order by ${consents.createdAt} desc
+            limit 1
+          ) is true`,
         ),
       );
     return rows.map((row) => ({

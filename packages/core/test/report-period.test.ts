@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  periodAgain,
   periodStart,
   planReportNow,
   planScheduledReport,
@@ -139,13 +140,13 @@ describe("the period a report covers", () => {
     expect(periodStart(end, at(2026, 10, 15, 9))).toEqual(at(2026, 10, 15, 9));
   });
 
-  it("is a calendar week, Monday to Sunday, when no session is set (the week fallback)", () => {
+  it("is the calendar week so far, from Monday to now, when no session is set (the week fallback)", () => {
     const week = weekPeriod(TZ, at(2026, 10, 15, 14), null);
     expect(week).toEqual({
       kind: "week",
       label: "2026-W42",
       start: at(2026, 10, 12),
-      end: at(2026, 10, 19),
+      end: at(2026, 10, 15, 14),
       session: null,
     });
     const none = { sessionDay: null, sessionTime: null, nextSessionAt: null, reportLeadMinutes: 60 };
@@ -278,6 +279,40 @@ describe("the scheduler's decision", () => {
 });
 
 describe("prepare it now", () => {
+  const none = { sessionDay: null, sessionTime: null, nextSessionAt: null, reportLeadMinutes: 60 };
+
+  it("opens this week's report, and preparing it again takes it up to now, never past Sunday", () => {
+    const week = report({ id: "w1", periodStart: at(2026, 10, 12), periodEnd: at(2026, 10, 14, 9) });
+    expect(
+      planReportNow({ schedule: none, timeZone: TZ, reports: [week], now: at(2026, 10, 16, 10) }),
+    ).toEqual({
+      action: "open",
+      reportId: "w1",
+    });
+    expect(periodAgain(week, none, TZ, at(2026, 10, 16, 10))).toMatchObject({ end: at(2026, 10, 16, 10) });
+    expect(periodAgain(week, none, TZ, at(2026, 10, 21, 10))).toMatchObject({ end: at(2026, 10, 19) });
+  });
+
+  it("starts next week's report where this week's ended, and a session's report where the week's ended", () => {
+    const week = report({
+      periodStart: at(2026, 10, 12),
+      periodEnd: at(2026, 10, 14, 9),
+      status: "reviewed",
+    });
+    expect(
+      planReportNow({ schedule: none, timeZone: TZ, reports: [week], now: at(2026, 10, 20, 10) }),
+    ).toMatchObject({
+      action: "create",
+      period: { label: "2026-W43", start: at(2026, 10, 19), end: at(2026, 10, 20, 10) },
+    });
+    expect(
+      planScheduledReport({ schedule: MONDAY_18, timeZone: TZ, reports: [week], now: at(2026, 10, 19, 17) }),
+    ).toMatchObject({
+      action: "create",
+      period: { start: at(2026, 10, 14, 9), end: at(2026, 10, 19, 17) },
+    });
+  });
+
   it("covers what exists so far for the next session, and opens it when it exists", () => {
     const plan = planReportNow({ schedule: MONDAY_18, timeZone: TZ, reports: [], now: at(2026, 10, 17, 10) });
     expect(plan).toEqual({

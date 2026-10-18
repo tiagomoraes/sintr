@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import {
+  HEALTH_DATA_CONSENT_VERSION,
   createLogger,
   generateMasterKey,
   loadConfig,
@@ -38,7 +39,14 @@ async function person(label: string, verified: boolean): Promise<UserScope> {
   const id = `${label}-${randomUUID()}`;
   await handle.db.insert(users).values({ id, email: `${id}@example.test`, emailVerified: verified });
   await runtime.repositories.provision(id);
-  return runtime.repositories.forUser(id);
+  const scope = await runtime.repositories.forUser(id);
+  // As at sign-up: the consent to process health data, current wording.
+  await scope.consents.record({
+    purpose: "health_data_processing",
+    version: HEALTH_DATA_CONSENT_VERSION,
+    granted: true,
+  });
+  return scope;
 }
 
 const SP = "America/Sao_Paulo";
@@ -173,6 +181,23 @@ describe("preparing reports on schedule", () => {
       week: "",
     });
     expect(email.sent.length).toBe(sent);
+  });
+
+  it("prepares nothing for a person whose consent to process their data is withdrawn or outdated", async () => {
+    const erin = await person("erin", true);
+    await erin.therapySettings.update({ sessionDay: 1, sessionTime: "21:00" });
+    await erin.consents.record({
+      purpose: "health_data_processing",
+      version: HEALTH_DATA_CONSENT_VERSION,
+      granted: false,
+    });
+    const frank = await person("frank", true);
+    await frank.therapySettings.update({ sessionDay: 1, sessionTime: "21:00" });
+    await frank.consents.record({ purpose: "health_data_processing", version: "2000-01-01", granted: true });
+    const scheduled = (await runtime.reportSchedules(new Date("2026-11-02T20:00:00Z"))).map((p) => p.userId);
+    expect(scheduled).not.toContain(erin.userId);
+    expect(scheduled).not.toContain(frank.userId);
+    expect(scheduled).toContain(alice.userId);
   });
 
   it("keeps going when one person's preparation fails", async () => {

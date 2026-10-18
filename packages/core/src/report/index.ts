@@ -71,6 +71,7 @@ export {
 export {
   FIRST_PERIOD_DAYS,
   MAX_PERIOD_DAYS,
+  calendarWeek,
   hasWeeklySchedule,
   inSchedule,
   periodAgain,

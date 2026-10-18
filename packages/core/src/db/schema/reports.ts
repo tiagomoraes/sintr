@@ -9,6 +9,7 @@ import {
   text,
   timestamp,
   unique,
+  uniqueIndex,
   uuid,
   type PgTableExtraConfigValue,
 } from "drizzle-orm/pg-core";
@@ -53,6 +54,11 @@ export const reports = pgTable(
     // Two reports never end at the same moment: a second preparation of the
     // same period (a retried tick, two workers) is refused by the database.
     unique("reports_user_id_period_end_key").on(t.userId, t.periodEnd),
+    // One report per session: two preparations of the same session (two
+    // tabs, a retried request) cannot both be kept.
+    uniqueIndex("reports_user_id_session_at_key")
+      .on(t.userId, t.sessionAt)
+      .where(sql`${t.sessionAt} is not null`),
     foreignKey({
       name: "reports_consent_owner_fk",
       columns: [t.consentId, t.userId],

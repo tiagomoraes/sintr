@@ -43,6 +43,8 @@ export interface PrepareReport {
   period: ReportPeriod;
   /** Prepare this report again, in place; otherwise a new report. */
   reportId?: string;
+  /** The scheduler's preparation: leave the report alone if the person changed it meanwhile. */
+  untouched?: boolean;
   /** The person's model; null prepares the parts sintr can make alone. */
   model: LanguageModel | null;
   /** Why there is no model, as a code. */
@@ -105,6 +107,8 @@ export async function prepareReport(input: PrepareReport): Promise<PreparedRepor
     content = draftContent({ digest, language, toBring, problem: input.modelProblem ?? "not_configured" });
   }
 
+  // The person left (a reload, a closed tab): keep nothing half-made.
+  if (input.abortSignal?.aborted) throw new DOMException("the preparation was abandoned", "AbortError");
   const stored = serializeContent(content);
   let report: Report;
   let created = false;
@@ -113,6 +117,7 @@ export async function prepareReport(input: PrepareReport): Promise<PreparedRepor
       content: stored,
       periodEnd: period.end,
       sessionAt: period.session,
+      ...(input.untouched ? { untouched: true } : {}),
     });
   } else {
     try {

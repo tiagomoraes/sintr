@@ -38,7 +38,7 @@ export async function prepareDueReports(
       const result = await prepareReport({
         scope,
         period: plan.period,
-        ...(plan.action === "retarget" ? { reportId: plan.reportId } : {}),
+        ...(plan.action === "retarget" ? { reportId: plan.reportId, untouched: true } : {}),
         model,
         modelProblem: problem,
         log,

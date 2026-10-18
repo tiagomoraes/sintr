@@ -1,5 +1,5 @@
 {
-  "id": "3303e037-c55e-42ff-aee0-396944923b20",
+  "id": "36b9a542-90dc-4615-8806-5f1735d2be0e",
   "prevId": "902395bc-a693-4e66-b22e-064d61ad1d0a",
   "version": "7",
   "dialect": "postgresql",
@@ -1836,6 +1836,28 @@
             }
           ],
           "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "reports_user_id_session_at_key": {
+          "name": "reports_user_id_session_at_key",
+          "columns": [
+            {
+              "expression": "user_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "session_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "where": "\"reports\".\"session_at\" is not null",
           "concurrently": false,
           "method": "btree",
           "with": {}

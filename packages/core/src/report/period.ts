@@ -144,7 +144,9 @@ export function preparationTime(schedule: SessionSchedule, session: Date): Date 
  */
 export function periodStart(end: Date, previousEnd: Date | null): Date {
   const earliest = end.getTime() - MAX_PERIOD_DAYS * DAY;
-  if (previousEnd && previousEnd < end) return new Date(Math.max(previousEnd.getTime(), earliest));
+  // Already covered up to (or past) `end`: the start meets the end, and there is nothing to prepare.
+  if (previousEnd && previousEnd >= end) return previousEnd;
+  if (previousEnd) return new Date(Math.max(previousEnd.getTime(), earliest));
   return new Date(end.getTime() - FIRST_PERIOD_DAYS * DAY);
 }
 
@@ -163,17 +165,28 @@ export function sessionPeriod(
   };
 }
 
-/** The calendar week (Monday to Sunday, local) that contains `now`. */
+/** The calendar week (Monday to Sunday, local) that contains `at`. */
+export function calendarWeek(timeZone: string, at: Date): { label: string; start: Date; end: Date } {
+  const monday = addDays(localDay(at, timeZone), -((localParts(at, timeZone).weekday + 6) % 7));
+  return {
+    label: isoWeek(monday),
+    start: dayStart(monday, timeZone),
+    end: dayStart(addDays(monday, 7), timeZone),
+  };
+}
+
+/**
+ * The calendar week of `now`, without a session, as far as it has gone:
+ * from Monday (or where the previous report ended) to now. Preparing it
+ * again later in the week takes it further; nothing after now is claimed.
+ */
 export function weekPeriod(timeZone: string, now: Date, previousEnd: Date | null): ReportPeriod {
-  const today = localDay(now, timeZone);
-  const monday = addDays(today, -((localParts(now, timeZone).weekday + 6) % 7));
-  const start = dayStart(monday, timeZone);
-  const end = dayStart(addDays(monday, 7), timeZone);
+  const week = calendarWeek(timeZone, now);
   return {
     kind: "week",
-    label: isoWeek(monday),
-    start: previousEnd && previousEnd > start && previousEnd < end ? previousEnd : start,
-    end,
+    label: week.label,
+    start: previousEnd && previousEnd > week.start && previousEnd < now ? previousEnd : week.start,
+    end: now,
     session: null,
   };
 }
@@ -283,9 +296,11 @@ export function planReportNow(input: {
     if (latest && period.start >= period.end) return { action: "open", reportId: latest.id };
     return { action: "create", period };
   }
+  // This week's report, if there is one, is opened (and can be prepared again, further).
+  const week = calendarWeek(timeZone, now);
+  const thisWeek = reports.find((report) => report.sessionAt === null && report.periodStart >= week.start);
+  if (thisWeek) return { action: "open", reportId: thisWeek.id };
   const period = weekPeriod(timeZone, now, latest?.periodEnd ?? null);
-  const existing = reports.find((report) => same(report.periodEnd, period.end));
-  if (existing) return { action: "open", reportId: existing.id };
   if (latest && period.start >= period.end) return { action: "open", reportId: latest.id };
   return { action: "create", period };
 }
@@ -301,11 +316,13 @@ export function periodAgain(
   now: Date,
 ): ReportPeriod {
   if (!report.sessionAt) {
+    const week = calendarWeek(timeZone, report.periodStart);
+    const limit = week.end < now ? week.end : now;
     return {
       kind: "week",
-      label: isoWeek(localDay(report.periodStart, timeZone)),
+      label: week.label,
       start: report.periodStart,
-      end: report.periodEnd,
+      end: limit > report.periodEnd ? limit : report.periodEnd,
       session: null,
     };
   }
