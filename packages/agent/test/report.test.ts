@@ -245,8 +245,8 @@ describe("the report writer", () => {
   it("takes the dashes out of its own prose, never out of the person's words", async () => {
     const dashed = {
       ...goodDraft,
-      week: "Uma semana puxada — sobretudo na terça.",
-      helped: ["A volta no parque – sexta."],
+      week: "Uma semana puxada \u2014 sobretudo na terça.",
+      helped: ["A volta no parque \u2013 sexta."],
     };
     const { result } = run([report(dashed)]);
     const written = await result;

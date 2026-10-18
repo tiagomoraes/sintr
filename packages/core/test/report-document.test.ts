@@ -101,7 +101,7 @@ describe("the report document", () => {
     const text = render()
       .replace(/<style>[\s\S]*?<\/style>/gu, "")
       .replace(/data:[^"')]+/gu, "");
-    expect(text).not.toMatch(/[–—]/u);
+    expect(text).not.toMatch(/[\u2013\u2014]/u);
   });
 
   it("embeds the design system's fonts and the light exactly as they are on disk (make report-assets)", () => {

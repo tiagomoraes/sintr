@@ -186,7 +186,7 @@ describe("the messages", () => {
 
   it("carry no dashes and no emoji", () => {
     for (const message of all) {
-      expect(`${message.subject}\n${message.text}\n${message.html}`).not.toMatch(/[–—\u{1F000}-\u{1FAFF}]/u);
+      expect(`${message.subject}\n${message.text}\n${message.html}`).not.toMatch(/[\u2013\u2014\u{1F000}-\u{1FAFF}]/u);
     }
   });
 
