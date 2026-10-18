@@ -11,6 +11,7 @@ export {
   entryTexts,
   isVerbatim,
   isVerified,
+  mapOutsideQuotes,
   normalizeWords,
   proseOf,
   quotesIn,
@@ -101,3 +102,15 @@ export {
   weekdayOf,
   zonedTime,
 } from "./time";
+export {
+  approveReport,
+  editReport,
+  notifyReportReady,
+  periodOf,
+  reportFilename,
+  reportHtml,
+  reportView,
+  sendReport,
+  sessionText,
+  type ReportView,
+} from "./service";

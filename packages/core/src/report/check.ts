@@ -48,6 +48,17 @@ export function splitQuotes(text: string): TextPart[] {
   return out;
 }
 
+/** Apply `fn` to the text outside quoted spans; the quotes stay exactly as written. */
+export function mapOutsideQuotes(text: string, fn: (plain: string) => string): string {
+  let out = "";
+  let at = 0;
+  for (const match of text.matchAll(QUOTE_RE)) {
+    out += fn(text.slice(at, match.index)) + match[0];
+    at = match.index + match[0].length;
+  }
+  return out + fn(text.slice(at));
+}
+
 export function quotesIn(text: string): string[] {
   return splitQuotes(text)
     .filter((part) => part.quote)

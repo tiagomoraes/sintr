@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { DataAccessError, InvalidStateError, NotFoundError } from "../src/errors";
+import { type DataAccessError, InvalidStateError, NotFoundError } from "../src/errors";
 import { draftContent } from "../src/report/draft";
 import { buildDigest } from "../src/report/digest";
 import { parseContent, serializeContent } from "../src/report/content";
