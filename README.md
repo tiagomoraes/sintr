@@ -15,7 +15,7 @@ There is no filesystem dependency: the ledger lives in Postgres, encrypted per p
 
 ## Where it is today
 
-Milestones **F0, the foundation**, **F1, capture**, and **F2, the weekly report** (see [`docs/PRODUCT.md`](docs/PRODUCT.md) for the milestones). What works:
+Milestones **F0, the foundation**, **F1, capture**, **F2, the weekly report**, and **F3, connect your agent** (see [`docs/PRODUCT.md`](docs/PRODUCT.md) for the milestones). What works:
 
 - sign up (email, password and the health data consent) and sign in, with Argon2id passwords and sliding sessions;
 - **talking to the assistant inside sintr**: tell it what happened, it acknowledges, asks a question or two and drafts a thought record in your own words, which you confirm, edit or discard. Nothing becomes an entry until you say so (the Confirm button, or "salva");
@@ -28,11 +28,12 @@ Milestones **F0, the foundation**, **F1, capture**, and **F2, the weekly report*
 - an example of what a therapist receives, from a fictional diary in Portuguese: [`docs/example-report.pdf`](docs/example-report.pdf);
 - **read, change, approve, send**: you read the report as a page, change its words, preview the PDF, and approve it; a second, explicit yes sends that PDF to your therapist by email, recorded with the date and the address. Nothing is ever sent on its own, and the PDFs of past reports stay available;
 - **email** (optional, any SMTP server): the approved report to your therapist, a "report ready" note to you if you ask for it, password reset and email confirmation;
+- **connect the assistant you already use** (Claude, ChatGPT, Gemini, Claude Code, Hermes) over MCP: make a key on the Connect screen (shown once, read and save, save only or read only), follow your assistant's steps with your address and key filled in, and see when it last talked to sintr. It records entries and check-ins held to the same rules as the assistant inside sintr (your exact words, only your numbers, the crisis protocol first), reads your recent days when it helps, and helps you prepare for a session; it can never send anything to your therapist. Disconnect a key with one click. See [`docs/MCP.md`](docs/MCP.md);
 - settings for the assistant, your time zone and how long conversations are kept;
 - the full data model in Postgres, every sensitive field encrypted before it is stored, and tests that prove one person cannot read another's data;
 - the self-host stack (Caddy, app, worker, Postgres) behind one command.
 
-Not yet: the MCP server (F3), the hosted offer (F4), export, deletion and the audit view in the UI (F5). `packages/mcp` holds its typed contract only.
+Not yet: the hosted offer (F4), export, deletion and the audit view in the UI (F5), and OAuth for MCP clients.
 
 ## Self-host
 
@@ -62,6 +63,7 @@ make build        # production builds of the web app and the worker
 make migrate      # apply migrations to the dev database
 make db-generate  # write a new SQL migration after a schema change (NAME=...)
 make report-assets # re-embed the report's fonts and light after changing them
+make mcp-bridge   # bundle the stdio bridge for local MCP clients (also part of make build)
 make help         # everything else
 ```
 
@@ -73,7 +75,8 @@ The assistant talks to the provider saved in Settings. To try the app without a 
 
 ```
 apps/
-  web/        Next.js 15 (App Router): UI, API and auth routes
+  web/        Next.js 15 (App Router): UI, API and auth routes, the MCP
+              endpoint and the Connect screen
   worker/     background jobs: the report before each session (every minute,
               from each person's schedule), expired auth records,
               conversation retention; also the migration runner
@@ -87,7 +90,9 @@ packages/
               writer (Vercel AI SDK), bring-your-own-key providers, the crisis
               protocol, the checks that keep drafts in the person's words, an
               offline test model
-  mcp/        the MCP contract (interfaces only)
+  mcp/        the MCP server: six tools, the instructions given to a connected
+              agent, the stateless HTTP endpoint the app mounts at /mcp,
+              and the stdio bridge for local clients (sintr-mcp.mjs)
 docker/       the self-host stack (compose, Caddy) and the dev database
 docs/         product, conventions, design, self-host, privacy, decisions
 ```

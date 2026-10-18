@@ -60,6 +60,15 @@ sintr's assistant talks to a model you choose, with your own key. In Settings:
 
 The key is encrypted with your data key before it is stored and is never shown again. What the provider receives is described in [`PRIVACY.md`](PRIVACY.md). Conversations are kept until you delete them, unless you choose a retention in Settings; the worker removes older ones every hour.
 
+## Connect your own assistant
+
+The Connect screen makes a key for an assistant you already use and shows its setup with your address filled in; [`MCP.md`](MCP.md) is the full guide.
+
+- **On this computer only** (the default, `http://localhost:3000`): Claude Code, Gemini CLI, Hermes and the Claude desktop app (from a file, through the bridge) work, since they reach sintr from your machine.
+- **Claude's connectors and ChatGPT** call sintr from their own servers, so they need sintr at a public `https` address: use a domain with TLS as above. A VPN address is not reachable from those services.
+- **The bridge** for local clients is served by your sintr at `/sintr-mcp.mjs`; it needs Node.js 20 or newer on the computer that runs the assistant.
+- The endpoint is `/mcp` on the same address; Caddy passes it through like any other request and keeps no access log, so a key inside an address is never written down.
+
 ## Email
 
 Email is optional. Without it, sintr works the same except that nothing is ever emailed: you download a report's PDF and share it yourself, a forgotten password cannot be reset, and Settings says so. With it, sintr sends four kinds of message, and nothing else:
@@ -150,7 +159,7 @@ Logs are JSON lines with event names, ids, counts and error codes. They never co
 | Service | Image | Role |
 | --- | --- | --- |
 | `caddy` | `caddy:2-alpine` | the edge: HTTP or automatic HTTPS, compression, reverse proxy to the app |
-| `app` | `sintr-app:local` | the Next.js app (UI, API, auth) on port 3000, inside the network only; prints report PDFs with the Chromium in the image and sends approved reports |
+| `app` | `sintr-app:local` | the Next.js app (UI, API, auth, the MCP endpoint at `/mcp`) on port 3000, inside the network only; prints report PDFs with the Chromium in the image and sends approved reports |
 | `worker` | `sintr-app:local` | background jobs: prepares each report before its session (checked every minute), sends the "report ready" note, removes expired sessions and conversations past their retention (hourly) |
 | `migrate` | `sintr-app:local` | applies migrations, then exits |
 | `db` | `postgres:16-alpine` | the database, on the `pgdata` volume |
