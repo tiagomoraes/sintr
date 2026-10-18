@@ -2,13 +2,16 @@ import { getTableColumns, getTableName } from "drizzle-orm";
 import type { PgTable } from "drizzle-orm/pg-core";
 import type { FieldCipher } from "../crypto";
 import {
+  agentSettings,
   checkins,
   consents,
   conversations,
+  corrections,
   entries,
   insights,
   messages,
   profiles,
+  proposals,
   reports,
   therapyNotes,
   therapySettings,
@@ -80,6 +83,9 @@ export const SEALED = {
   consents: sealedFields(consents, { recipient: "text" }),
   conversations: sealedFields(conversations, { title: "text" }),
   messages: sealedFields(messages, { content: "text" }),
+  agentSettings: sealedFields(agentSettings, { apiKey: "text" }),
+  proposals: sealedFields(proposals, { payload: "json" }),
+  corrections: sealedFields(corrections, { previous: "json", note: "text" }),
 } as const;
 
 /** bytea columns that hold wrapped keys rather than sealed content. */

@@ -278,6 +278,14 @@ describe("account deletion", () => {
     await leaving.reports.markSent(report.id, consent.id);
     const conversation = await leaving.conversations.create();
     await leaving.conversations.append(conversation.id, { role: "user", content: "x" });
+    await leaving.agentSettings.update({ provider: "anthropic", model: "m", apiKey: "k" });
+    const proposal = await leaving.proposals.create({
+      conversationId: conversation.id,
+      kind: "entry",
+      payload: { situation: "x" },
+    });
+    const { record } = await leaving.proposals.confirm(proposal.id);
+    await leaving.entries.correct(record.id, { situation: "y" });
     await leaving.apiTokens.create({ name: "x", scopes: ["entries:read"] });
     await leaving.auditLog.record({ action: "data.deleted" });
 
@@ -286,7 +294,7 @@ describe("account deletion", () => {
     const tables = await handle.db.execute<{ table_name: string }>(
       sql`select table_name from information_schema.columns where table_schema = 'public' and column_name = 'user_id'`,
     );
-    expect(tables.length).toBeGreaterThanOrEqual(15);
+    expect(tables.length).toBeGreaterThanOrEqual(18);
     for (const { table_name } of tables) {
       const rows = await handle.db.execute<{ n: number }>(
         sql.raw(`select count(*)::int as n from "${table_name}" where user_id = '${id}'`),

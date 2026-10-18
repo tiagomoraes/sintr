@@ -140,6 +140,28 @@ export interface Checkin extends z.infer<typeof CheckinContent> {
   updatedAt: Date;
 }
 
+/* Corrections (the pack's correction rule: never rewrite history silently) */
+
+export const CorrectionNote = z.string().min(1).max(2_000);
+
+/** One dated change to an entry or a check-in, with what it replaced. */
+export interface Correction {
+  id: string;
+  /** Names of the fields that changed. */
+  fields: string[];
+  /** What those fields held before the change; null where they were empty. */
+  previous: Record<string, unknown>;
+  note: string | null;
+  createdAt: Date;
+}
+
+/** The result of correcting a record: the live record and the change, if any. */
+export interface Corrected<T> {
+  record: T;
+  /** Null when nothing differed, so nothing was written. */
+  correction: Correction | null;
+}
+
 /* Therapy notes */
 
 export const TherapyNoteKind = z.enum(["session", "goal", "theme", "task", "to_bring"]);
@@ -270,6 +292,72 @@ export interface Message {
   createdAt: Date;
 }
 
+/* The embedded agent: provider settings (bring your own key) */
+
+export const ProviderKind = z.enum(["openai_compatible", "anthropic", "google"]);
+export type ProviderKind = z.infer<typeof ProviderKind>;
+
+export const AgentSettingsPatch = z
+  .object({
+    provider: ProviderKind.nullable(),
+    baseUrl: z
+      .url({ protocol: /^https?$/ })
+      .max(500)
+      .nullable(),
+    model: z.string().min(1).max(200).nullable(),
+    /** A new key, or null to remove the saved one. Absent keeps it. */
+    apiKey: z.string().min(1).max(2_000).nullable(),
+    conversationRetentionDays: z.number().int().min(1).max(3_650).nullable(),
+  })
+  .partial();
+export type AgentSettingsPatch = z.input<typeof AgentSettingsPatch>;
+
+/** What may be shown: the key itself never leaves the server once saved. */
+export interface AgentSettings {
+  provider: ProviderKind | null;
+  baseUrl: string | null;
+  model: string | null;
+  hasKey: boolean;
+  /** The last characters of a long key, to recognise it; null otherwise. */
+  keyHint: string | null;
+  conversationRetentionDays: number | null;
+}
+
+/** For the server-side model call only. Never rendered, never logged. */
+export interface ProviderCredentials {
+  provider: ProviderKind;
+  baseUrl: string | null;
+  model: string;
+  apiKey: string | null;
+}
+
+/* Proposals: what the assistant drafted, waiting for the person */
+
+export const ProposalKind = z.enum(["entry", "checkin"]);
+export type ProposalKind = z.infer<typeof ProposalKind>;
+export const ProposalStatus = z.enum(["proposed", "saved", "discarded"]);
+export type ProposalStatus = z.infer<typeof ProposalStatus>;
+
+interface ProposalBase {
+  id: string;
+  conversationId: string;
+  status: ProposalStatus;
+  edited: boolean;
+  recordId: string | null;
+  decidedAt: Date | null;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+/** Payload dates are ISO strings: a proposal is JSON until it is saved. */
+export type Proposal =
+  | (ProposalBase & { kind: "entry"; payload: EntryInput })
+  | (ProposalBase & { kind: "checkin"; payload: CheckinInput });
+
+export type ProposalInput =
+  | { conversationId: string; kind: "entry"; payload: EntryInput }
+  | { conversationId: string; kind: "checkin"; payload: CheckinInput };
+
 /* API tokens */
 
 export const DATA_TYPES = ["entries", "checkins", "therapy", "insights", "reports"] as const;
@@ -306,6 +394,8 @@ export const AuditAction = z.enum([
   "report.sent",
   "data.exported",
   "data.deleted",
+  "agent_key.saved",
+  "agent_key.removed",
 ]);
 export type AuditAction = z.infer<typeof AuditAction>;
 

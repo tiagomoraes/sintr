@@ -31,15 +31,18 @@ describe("schema invariants", () => {
     expect(tables.map(getTableName).sort()).toEqual(
       [
         "accounts",
+        "agent_settings",
         "api_tokens",
         "audit_log",
         "checkins",
         "consents",
         "conversations",
+        "corrections",
         "entries",
         "insights",
         "messages",
         "profiles",
+        "proposals",
         "reports",
         "sessions",
         "therapy_notes",
@@ -97,6 +100,9 @@ describe("schema invariants", () => {
       "content",
       "title",
       "recipient",
+      "payload",
+      "previous",
+      "api_key",
     ];
     for (const table of tables) {
       for (const column of getTableConfig(table).columns) {

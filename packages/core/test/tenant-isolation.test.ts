@@ -1,7 +1,7 @@
 import { sql } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { authenticateApiToken } from "../src/auth/api-tokens";
-import { ConsentRequiredError, NotFoundError } from "../src/errors";
+import { ConsentRequiredError, InvalidStateError, NotFoundError } from "../src/errors";
 import { createRepositories, type UserScope } from "../src/repositories";
 import { createUser, openTestDatabase, testMasterKey } from "./support";
 
@@ -22,6 +22,7 @@ interface Owned {
   conversation: string;
   token: string;
   rawToken: string;
+  proposal: string;
 }
 
 describe("tenant isolation", () => {
@@ -73,9 +74,51 @@ describe("tenant isolation", () => {
       targetType: "api_token",
       targetId: created.apiToken.id,
     });
+    // F1: A's assistant settings, a draft waiting in A's conversation, and a corrected entry.
+    await a.agentSettings.update({
+      provider: "anthropic",
+      model: "a-model",
+      apiKey: "alice-key-0123456789abcdef",
+      conversationRetentionDays: 30,
+    });
+    owned.proposal = (
+      await a.proposals.create({
+        conversationId: conversation.id,
+        kind: "entry",
+        payload: { situation: "alice's draft" },
+      })
+    ).id;
+    await a.entries.correct(owned.entry, { behavior: "alice's correction" }, { note: "alice's note" });
+    await a.checkins.correct(owned.checkin, { sleepHours: 7 });
   });
 
   afterAll(() => handle.close());
+
+  it("keeps A's assistant, drafts and corrections out of B's reach", async () => {
+    expect(await b.agentSettings.get()).toMatchObject({ provider: null, hasKey: false, keyHint: null });
+    expect(await b.agentSettings.credentials()).toBeNull();
+    expect(await b.proposals.get(owned.proposal)).toBeNull();
+    expect(await b.proposals.list(owned.conversation)).toEqual([]);
+    expect(await b.proposals.latestPending(owned.conversation)).toBeNull();
+    await expect(b.proposals.confirm(owned.proposal)).rejects.toBeInstanceOf(NotFoundError);
+    await expect(b.proposals.discard(owned.proposal)).rejects.toBeInstanceOf(NotFoundError);
+    await expect(
+      b.proposals.create({ conversationId: owned.conversation, kind: "entry", payload: { situation: "x" } }),
+    ).rejects.toBeInstanceOf(NotFoundError);
+    expect(await b.entries.corrections(owned.entry)).toEqual([]);
+    expect(await b.checkins.corrections(owned.checkin)).toEqual([]);
+    expect(await b.entries.correct(owned.entry, { situation: "overwritten" })).toBeNull();
+    expect(await b.checkins.correct(owned.checkin, { mood: 5 })).toBeNull();
+    expect(await b.conversations.setTitle(owned.conversation, "overwritten")).toBeNull();
+
+    // A's data is untouched, and A's draft is still A's to decide.
+    expect((await a.proposals.get(owned.proposal))?.status).toBe("proposed");
+    expect(await a.entries.corrections(owned.entry)).toHaveLength(1);
+    expect((await a.agentSettings.credentials())?.apiKey).toBe("alice-key-0123456789abcdef");
+    expect((await a.conversations.get(owned.conversation))?.title).toBe("alice's chat");
+    const { proposal } = await a.proposals.confirm(owned.proposal);
+    await expect(a.proposals.confirm(proposal.id)).rejects.toBeInstanceOf(InvalidStateError);
+  });
 
   it("lists nothing of A's to B", async () => {
     expect(await b.entries.list()).toEqual([]);
@@ -155,6 +198,14 @@ describe("tenant isolation", () => {
       sql`insert into consents (user_id, purpose, version, granted, report_id) values (${bobId}, 'report_send', '1', true, ${owned.report})`,
     );
     await expect(consentAttempt).rejects.toThrow();
+    const proposalAttempt = handle.db.execute(
+      sql`insert into proposals (user_id, conversation_id, kind, payload) values (${bobId}, ${owned.conversation}, 'entry', '\\x01'::bytea)`,
+    );
+    await expect(proposalAttempt).rejects.toThrow();
+    const correctionAttempt = handle.db.execute(
+      sql`insert into corrections (user_id, entry_id, fields, previous) values (${bobId}, ${owned.entry}, '{}', '\\x01'::bytea)`,
+    );
+    await expect(correctionAttempt).rejects.toThrow();
   });
 
   it("cannot decrypt A's ciphertext with B's key", async () => {

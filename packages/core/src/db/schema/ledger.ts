@@ -2,13 +2,16 @@ import { sql } from "drizzle-orm";
 import {
   check,
   date,
+  foreignKey,
   index,
   jsonb,
   numeric,
   pgEnum,
   pgTable,
   smallint,
+  text,
   timestamp,
+  unique,
   uuid,
 } from "drizzle-orm/pg-core";
 import { bytea, createdAt, updatedAt } from "../columns";
@@ -55,6 +58,7 @@ export const entries = pgTable(
   },
   (t) => [
     index("entries_user_id_occurred_at_idx").on(t.userId, t.occurredAt),
+    unique("entries_id_user_id_key").on(t.id, t.userId),
     check("entries_alternative_belief_range", sql`${t.alternativeBelief} between 0 and 100`),
     check("entries_peak_intensity_range", sql`${t.peakIntensity} between 0 and 100`),
   ],
@@ -78,10 +82,48 @@ export const checkins = pgTable(
   },
   (t) => [
     index("checkins_user_id_occurred_at_idx").on(t.userId, t.occurredAt),
+    unique("checkins_id_user_id_key").on(t.id, t.userId),
     check("checkins_mood_range", sql`${t.mood} between 0 and 5`),
     check("checkins_energy_range", sql`${t.energy} between 0 and 5`),
     check("checkins_anxiety_range", sql`${t.anxiety} between 0 and 5`),
     check("checkins_sleep_hours_range", sql`${t.sleepHours} between 0 and 24`),
+  ],
+);
+
+/**
+ * A dated correction of an entry or a check-in. The record itself shows the
+ * current words; what each changed field held before is kept here, so a
+ * change is never a silent rewrite. Field names are clear, values sealed.
+ */
+export const corrections = pgTable(
+  "corrections",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: ownerId(),
+    entryId: uuid("entry_id"),
+    checkinId: uuid("checkin_id"),
+    /** The names of the fields that changed, never their values. */
+    fields: text("fields").array().notNull(),
+    /** sealed: the values those fields held before, as JSON */
+    previous: bytea("previous").notNull(),
+    /** sealed: the person's own note about the change, if any */
+    note: bytea("note"),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    index("corrections_user_id_entry_id_idx").on(t.userId, t.entryId, t.createdAt),
+    index("corrections_user_id_checkin_id_idx").on(t.userId, t.checkinId, t.createdAt),
+    foreignKey({
+      name: "corrections_entry_owner_fk",
+      columns: [t.entryId, t.userId],
+      foreignColumns: [entries.id, entries.userId],
+    }).onDelete("cascade"),
+    foreignKey({
+      name: "corrections_checkin_owner_fk",
+      columns: [t.checkinId, t.userId],
+      foreignColumns: [checkins.id, checkins.userId],
+    }).onDelete("cascade"),
+    check("corrections_one_record", sql`num_nonnulls(${t.entryId}, ${t.checkinId}) = 1`),
   ],
 );
 

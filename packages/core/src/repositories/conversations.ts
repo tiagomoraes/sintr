@@ -57,6 +57,17 @@ export function conversationsRepository({ db, userId, cipher }: ScopeContext) {
       return rows.map(decode);
     },
 
+    /** A sealed title, or null to clear it. */
+    async setTitle(id: string, title: string | null): Promise<Conversation | null> {
+      if (!isId(id)) return null;
+      const [row] = await db
+        .update(conversations)
+        .set({ title: title ? cipher.sealText(spec.columns.title, title) : null, updatedAt: new Date() })
+        .where(own(id))
+        .returning();
+      return row ? decode(row) : null;
+    },
+
     async append(conversationId: string, input: MessageInput): Promise<Message> {
       const value = parseInput(MessageInput, input);
       if (!(await exists(conversationId))) throw new NotFoundError("conversation");
