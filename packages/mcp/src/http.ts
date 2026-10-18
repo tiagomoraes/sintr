@@ -126,44 +126,42 @@ export function createMcpHandler(options: McpHandlerOptions): McpHandler {
       return { response: refuse(403, "Requests from a web page are not accepted.") };
     }
 
+    // A wrong key counts against its address; past the limit the address is
+    // answered 429 instead of 401. Only failures are throttled: a working key
+    // from the same address (a vendor's shared egress, a local proxy) goes on.
     const address = addressOf(request);
-    const wait = failures.waitFor(address);
-    if (wait > 0)
+    const wrong = (status: number, message: string, headers: Record<string, string> = {}) => {
+      const wait = failures.hit(address);
       return {
-        response: refuse(429, "Too many wrong keys. Try again later.", { "Retry-After": String(wait) }),
+        response:
+          wait > 0
+            ? refuse(429, "Too many wrong keys. Try again later.", { "Retry-After": String(wait) })
+            : refuse(status, message, headers),
       };
+    };
 
     const header = request.headers.get("authorization");
     const fromHeader = header ? BEARER.exec(header)?.[1] : undefined;
-    if (header && !fromHeader) {
-      failures.hit(address);
-      return { response: refuse(401, "Send the key as: Authorization: Bearer <key>.", challenge) };
-    }
+    if (header && !fromHeader) return wrong(401, "Send the key as: Authorization: Bearer <key>.", challenge);
     if (fromHeader && urlToken && fromHeader !== urlToken) {
-      failures.hit(address);
-      return { response: refuse(400, "Two different keys were sent. Send one.") };
+      return wrong(400, "Two different keys were sent. Send one.");
     }
     const token = fromHeader ?? urlToken;
-    if (!token) {
-      failures.hit(address);
-      return { response: refuse(401, "A sintr connection key is required.", challenge) };
-    }
+    if (!token) return wrong(401, "A sintr connection key is required.", challenge);
 
     const body = await readBody(request, limits.maxBodyBytes);
     if (!body.ok) return { response: body.response };
 
     const principal = await options.authenticate(token, { client: clientOf(body.value) });
     if (!principal) {
-      failures.hit(address);
-      return {
-        response: refuse(
-          401,
-          "This sintr connection key does not work: it is wrong, revoked or expired.",
-          challenge,
-        ),
-      };
+      return wrong(
+        401,
+        "This sintr connection key does not work: it is wrong, revoked or expired.",
+        challenge,
+      );
     }
-    const busy = calls.hit(principal.tokenId);
+    // Every message of a batch is a call.
+    const busy = calls.hit(principal.tokenId, Array.isArray(body.value) ? Math.max(1, body.value.length) : 1);
     if (busy > 0) {
       return {
         response: refuse(429, "Too many requests. Try again in a moment.", { "Retry-After": String(busy) }),

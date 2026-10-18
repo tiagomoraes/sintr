@@ -13,23 +13,16 @@ export class RateLimiter {
     private readonly clock: () => number = Date.now,
   ) {}
 
-  /** Seconds to wait before this key may go on; 0 when it may go on now. */
-  waitFor(key: string): number {
-    const window = this.windows.get(key);
-    const now = this.clock();
-    if (!window || now - window.start >= this.windowMs || window.count < this.limit) return 0;
-    return Math.max(1, Math.ceil((window.start + this.windowMs - now) / 1000));
-  }
-
-  /** Count one use of this key; returns what `waitFor` returns after it. */
-  hit(key: string): number {
+  /** Count `uses` uses of this key (one by default); the seconds to wait when that went over the limit, else 0. */
+  hit(key: string, uses = 1): number {
     const now = this.clock();
     if (this.windows.size > 10_000) this.prune(now);
     const window = this.windows.get(key);
     if (!window || now - window.start >= this.windowMs) {
-      this.windows.set(key, { start: now, count: 1 });
+      this.windows.set(key, { start: now, count: uses });
+      if (uses > this.limit) return Math.max(1, Math.ceil(this.windowMs / 1000));
     } else {
-      window.count += 1;
+      window.count += uses;
       if (window.count > this.limit)
         return Math.max(1, Math.ceil((window.start + this.windowMs - now) / 1000));
     }

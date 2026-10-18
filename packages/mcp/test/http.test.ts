@@ -125,23 +125,39 @@ describe("the MCP endpoint", () => {
     expect((await mcpHandler()(mcpRequest(INITIALIZE, { token: bobKey.token }))).status).toBe(403);
   });
 
-  it("limits wrong keys per address, calls per key, and the size of a request", async () => {
-    const strict = mcpHandler({ limits: { failuresPerMinute: 3, callsPerMinute: 2, maxBodyBytes: 2_000 } });
+  it("limits wrong keys per address, without locking out a working key from the same address", async () => {
+    const strict = mcpHandler({ limits: { failuresPerMinute: 3, callsPerMinute: 50 } });
     const from = (address: string) => ({ "X-Forwarded-For": address });
+    const shared = from("203.0.113.9");
     for (let i = 0; i < 3; i += 1) {
-      expect(
-        (await strict(mcpRequest(INITIALIZE, { token: "sintr_wrong", headers: from("203.0.113.9") }))).status,
-      ).toBe(401);
+      expect((await strict(mcpRequest(INITIALIZE, { token: "sintr_wrong", headers: shared }))).status).toBe(
+        401,
+      );
     }
-    const blocked = await strict(mcpRequest(INITIALIZE, { token: key.token, headers: from("203.0.113.9") }));
+    const blocked = await strict(mcpRequest(INITIALIZE, { token: "sintr_wrong", headers: shared }));
     expect(blocked.status).toBe(429);
     expect(Number(blocked.headers.get("retry-after"))).toBeGreaterThan(0);
-    // Another address is not blocked by the first one's mistakes.
+    expect((await strict(mcpRequest(INITIALIZE, { headers: shared }))).status).toBe(429);
+    // A vendor's servers, or a proxy, send many people's keys from one address: a working one still goes on.
+    expect((await strict(mcpRequest(INITIALIZE, { token: key.token, headers: shared }))).status).toBe(200);
+    // Another address is not touched by the first one's mistakes.
     expect(
-      (await strict(mcpRequest(INITIALIZE, { token: key.token, headers: from("203.0.113.10") }))).status,
-    ).toBe(200);
-    expect((await strict(mcpRequest(INITIALIZE, { token: key.token }))).status).toBe(200);
-    expect((await strict(mcpRequest(INITIALIZE, { token: key.token }))).status).toBe(429);
+      (await strict(mcpRequest(INITIALIZE, { token: "sintr_wrong", headers: from("203.0.113.10") }))).status,
+    ).toBe(401);
+  });
+
+  it("limits calls per key, counting every message of a batch, and the size of a request", async () => {
+    const strict = mcpHandler({ limits: { callsPerMinute: 3, maxBodyBytes: 2_000 } });
+    const counted = await keyFor(alice.scope);
+    expect((await strict(mcpRequest(INITIALIZE, { token: counted.token }))).status).toBe(200);
+    const list = (id: number) => ({ jsonrpc: "2.0", id, method: "tools/list" });
+    const batch = await strict(
+      mcpRequest([list(2), list(3), list(4)], {
+        token: counted.token,
+        headers: { "mcp-protocol-version": "2025-06-18" },
+      }),
+    );
+    expect(batch.status).toBe(429);
 
     const big = { ...INITIALIZE, params: { ...INITIALIZE.params, padding: "x".repeat(3_000) } };
     const other = await keyFor(alice.scope);

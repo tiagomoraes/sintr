@@ -150,6 +150,16 @@ test("a key made with options, the address form, and only one's own keys", async
   await other.close();
 });
 
+test("a key disconnected while it is still shown disappears, and is not waited for", async ({ page }) => {
+  await signUpQuietly(page);
+  const key = await makeKey(page);
+  await page.getByRole("button", { name: "Disconnect My assistant" }).click();
+  await expect(page.getByRole("heading", { name: "Connect an assistant" })).toBeVisible();
+  await expect(page.getByText(key)).toHaveCount(0);
+  await expect(page.getByText(/^Waiting for your assistant/)).toHaveCount(0);
+  expect((await mcp(key, initialize)).status).toBe(401);
+});
+
 test("the Connect screen fits a phone, and the bridge can be downloaded", async ({ browser }) => {
   const phone = await browser.newContext({
     viewport: { width: 375, height: 812 },

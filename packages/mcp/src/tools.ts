@@ -155,10 +155,20 @@ function crisisAnswer(language: CrisisLanguage) {
   };
 }
 
-/** The crisis screen of the embedded assistant, over everything the agent asks to keep. */
-function screenAll(texts: readonly (string | undefined | null)[]) {
-  for (const text of texts) {
-    if (!text) continue;
+/** Every string in a value, however deep: each field a draft holds, so none is missed. */
+function stringsIn(value: unknown): string[] {
+  if (typeof value === "string") return [value];
+  if (Array.isArray(value)) return value.flatMap(stringsIn);
+  if (value && typeof value === "object") return Object.values(value).flatMap(stringsIn);
+  return [];
+}
+
+/**
+ * The crisis screen of the embedded assistant, over the person's words and
+ * every word of the draft, since an agent may write in any field.
+ */
+function screenAll(...values: unknown[]) {
+  for (const text of values.flatMap(stringsIn)) {
     const screening = screenForRisk(text);
     if (screening.risk) return screening;
   }
@@ -248,18 +258,7 @@ const saveEntry = define({
   input: EntryDraft.extend({ personWords: PersonWords, personConfirmed: PersonConfirmed }),
   async run(input, { scope, tokenId, appUrl, log }) {
     const { personWords, personConfirmed: _confirmed, ...draft } = input;
-    const risk = screenAll([
-      ...personWords,
-      draft.title,
-      draft.situation,
-      draft.notes,
-      draft.body,
-      draft.behavior,
-      draft.context,
-      draft.hotThought,
-      draft.alternative,
-      ...(draft.thoughts ?? []),
-    ]);
+    const risk = screenAll(personWords, draft);
     if (risk) {
       log.info("mcp.crisis", { code: `screen_${risk.kind}`, tokenId });
       return crisisAnswer(risk.language);
@@ -291,7 +290,7 @@ const saveCheckin = define({
   input: CheckinDraft.extend({ personWords: PersonWords, personConfirmed: PersonConfirmed }),
   async run(input, { scope, tokenId, appUrl, log }) {
     const { personWords, personConfirmed: _confirmed, ...draft } = input;
-    const risk = screenAll([...personWords, draft.note, draft.sleepQuality]);
+    const risk = screenAll(personWords, draft);
     if (risk) {
       log.info("mcp.crisis", { code: `screen_${risk.kind}`, tokenId });
       return crisisAnswer(risk.language);

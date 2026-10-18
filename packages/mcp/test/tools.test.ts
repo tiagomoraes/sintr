@@ -260,6 +260,19 @@ describe("the tools", () => {
     )) as SavedEntry;
     expect(checkin.crisis).toBe(true);
     expect(checkin.message).toMatch(/call CVV on 188/);
+    // Any field the agent writes is screened, those the word checks do not cover too.
+    for (const field of [
+      { evidenceFor: "she said she wants to end it all" },
+      { tags: ["self harm"] },
+      { emotions: [{ name: "vontade de me matar" }] },
+    ]) {
+      const answer = (await callTool(
+        tool("save_entry"),
+        { notes: "um dia difícil", ...field, personWords: ["um dia difícil"], personConfirmed: true },
+        context,
+      )) as SavedEntry;
+      expect(answer.crisis, JSON.stringify(field)).toBe(true);
+    }
     expect(logged.some((line) => line.includes("mcp.crisis") && line.includes("screen_self_harm"))).toBe(
       true,
     );
