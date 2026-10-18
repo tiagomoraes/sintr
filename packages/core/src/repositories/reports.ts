@@ -182,6 +182,17 @@ export function reportsRepository({ db, userId, cipher }: ScopeContext) {
       return rows.map(decode);
     },
 
+    /** The latest draft waiting for the person, without opening its words. */
+    async waiting(): Promise<{ id: string; sessionAt: Date | null; periodEnd: Date } | null> {
+      const [row] = await db
+        .select({ id: reports.id, sessionAt: reports.sessionAt, periodEnd: reports.periodEnd })
+        .from(reports)
+        .where(and(eq(reports.userId, userId), eq(reports.status, "draft")))
+        .orderBy(desc(reports.periodEnd))
+        .limit(1);
+      return row ?? null;
+    },
+
     /**
      * The person's own change to the words. The previous version is kept as
      * a dated revision; the report is a draft again, to be reviewed as it
