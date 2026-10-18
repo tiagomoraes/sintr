@@ -225,10 +225,7 @@ export const rehearsalScript: Script = (call) => {
     thoughts: [thoughtIn(later)],
     emotions: emotionsIn(later),
   };
-  return {
-    text: "Thank you. I put it together with your words.",
-    toolCalls: [{ toolName: "propose_entry", input: draft }],
-  };
+  return { toolCalls: [{ toolName: "propose_entry", input: draft }] };
 };
 
 export function rehearsalModel(): ScriptedModel {

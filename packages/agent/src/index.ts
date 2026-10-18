@@ -33,6 +33,7 @@ export {
   createLanguageModel,
   describeProviderError,
   testConnection,
+  unavailableModel,
   type BaseUrlProblem,
   type ConnectionProblem,
   type ModelOptions,

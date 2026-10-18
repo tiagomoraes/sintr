@@ -74,6 +74,8 @@ export function runCaptureTurn(turn: CaptureTurn): ReadableStream<SintrUIMessage
   const text = last?.role === "user" ? textOf(last) : "";
   const { log, person } = turn;
   const started = Date.now();
+  // A failed reply is not stored: the person's message is, and they can retry.
+  let keepReply = true;
 
   return createUIMessageStream<SintrUIMessage>({
     originalMessages: messages,
@@ -83,7 +85,7 @@ export function runCaptureTurn(turn: CaptureTurn): ReadableStream<SintrUIMessage
       return "assistant_unavailable";
     },
     onEnd: async ({ responseMessage }) => {
-      if (turn.onResponse && hasContent(responseMessage)) await turn.onResponse(responseMessage);
+      if (keepReply && turn.onResponse && hasContent(responseMessage)) await turn.onResponse(responseMessage);
     },
     execute: async ({ writer }) => {
       writer.write({ type: "start", messageId: randomUUID() });
@@ -163,7 +165,10 @@ export function runCaptureTurn(turn: CaptureTurn): ReadableStream<SintrUIMessage
           return describeProviderError(error);
         },
       }) as ReadableStream<SintrUIMessageChunk>;
-      for await (const chunk of chunks) {
+      const reader = chunks.getReader();
+      for (;;) {
+        const { done, value: chunk } = await reader.read();
+        if (done) break;
         if (chunk.type === "error") {
           failed = true;
           // In crisis mode a failure must not leave the person without the numbers.
@@ -172,10 +177,18 @@ export function runCaptureTurn(turn: CaptureTurn): ReadableStream<SintrUIMessage
         writer.write(chunk);
       }
 
-      if (signal.crisis) {
+      const withdraw = async () => {
         for (const id of proposedThisTurn) {
           await turn.ports.discardProposal(id).catch(() => undefined);
         }
+      };
+      if (failed && !inCrisis) {
+        // Drafts of a reply that is not kept would wait unseen; withdraw them.
+        keepReply = false;
+        await withdraw();
+      }
+      if (signal.crisis) {
+        await withdraw();
         log.info("agent.crisis", { code: "assistant" });
         writeCrisis(writer, "assistant", crisisLanguage(signal.crisis.language ?? person.language));
       } else if (inCrisis && failed) {

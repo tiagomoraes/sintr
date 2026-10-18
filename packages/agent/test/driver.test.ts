@@ -413,6 +413,18 @@ describe("failures and privacy", () => {
     expect(logged).not.toContain("reunião");
   });
 
+  it("keeps no half reply when the provider fails mid-turn, and withdraws its drafts", async () => {
+    const model = scriptedModel([
+      proposeEntry({ situation: SITUATION }),
+      { error: new Error("connection reset") },
+    ]);
+    const t = turn({ model, history: [user(SITUATION)], message: user(THOUGHT_TURN) });
+    const out = await t.run();
+    expect(out.types).toContain("error");
+    expect(t.responses).toEqual([]);
+    expect([...t.memory.proposals.values()].map((p) => p.status)).toEqual(["discarded"]);
+  });
+
   it("writes no words of the conversation to the logs", async () => {
     const model = scriptedModel([
       proposeEntry({ situation: SITUATION, thoughts: ["vou decepcionar todo mundo"] }),

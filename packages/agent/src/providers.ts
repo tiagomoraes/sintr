@@ -11,6 +11,7 @@
 import { createAnthropic } from "@ai-sdk/anthropic";
 import { createGoogle } from "@ai-sdk/google";
 import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
+import type { LanguageModelV4 } from "@ai-sdk/provider";
 import type { Logger, ProviderCredentials, ProviderKind } from "@sintr/core";
 import { APICallError, generateText, type LanguageModel } from "ai";
 
@@ -145,4 +146,21 @@ export async function testConnection(
     });
     return { ok: false, problem };
   }
+}
+
+/**
+ * A model that always fails. The app uses it when no provider is set yet,
+ * so a message that signals risk is still answered: the crisis screen runs
+ * before any model, and every other message gets a clear "not set up".
+ */
+export function unavailableModel(): LanguageModelV4 {
+  const fail = () => Promise.reject(new ProviderSetupError("key_required"));
+  return {
+    specificationVersion: "v4",
+    provider: "sintr-unavailable",
+    modelId: "none",
+    supportedUrls: {},
+    doGenerate: fail,
+    doStream: fail,
+  };
 }
