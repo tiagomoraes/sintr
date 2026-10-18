@@ -13,7 +13,7 @@ import { createGoogle } from "@ai-sdk/google";
 import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
 import type { LanguageModelV4 } from "@ai-sdk/provider";
 import type { Logger, ProviderCredentials, ProviderKind } from "@sintr/core";
-import { APICallError, generateText, type LanguageModel } from "ai";
+import { APICallError, RetryError, generateText, type LanguageModel } from "ai";
 
 // Warnings name settings and features, never content, but they would go to
 // process.emitWarning; the redacting logger is the only logger here.
@@ -114,6 +114,8 @@ export type ConnectionProblem =
 
 /** A provider failure as a code the person can act on. Never its message. */
 export function describeProviderError(error: unknown): ConnectionProblem {
+  // With retries on, the cause is the last attempt's error.
+  if (RetryError.isInstance(error)) return describeProviderError(error.lastError);
   const status = APICallError.isInstance(error) ? error.statusCode : undefined;
   if (status === 401 || status === 403) return "key_refused";
   if (status === 404) return "model_not_found";

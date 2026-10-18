@@ -1,4 +1,4 @@
-import { generateText } from "ai";
+import { APICallError, RetryError, generateText } from "ai";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
   ProviderSetupError,
@@ -220,6 +220,19 @@ describe("testing the connection", () => {
     );
     expect(await testConnection(model, capturedLogger().log)).toEqual({ ok: false, problem: "unreachable" });
     expect(describeProviderError(Object.assign(new Error("x"), { name: "TimeoutError" }))).toBe("timeout");
+    // A conversation retries once, so its error arrives wrapped.
+    const refused = new APICallError({
+      message: "no",
+      url: "https://llm.example.test",
+      requestBodyValues: {},
+      statusCode: 401,
+      isRetryable: false,
+    });
+    expect(
+      describeProviderError(
+        new RetryError({ message: "failed", reason: "maxRetriesExceeded", errors: [refused] }),
+      ),
+    ).toBe("key_refused");
     const { fetch } = fakeFetch({ error: { message: "model not found" } }, 404);
     const missing = createLanguageModel(
       { provider: "openai_compatible", baseUrl: "https://llm.example.test/v1", model: "nope", apiKey: "k" },
