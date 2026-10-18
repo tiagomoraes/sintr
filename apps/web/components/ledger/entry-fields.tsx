@@ -177,7 +177,11 @@ export function EntryFields({
       <Field
         label={ENTRY_LABELS.occurredAt}
         htmlFor={`${id}-when`}
-        hint="In your time zone. Leave it as it is if the time is right."
+        hint={
+          when
+            ? "In your time zone. Leave it as it is if the time is right."
+            : "Leave it empty if it was just now."
+        }
         problem={problems.occurredAt}
       >
         <input type="hidden" name="occurredAtShown" value={when} />
