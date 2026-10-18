@@ -5,6 +5,13 @@ import type { Config } from "../config";
 import type { Database } from "../db/client";
 import { accounts, sessions, users, verificationTokens } from "../db/schema";
 import { HEALTH_DATA_CONSENT_VERSION } from "../domain";
+import {
+  emailOff,
+  passwordResetEmail,
+  verificationEmail,
+  type EmailMessage,
+  type EmailTransport,
+} from "../email";
 import type { Logger } from "../log";
 import { createRepositories } from "../repositories";
 import { hashPassword, verifyPassword } from "./password";
@@ -13,32 +20,53 @@ export interface AuthOptions {
   db: Database;
   config: Config;
   logger: Logger;
+  /** Password reset and email verification are on only when email is available. */
+  email?: EmailTransport;
 }
 
 const DAY = 60 * 60 * 24;
 const EMAIL = /[^\s@"'<>]+@[^\s@"'<>]+/g;
 
 /**
- * Endpoints the product does not use yet. Email delivery (verification,
- * password reset, magic link) arrives with the email transport; until then
- * those routes are closed rather than half working. `update-user` stays
- * closed so `users.name` keeps holding nothing.
+ * Endpoints the product does not use. `update-user` stays closed so
+ * `users.name` keeps holding nothing; changing the email and the magic link
+ * are not offered yet.
  */
 export const DISABLED_AUTH_PATHS = [
   "/update-user",
   "/delete-user",
   "/change-email",
-  "/request-password-reset",
-  "/reset-password",
-  "/send-verification-email",
-  "/verify-email",
   "/sign-in/social",
   "/link-social",
 ];
 
-export function createAuth({ db, config, logger }: AuthOptions) {
+/**
+ * Password reset and email verification need email. Without a transport
+ * they are closed rather than half working (and links are never logged).
+ */
+export const EMAIL_AUTH_PATHS = [
+  "/request-password-reset",
+  "/reset-password",
+  "/reset-password/:token",
+  "/send-verification-email",
+  "/verify-email",
+];
+
+const HOUR = 60 * 60;
+
+export function createAuth({ db, config, logger, email = emailOff }: AuthOptions) {
   const repositories = createRepositories(db, config.masterKey);
   const log = logger.child({ service: "auth" });
+  // Sending is awaited but never throws back: a failed email must not tell
+  // the browser whether an address has an account. Only codes are logged.
+  const deliver = async (message: EmailMessage, kind: string) => {
+    try {
+      await email.send(message);
+      log.info("auth.email_sent", { code: kind });
+    } catch (error) {
+      log.warn("auth.email_failed", { code: kind, error });
+    }
+  };
 
   return betterAuth({
     appName: "sintr",
@@ -71,7 +99,25 @@ export function createAuth({ db, config, logger }: AuthOptions) {
       autoSignIn: true,
       revokeSessionsOnPasswordReset: true,
       password: { hash: hashPassword, verify: verifyPassword },
+      resetPasswordTokenExpiresIn: HOUR,
+      ...(email.available
+        ? {
+            sendResetPassword: async ({ user, url }: { user: { email: string }; url: string }) =>
+              deliver(passwordResetEmail({ to: user.email, url }), "password_reset"),
+          }
+        : {}),
     },
+    ...(email.available
+      ? {
+          emailVerification: {
+            sendOnSignUp: true,
+            autoSignInAfterVerification: true,
+            expiresIn: HOUR,
+            sendVerificationEmail: async ({ user, url }: { user: { email: string }; url: string }) =>
+              deliver(verificationEmail({ to: user.email, url }), "verification"),
+          },
+        }
+      : {}),
     rateLimit: {
       enabled: true,
       storage: "memory",
@@ -80,9 +126,11 @@ export function createAuth({ db, config, logger }: AuthOptions) {
       customRules: {
         "/sign-in/email": { window: 60, max: 10 },
         "/sign-up/email": { window: 600, max: 10 },
+        "/request-password-reset": { window: 600, max: 5 },
+        "/send-verification-email": { window: 600, max: 5 },
       },
     },
-    disabledPaths: DISABLED_AUTH_PATHS,
+    disabledPaths: email.available ? DISABLED_AUTH_PATHS : [...DISABLED_AUTH_PATHS, ...EMAIL_AUTH_PATHS],
     advanced: {
       cookiePrefix: "sintr",
       useSecureCookies: config.url.protocol === "https:",
