@@ -2,11 +2,15 @@
 // and place a copy where the web app serves it (/sintr-mcp.mjs), so a person
 // can download it from their own sintr. Not minified: whoever runs it can read it.
 import { copyFileSync, mkdirSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 import { build } from "esbuild";
 
+// Paths from this file, so the web app's build can run it from its own folder.
+const here = (path) => fileURLToPath(new URL(path, import.meta.url));
+
 await build({
-  entryPoints: { "sintr-mcp": "src/bin.ts" },
-  outdir: "dist",
+  entryPoints: { "sintr-mcp": here("src/bin.ts") },
+  outdir: here("dist"),
   outExtension: { ".js": ".mjs" },
   bundle: true,
   platform: "node",
@@ -25,5 +29,5 @@ await build({
   logLevel: "warning",
 });
 
-mkdirSync("../../apps/web/public", { recursive: true });
-copyFileSync("dist/sintr-mcp.mjs", "../../apps/web/public/sintr-mcp.mjs");
+mkdirSync(here("../../apps/web/public"), { recursive: true });
+copyFileSync(here("dist/sintr-mcp.mjs"), here("../../apps/web/public/sintr-mcp.mjs"));

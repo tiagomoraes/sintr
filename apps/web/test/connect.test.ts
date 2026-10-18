@@ -43,7 +43,9 @@ describe("the setup for each assistant", () => {
       'gemini mcp add -s user --transport http --header "Authorization: Bearer sintr_abcDEF123_-xyz" sintr https://diary.example.com/mcp',
     );
     // Hermes asks for the key itself and keeps it in ~/.hermes/.env, out of the command line.
-    expect(hermesCommand(endpoint)).toBe("hermes mcp add sintr --url https://diary.example.com/mcp --auth header");
+    expect(hermesCommand(endpoint)).toBe(
+      "hermes mcp add sintr --url https://diary.example.com/mcp --auth header",
+    );
     expect(hermesCommand(endpoint)).not.toContain(endpoint.key);
   });
 
@@ -68,7 +70,13 @@ describe("the setup for each assistant", () => {
 
   it("covers the five assistants, each with a check, and fills in the key or the placeholder", () => {
     const guides = clientGuides(endpoint);
-    expect(guides.map((guide) => guide.name)).toEqual(["Claude", "ChatGPT", "Gemini", "Claude Code", "Hermes"]);
+    expect(guides.map((guide) => guide.name)).toEqual([
+      "Claude",
+      "ChatGPT",
+      "Gemini",
+      "Claude Code",
+      "Hermes",
+    ]);
     for (const guide of guides) {
       expect(guide.what.length).toBeGreaterThan(10);
       expect(guide.check.length).toBeGreaterThan(10);
@@ -76,9 +84,13 @@ describe("the setup for each assistant", () => {
     }
     const snippets = (key: string) =>
       clientGuides({ ...endpoint, key }).flatMap((guide) =>
-        [...guide.steps, ...(guide.another?.steps ?? [])].flatMap((step) => (step.snippet ? [step.snippet.text] : [])),
+        [...guide.steps, ...(guide.another?.steps ?? [])].flatMap((step) =>
+          step.snippet ? [step.snippet.text] : [],
+        ),
       );
-    expect(snippets(endpoint.key).filter((text) => text.includes(endpoint.key)).length).toBeGreaterThanOrEqual(6);
+    expect(
+      snippets(endpoint.key).filter((text) => text.includes(endpoint.key)).length,
+    ).toBeGreaterThanOrEqual(6);
     expect(snippets(KEY_PLACEHOLDER).join("\n")).not.toContain("sintr_abc");
     // The services that call from their own servers get the address that carries the key.
     const web = guides.filter((guide) => guide.fromTheirServers).map((guide) => guide.id);
