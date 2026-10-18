@@ -6,7 +6,7 @@ sintr runs on your own machine as four containers behind one command: Caddy (the
 
 - Docker with Compose v2 (`docker compose version`)
 - `make` and a POSIX shell (Linux, macOS, or WSL on Windows)
-- about 1 GB of disk for the image and the database
+- about 1.5 GB of disk for the image (it includes Chromium, to print reports) and the database
 
 Node is not needed to self-host; it is only needed for development.
 
@@ -60,6 +60,40 @@ sintr's assistant talks to a model you choose, with your own key. In Settings:
 
 The key is encrypted with your data key before it is stored and is never shown again. What the provider receives is described in [`PRIVACY.md`](PRIVACY.md). Conversations are kept until you delete them, unless you choose a retention in Settings; the worker removes older ones every hour.
 
+## Email
+
+Email is optional. Without it, sintr works the same except that nothing is ever emailed: you download a report's PDF and share it yourself, a forgotten password cannot be reset, and Settings says so. With it, sintr sends four kinds of message, and nothing else:
+
+- an approved report, as a PDF attachment, to your therapist, when you say "send" for that report;
+- a short note to you that a report is ready, if you ask for it in Therapy (a link, never the report's words);
+- a link to set a new password, when you ask for one;
+- a link to confirm your address, when you create your account or ask again in Settings.
+
+Any provider that speaks SMTP works: your mail host, Fastmail, Gmail with an app password, Postmark, Amazon SES, a relay on your network. In `.env`:
+
+```bash
+SINTR_SMTP_HOST=smtp.example.com
+SINTR_SMTP_PORT=587               # 587 with starttls (the default), or 465 with tls
+SINTR_SMTP_SECURITY=starttls      # starttls, tls, or none for a relay on the same machine or network
+SINTR_SMTP_USER=diary@example.com
+SINTR_SMTP_PASSWORD=the-password-or-app-password
+SINTR_EMAIL_FROM="sintr <diary@example.com>"
+```
+
+Then run `make selfhost-up` again. The sender must be an address your provider lets you send from, or messages will be refused or land in spam. Links in the messages point at `SINTR_URL`, so set it to the address you open sintr at.
+
+To check it: in Settings, under Your email, send yourself the confirmation link. A failure is logged as `auth.email_failed` (or `report.send_failed` for a report) with a code, never with the address or the link; the server's own words are not logged either, because they can repeat the address. The usual causes are a wrong password, port 587 blocked by the network, or a sender the provider does not accept.
+
+What email means for privacy: a report you send leaves sintr's encryption. Your SMTP provider and your therapist's mailbox can read the PDF, as with any email attachment. That is why each send is your explicit yes for that one report and that one address, recorded with the date. See [`PRIVACY.md`](PRIVACY.md).
+
+## The weekly report
+
+Set your sessions in Therapy: the day and time, your time zone, and when to prepare the report (an hour before, by default). The worker checks every minute and prepares each report at that moment, covering exactly the days since the previous report ended. If a session moves for one week, give its date under "Has a session moved?"; if your sessions move for good, change the day. The preparation follows either way. You can also prepare a report by hand from Reports at any time.
+
+The report is written by your assistant (the provider in Settings), which receives the period's entries and check-ins to do it. Without an assistant, sintr prepares what it can on its own (your moments, notes and topics, in your words) and leaves the prose to you. You read it, change what you want, approve it, and only then can you send it.
+
+The PDF is printed inside the app container by Chromium (installed in the image), from a page that loads nothing from the network and runs no script. Nothing to configure.
+
 ## The keys, and backups
 
 `.env` holds two secrets that matter:
@@ -105,15 +139,19 @@ Logs are JSON lines with event names, ids, counts and error codes. They never co
 
 **Signing in fails with a 403.** The address in the browser must match `SINTR_URL` exactly (scheme, host and port); requests from any other origin are refused.
 
-**The app container is not healthy.** `docker compose -f docker/compose.yaml --env-file .env logs app` shows why. A message about `invalid configuration` names the variable to fix.
+**The app container is not healthy.** `docker compose -f docker/compose.yaml --env-file .env logs app` shows why. A message about `invalid configuration` names the variable to fix (for email, `SINTR_EMAIL_FROM` is required as soon as `SINTR_SMTP_HOST` is set).
+
+**"The PDF could not be printed just now".** The app logs `api.report_pdf_failed` or answers `pdf_unavailable`. Inside the stack, Chromium comes with the image; on a host with very little memory it can fail to start, so give the machine at least 1 GB.
+
+**No report was prepared before a session.** Check that Therapy shows "The next report will be prepared on ...", that the time zone is yours, and that the worker is running (`logs worker` shows `job.done` for `prepare-reports` every minute). A report is never prepared for a session that already started.
 
 ## What runs where
 
 | Service | Image | Role |
 | --- | --- | --- |
 | `caddy` | `caddy:2-alpine` | the edge: HTTP or automatic HTTPS, compression, reverse proxy to the app |
-| `app` | `sintr-app:local` | the Next.js app (UI, API, auth) on port 3000, inside the network only |
-| `worker` | `sintr-app:local` | background jobs: removes expired sessions, and conversations past their retention, every hour |
+| `app` | `sintr-app:local` | the Next.js app (UI, API, auth) on port 3000, inside the network only; prints report PDFs with the Chromium in the image and sends approved reports |
+| `worker` | `sintr-app:local` | background jobs: prepares each report before its session (checked every minute), sends the "report ready" note, removes expired sessions and conversations past their retention (hourly) |
 | `migrate` | `sintr-app:local` | applies migrations, then exits |
 | `db` | `postgres:16-alpine` | the database, on the `pgdata` volume |
 

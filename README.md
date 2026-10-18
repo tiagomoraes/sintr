@@ -15,7 +15,7 @@ There is no filesystem dependency: the ledger lives in Postgres, encrypted per p
 
 ## Where it is today
 
-Milestones **F0, the foundation**, and **F1, capture** (see [`docs/PRODUCT.md`](docs/PRODUCT.md) for the milestones). What works:
+Milestones **F0, the foundation**, **F1, capture**, and **F2, the weekly report** (see [`docs/PRODUCT.md`](docs/PRODUCT.md) for the milestones). What works:
 
 - sign up (email, password and the health data consent) and sign in, with Argon2id passwords and sliding sessions;
 - **talking to the assistant inside sintr**: tell it what happened, it acknowledges, asks a question or two and drafts a thought record in your own words, which you confirm, edit or discard. Nothing becomes an entry until you say so (the Confirm button, or "salva");
@@ -23,11 +23,15 @@ Milestones **F0, the foundation**, and **F1, capture** (see [`docs/PRODUCT.md`](
 - **the crisis protocol**: a message that signals acute risk stops the diary and points to human help (CVV 188, SAMU 192), before any model is called;
 - **quick check-ins** (mood, energy, anxiety, sleep, a note) without the conversation;
 - **the timeline** of entries and check-ins, with a detail view; changing a saved record keeps a dated correction with what it said before;
+- **your therapy**: the day and time of your sessions in your time zone, a one-off date when a session moves, your therapist's name and email, and whether an approved report is sent or kept for you;
+- **the weekly report**: prepared an hour (or the lead you choose) before each session, covering exactly the days since the last one. It has the six sections of the pack's guide (how the week went, what to bring to the session, mood, energy and sleep with a chart of the last weeks, the moments that stood out, what repeated, what helped), written by your assistant in your language, with your own words quoted exactly as recorded and checked against your diary;
+- **read, change, approve, send**: you read the report as a page, change its words, preview the PDF, and approve it; a second, explicit yes sends that PDF to your therapist by email, recorded with the date and the address. Nothing is ever sent on its own, and the PDFs of past reports stay available;
+- **email** (optional, any SMTP server): the approved report to your therapist, a "report ready" note to you if you ask for it, password reset and email confirmation;
 - settings for the assistant, your time zone and how long conversations are kept;
 - the full data model in Postgres, every sensitive field encrypted before it is stored, and tests that prove one person cannot read another's data;
 - the self-host stack (Caddy, app, worker, Postgres) behind one command.
 
-Not yet: the weekly report and its approved send (F2), the MCP server (F3), the hosted offer (F4), export, deletion and the audit view in the UI (F5). `packages/mcp` holds its typed contract only.
+Not yet: the MCP server (F3), the hosted offer (F4), export, deletion and the audit view in the UI (F5). `packages/mcp` holds its typed contract only.
 
 ## Self-host
 
@@ -39,7 +43,7 @@ cd sintr-app
 make selfhost-up
 ```
 
-The first run writes `.env` with fresh secrets, builds the image and starts the stack. Open `http://localhost:3000`, create your account, and choose your assistant's provider and key in Settings. `make selfhost-down` stops it and keeps your data.
+The first run writes `.env` with fresh secrets, builds the image and starts the stack. Open `http://localhost:3000`, create your account, and choose your assistant's provider and key in Settings. To send reports by email, fill in the `SINTR_SMTP_*` lines of `.env` and run `make selfhost-up` again. `make selfhost-down` stops it and keeps your data.
 
 Back up `SINTR_MASTER_KEY` from `.env` somewhere other than the database backup: without it nothing can be read, and with it next to the database the encryption protects nothing. [`docs/SELFHOST.md`](docs/SELFHOST.md) covers a public domain with TLS, closing sign-up, backups and upgrades.
 
@@ -56,27 +60,32 @@ make typecheck    # TypeScript, strict, in every package
 make build        # production builds of the web app and the worker
 make migrate      # apply migrations to the dev database
 make db-generate  # write a new SQL migration after a schema change (NAME=...)
+make report-assets # re-embed the report's fonts and light after changing them
 make help         # everything else
 ```
 
 The app serves `http://localhost:3000`. Each checkout gets its own dev database container on `127.0.0.1`, at the port in `SINTR_DEV_DB_PORT`, so worktrees do not share data.
 
-The assistant talks to the provider saved in Settings. To try the app without a key, set `SINTR_FAKE_AGENT=1` in `.env` and run `make dev`: replies then come from a scripted, offline assistant, and the page says so. `make test` always runs that way; no test reaches a real model.
+The assistant talks to the provider saved in Settings. To try the app without a key, set `SINTR_FAKE_AGENT=1` in `.env` and run `make dev`: replies (and reports) then come from a scripted, offline assistant, and the page says so. `make test` always runs that way; no test reaches a real model or a mail server: email goes to an in-memory transport or an outbox directory, and the report PDF is printed by the Chromium that `make setup` installs.
 
 ## Repository
 
 ```
 apps/
   web/        Next.js 15 (App Router): UI, API and auth routes
-  worker/     background jobs (expired auth records, conversation retention);
-              also the migration runner
+  worker/     background jobs: the report before each session (every minute,
+              from each person's schedule), expired auth records,
+              conversation retention; also the migration runner
 packages/
   core/       domain (Zod), Postgres schema and migrations (Drizzle), envelope
-              encryption, user-scoped repositories, Better Auth, the redacting logger
+              encryption, user-scoped repositories, Better Auth, the redacting
+              logger, the report (periods, digest, checks, the document and its
+              PDF), the email transport
   ui/         the sintr design system: tokens, fonts, shadcn/ui components
-  agent/      the embedded assistant: the capture conversation (Vercel AI SDK),
-              bring-your-own-key providers, the crisis protocol, the checks
-              that keep drafts in the person's words, an offline test model
+  agent/      the embedded assistant: the capture conversation and the report
+              writer (Vercel AI SDK), bring-your-own-key providers, the crisis
+              protocol, the checks that keep drafts in the person's words, an
+              offline test model
   mcp/        the MCP contract (interfaces only)
 docker/       the self-host stack (compose, Caddy) and the dev database
 docs/         product, conventions, design, self-host, privacy, decisions

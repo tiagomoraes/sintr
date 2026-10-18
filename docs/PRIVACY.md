@@ -1,6 +1,6 @@
 # Privacy and data protection
 
-This describes what sintr does with personal data **as implemented today** (milestones F0 and F1), so it can be checked against the code. Where something is planned but not built, it says so. The product rules behind it are in [`PRODUCT.md`](PRODUCT.md) (Security and privacy, Invariants) and [`CONVENTIONS.md`](CONVENTIONS.md) (Non-negotiable rules).
+This describes what sintr does with personal data **as implemented today** (milestones F0, F1 and F2), so it can be checked against the code. Where something is planned but not built, it says so. The product rules behind it are in [`PRODUCT.md`](PRODUCT.md) (Security and privacy, Invariants) and [`CONVENTIONS.md`](CONVENTIONS.md) (Non-negotiable rules).
 
 A diary kept in sintr is sensitive personal data: health data under LGPD art. 11. The posture is built around four ideas: the person's specific consent, encryption by the application before anything is stored, strict separation between people, and nothing sent anywhere without approval.
 
@@ -9,7 +9,7 @@ A diary kept in sintr is sensitive personal data: health data under LGPD art. 11
 - An account cannot be created without the consent to process health data. The sign-up form asks for it in plain words, and the server refuses a sign-up without it (`CONSENT_REQUIRED`), whatever the client sends.
 - The consent is recorded in `consents` with its purpose (`health_data_processing`), the version of the wording, and the time. The log is append-only: a withdrawal is a new row with `granted = false`, never an edit.
 - When the wording changes, its version (`HEALTH_DATA_CONSENT_VERSION` in `packages/core`) changes too, and every person is asked again before the diary opens.
-- Sending a report to a therapist needs a separate, per-report consent (`report_send`) that names the report and the recipient. The repository refuses to mark a report sent without one, and so does the database: a check constraint rejects `status = 'sent'` without a consent, and a composite key rejects a consent that belongs to another person. The send itself arrives in F2; the guard is already in place.
+- Sending a report to a therapist needs a separate, per-report consent (`report_send`, versioned by `REPORT_SEND_CONSENT_VERSION`) that names the report and the recipient. It is given by an explicit "Approve and send" on that report, after the person approved its words, and the browser must send back the address the person was shown: if the settings changed in between, nothing is sent. The consent and an audit event are recorded before the email leaves; the report is marked sent, with the recipient and the time, only after the mail server accepted it. The repository refuses to mark a report sent without the consent, and so does the database: a check constraint rejects `status = 'sent'` without one, and a composite key rejects a consent that belongs to another person. Nothing is ever sent by the scheduler, and approval before sending cannot be turned off.
 
 ## Encryption at the application layer
 
@@ -20,19 +20,20 @@ A diary kept in sintr is sensitive personal data: health data under LGPD art. 11
 | Table | Sealed |
 | --- | --- |
 | `profiles` | display name |
-| `therapy_settings` | therapist name, therapist contact |
+| `therapy_settings` | therapist name, therapist email |
 | `entries` | title, situation, thoughts, emotions, body, behaviour, context, tags, notes, hot thought, evidence for and against, alternative thought, emotions after |
 | `checkins` | sleep quality, note |
 | `therapy_notes` | body |
 | `insights` | body |
-| `reports` | content, PDF, recipient |
+| `reports` | content (the report's words, including the copied moments), PDF, recipient |
+| `report_revisions` | what a report said before each change |
 | `consents` | recipient |
 | `conversations`, `messages` | title, message content |
 | `proposals` | the draft the assistant prepared (every field of it) |
 | `corrections` | what a changed field held before, the person's note |
 | `agent_settings` | the API key of the person's assistant provider |
 
-**Kept in the clear, on purpose,** so they can be counted and charted without decrypting anything: dates and times, the 0 to 100 intensities and the 0 to 5 check-in scales, sleep hours, statuses and kinds, ids. Also the names of the fields a correction changed (never their values), and which provider, address and model a person's assistant uses. Also in the clear: the email address (needed to sign in), session metadata (IP address and browser, which Better Auth stores for each session), API token labels and scopes, and audit events, which hold no content.
+**Kept in the clear, on purpose,** so they can be counted and charted without decrypting anything: dates and times, the 0 to 100 intensities and the 0 to 5 check-in scales, sleep hours, statuses and kinds, ids. Also the therapy schedule (session day and time, a moved session's date, the report lead, the delivery choice), which the worker reads for everyone to know when a report is due, and the names of the sections a report revision changed (never their words). Also the names of the fields a correction changed (never their values), and which provider, address and model a person's assistant uses. Also in the clear: the email address (needed to sign in), session metadata (IP address and browser, which Better Auth stores for each session), API token labels and scopes, and audit events, which hold no content.
 
 **What a database dump reveals.** Account emails, dates, scales and the shape of the data; none of the words. A test writes recognisable text into every sealed column and then scans a text dump of every table for it, in clear and as hex; it finds nothing. The test was also run with sealing removed, and it fails, as it should.
 
@@ -72,7 +73,22 @@ The embedded assistant talks to a language model **the person chooses, with thei
 - **What the provider receives:** the messages of the current conversation (the last 40) and, when the assistant asks for it, a summary of the last seven days: dates, entry titles (or the first 120 characters of the situation), emotions with their intensities, and check-in scales. Nothing else from the diary. What the provider does with it is governed by that provider's terms; a model on the person's own machine keeps it there.
 - **Nothing the assistant drafts is a record** until the person confirms it, on screen or by telling it to save. Drafts are stored sealed and go away with their conversation.
 - **A message that signals acute risk** stops the diary before anything is sent to the provider: the reply that points to CVV 188 and SAMU 192 is written in advance, and works even without a provider.
-- No other personal data leaves the installation in F1: there is no email and no analytics. The hosted offer will use zero-data-retention routes; this document will say which.
+- **For the weekly report** (F2), the assistant receives the digest of the period: every entry of the period in full (title, situation, thoughts, emotions with intensities, body, behaviour, context, tags, notes and the working of a thought), the check-in values and notes of those days, the averages, and the person's open "things to bring up" and tasks. That is what it needs to write the report; nothing outside the period, and nothing else from the diary. What it writes is checked before it is kept (quotes against the diary, no causes, no clinical labels), and a report is never sent by it. Without a provider, sintr prepares the parts it can alone and sends nothing to any model.
+- The hosted offer will use zero-data-retention routes; this document will say which.
+
+## Email
+
+Email is off unless the operator configures an SMTP server (`SINTR_SMTP_*`). When it is on, sintr sends four kinds of message and nothing else:
+
+- **the approved report to the therapist**: the PDF the person approved, as an attachment, with a subject and two sentences that name the person (their display name, if they set one) and the session's date. This is the only message that carries diary content, and only after the per-report consent above;
+- **a "report ready" note to the person**: a link to the report and a sentence, never its words; sent only if the person asked for it in Therapy, and only to an address they confirmed;
+- **a link to set a new password**, and **a link to confirm the address**, valid for an hour.
+
+What this means: email is not end-to-end encrypted. The SMTP provider the operator chose, and the therapist's mailbox provider, can read a sent report's PDF, and both see the addresses and the subject. The connection to the SMTP server uses TLS unless the operator chose a plain relay on their own network (refused in saas mode). The therapist's address is stored sealed (in `therapy_settings`, the consent and the report); it never appears in the audit log or the logs. Email addresses, links and tokens never reach the logs; a failed send is logged as a code, and the mail server's own words are dropped because they can repeat an address.
+
+## The PDF
+
+A report's PDF is printed inside the app by headless Chromium from a page sintr builds itself: every font and image is inline, JavaScript is off and every network request is refused, so printing reaches nothing outside. A draft's PDF is printed on demand from its current words and is marked as a draft; when the person approves the report, the final PDF is printed once and stored sealed, and that stored file is exactly what is sent and what stays available afterwards. A quoted span gets the peach highlighter ("the person's exact words") only when sintr found it in the diary word for word.
 
 ## Retention, export and deletion
 
@@ -80,6 +96,7 @@ The embedded assistant talks to a language model **the person chooses, with thei
 - Deleting an account removes every row the person owns, in every table, by cascade (tested in `packages/core`). There is no button for it in the app yet.
 - **Conversations** are kept until the person deletes them, unless they choose in Settings to keep them 30, 90 or 365 days after the last message; the worker then removes older ones every hour, with their messages and drafts. A conversation can also be deleted from its page. Entries and check-ins saved from a conversation are records of their own and stay.
 - **Corrections** of an entry or check-in keep what the changed fields held before, dated, so nothing is rewritten silently. They are removed with the record.
+- **Reports** are kept until the person's account is deleted, with their revisions (what each said before a change) and, once approved, their PDF. A sent report cannot change. Deleting a single report from the UI arrives with F5.
 - Export (JSON and Markdown), deleting entries and the account from the UI, and the audit view arrive in F5. Until then, a self-host operator can run them directly; on the hosted offer they will exist before it opens.
 
 ## Known gaps
@@ -87,7 +104,10 @@ The embedded assistant talks to a language model **the person chooses, with thei
 Recorded here so they are not mistaken for features:
 
 - Better Auth 1.7 refreshes a session's expiry but does not rotate its token in place; a new token is issued at each sign-in.
-- Without email delivery (it arrives with F2), there is no email verification, password reset or magic link, and sign-up still tells you when an email is already registered.
+- Without an SMTP server configured, there is no email confirmation or password reset. With one, they work, but sign-up still tells you when an email is already registered (closing that needs required confirmation, left for F4), and there is no magic link.
+- Email is not end-to-end encrypted (see Email above).
+- Chromium prints PDFs without its own sandbox, as an unprivileged container requires; the page it prints is sintr's own escaped HTML, offline and without script.
+- Entries cannot be marked as "not for the report" yet (the pack's `share: no`); the person removes a moment from a report instead.
 - The app connects to Postgres as the database owner; a least-privilege role is part of F4 hardening.
 - Session IP addresses and user agents are kept for the life of the session.
 - No MFA yet (F5).
