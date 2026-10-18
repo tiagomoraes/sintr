@@ -19,7 +19,7 @@ COMPOSE := docker compose -f docker/compose.yaml $(if $(SINTR_DOCKER_SUBNET),-f 
 # CI passes --with-deps to also install the browser's system libraries.
 PLAYWRIGHT_INSTALL_FLAGS ?=
 
-.PHONY: help setup dev test lint typecheck build migrate db-generate report-assets selfhost-up selfhost-down db-up db-down
+.PHONY: help setup dev test lint typecheck build migrate db-generate report-assets mcp-bridge selfhost-up selfhost-down db-up db-down
 
 help: ## List the targets
 	@grep -hE '^[a-z-]+:.*## ' Makefile | awk -F ':.*## ' '{printf "  make %-14s %s\n", $$1, $$2}'
@@ -48,12 +48,16 @@ db-generate: ## Write a new SQL migration after a schema change (name it with NA
 report-assets: ## Re-embed the report's fonts and light after changing them (LIGHT=1 renders the light again)
 	node scripts/report-assets.mjs $(if $(LIGHT),--light)
 
-dev: migrate ## Run the web app and the worker against the development database
+mcp-bridge: ## Build the stdio bridge for local MCP clients (packages/mcp/dist/sintr-mcp.mjs)
+	$(PNPM) --filter @sintr/mcp build
+
+dev: migrate mcp-bridge ## Run the web app and the worker against the development database
 	$(PNPM) --parallel --filter @sintr/web --filter @sintr/worker dev
 
 test: db-up ## Unit, integration and end-to-end tests (real Postgres, offline assistant)
 	$(PNPM) --filter @sintr/core test
 	$(PNPM) --filter @sintr/agent test
+	$(PNPM) --filter @sintr/mcp test
 	$(PNPM) --filter @sintr/worker test
 	$(PNPM) --filter @sintr/web test
 

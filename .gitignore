@@ -53,3 +53,6 @@ next-env.d.ts
 
 # Worker bundles
 apps/worker/dist/
+
+# The stdio bridge, bundled by make build (packages/mcp/build.mjs) and served by the app
+apps/web/public/sintr-mcp.mjs
