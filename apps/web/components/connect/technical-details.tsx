@@ -5,7 +5,7 @@ import type { ReactNode } from "react";
 import { bridgeUrl, mcpUrl } from "@/lib/connect";
 import { Snippet } from "./copy-button";
 
-const DOCS = "https://github.com/tiagomoraes/sintr-app/blob/main/docs/MCP.md";
+const DOCS = "https://github.com/tiagomoraes/sintr/blob/main/docs/MCP.md";
 
 function Row({ term, children }: { term: string; children: ReactNode }) {
   return (

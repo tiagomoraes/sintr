@@ -98,8 +98,12 @@ export function ConnectFlow({
   const hydrated = useHydrated();
   const [state, action, pending] = useActionState(make, { key: null, problem: null });
   const [hiddenId, setHiddenId] = useState<string | null>(null);
-  const made = state.key && state.key.id !== hiddenId ? state.key : null;
-  const status = made ? keys.find((key) => key.id === made.id) : undefined;
+  const [listedId, setListedId] = useState<string | null>(null);
+  const fresh = state.key && state.key.id !== hiddenId ? state.key : null;
+  const status = fresh ? keys.find((key) => key.id === fresh.id) : undefined;
+  if (fresh && status && listedId !== fresh.id) setListedId(fresh.id);
+  // Listed once and gone now: it was disconnected, so it is not shown or waited for any more.
+  const made = fresh && !(listedId === fresh.id && !status) ? fresh : null;
   useRefreshWhile(Boolean(made && !status?.used));
 
   return (
@@ -109,32 +113,10 @@ export function ConnectFlow({
         <h2 id="connect-title" className="font-serif text-title-small font-normal text-ink">
           {made ? "Your new key" : keys.length ? "Connect another assistant" : "Connect an assistant"}
         </h2>
-        {made ? null : (
-          <ol className="mt-6 grid gap-5 sm:grid-cols-3">
-            {HOW.map((step, index) => (
-              <li
-                key={step.title}
-                className="grid grid-cols-[1.75rem_minmax(0,1fr)] gap-x-2 border-t border-ink pt-4 sm:block"
-              >
-                <span
-                  aria-hidden="true"
-                  className="font-serif text-[1.375rem] font-light leading-[1.2] text-ink-soft sm:text-[1.75rem] sm:leading-none"
-                >
-                  {index + 1}
-                </span>
-                <div>
-                  <p className="font-serif text-[1.125rem] text-ink sm:mt-2">{step.title}</p>
-                  <p className="mt-1 text-[0.9375rem] text-ink-2 sm:mt-1.5">{step.text}</p>
-                </div>
-              </li>
-            ))}
-          </ol>
-        )}
-
         {made ? (
           <KeyPanel made={made} status={status} onDone={() => setHiddenId(made.id)} />
         ) : (
-          <form onSubmit={submitWith(action)} className="mt-8" aria-label="Make a key">
+          <form onSubmit={submitWith(action)} className="mt-6" aria-label="Make a key">
             <Button type="submit" disabled={!hydrated || pending}>
               {pending ? "Making your key" : "Make a key"}
             </Button>
@@ -187,6 +169,27 @@ export function ConnectFlow({
               </div>
             </details>
           </form>
+        )}
+        {made ? null : (
+          <ol className="mt-10 grid gap-5 sm:grid-cols-3" aria-label="How it works">
+            {HOW.map((step, index) => (
+              <li
+                key={step.title}
+                className="grid grid-cols-[1.75rem_minmax(0,1fr)] gap-x-2 border-t border-ink pt-4 sm:block"
+              >
+                <span
+                  aria-hidden="true"
+                  className="font-serif text-[1.375rem] font-light leading-[1.2] text-ink-soft sm:text-[1.75rem] sm:leading-none"
+                >
+                  {index + 1}
+                </span>
+                <div>
+                  <p className="font-serif text-[1.125rem] text-ink sm:mt-2">{step.title}</p>
+                  <p className="mt-1 text-[0.9375rem] text-ink-2 sm:mt-1.5">{step.text}</p>
+                </div>
+              </li>
+            ))}
+          </ol>
         )}
       </section>
 
