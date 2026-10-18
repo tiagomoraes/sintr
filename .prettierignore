@@ -1,0 +1,10 @@
+pnpm-lock.yaml
+**/drizzle/meta/
+**/.next/
+**/dist/
+**/next-env.d.ts
+playwright-report/
+test-results/
+LICENSE
+# Prose is reviewed by hand; scripts/check-copy.mjs enforces the copy rules.
+*.md
