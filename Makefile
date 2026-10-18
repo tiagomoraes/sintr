@@ -48,8 +48,9 @@ db-generate: ## Write a new SQL migration after a schema change (name it with NA
 dev: migrate ## Run the web app and the worker against the development database
 	$(PNPM) --parallel --filter @sintr/web --filter @sintr/worker dev
 
-test: db-up ## Unit, integration and end-to-end tests (real Postgres)
+test: db-up ## Unit, integration and end-to-end tests (real Postgres, offline assistant)
 	$(PNPM) --filter @sintr/core test
+	$(PNPM) --filter @sintr/agent test
 	$(PNPM) --filter @sintr/worker test
 	$(PNPM) --filter @sintr/web test
 

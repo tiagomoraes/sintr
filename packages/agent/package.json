@@ -4,12 +4,25 @@
   "private": true,
   "type": "module",
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./shapes": "./src/shapes.ts",
+    "./testing": "./src/testing.ts"
   },
   "scripts": {
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
   },
   "dependencies": {
-    "@sintr/core": "workspace:*"
+    "@ai-sdk/anthropic": "4.0.82",
+    "@ai-sdk/google": "4.0.99",
+    "@ai-sdk/openai-compatible": "3.0.71",
+    "@ai-sdk/provider": "4.0.29",
+    "@sintr/core": "workspace:*",
+    "ai": "7.0.143",
+    "zod": "4.6.7"
+  },
+  "devDependencies": {
+    "vite": "8.3.4",
+    "vitest": "5.0.5"
   }
 }
