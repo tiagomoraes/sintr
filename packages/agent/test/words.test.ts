@@ -43,6 +43,10 @@ describe("stated numbers", () => {
     expect(wasStated(["foi muito forte"], 80)).toBe(false);
     expect(wasStated(["uns 180"], 80)).toBe(false);
     expect(wasStated(["dormi 6 horas"], 6.5)).toBe(false);
+    // Articles and ordinary words are not numbers.
+    expect(wasStated(["tive uma reunião com um cliente"], 1)).toBe(false);
+    expect(wasStated(["a reunião dos chefes"], 2)).toBe(false);
+    expect(wasStated(["it happened once, with one colleague"], 1)).toBe(false);
   });
 });
 
@@ -65,6 +69,8 @@ describe("isSaveCommand", () => {
     "ok",
     "sim",
     "acho que sim",
+    "salva?",
+    "confirma?",
     "save the first one and drop the second",
     "",
   ])("does not take %j as a yes", (text) => expect(isSaveCommand(text)).toBe(false));

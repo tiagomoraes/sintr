@@ -16,6 +16,10 @@ describe("the crisis screen", () => {
     ["I've been cutting myself again", "en"],
     ["everyone would be better off without me", "en"],
     ["quiero morir", "es"],
+    ["I don\u2019t want to live anymore", "en"],
+    ["I can\u2019t go on living", "en"],
+    ["estou morrendo de vontade de me matar", "pt"],
+    ["se ele for embora eu me mato", "pt"],
     ["pienso en quitarme la vida", "es"],
   ] as const)("stops the diary for %j (%s)", (text, language) => {
     expect(screenForRisk(text)).toEqual({ risk: true, kind: "self_harm", language });
@@ -24,6 +28,7 @@ describe("the crisis screen", () => {
   it.each([
     ["vou matar ele quando chegar em casa", "pt"],
     ["I'm going to kill him tonight", "en"],
+    ["I\u2019m going to kill him tonight", "en"],
     ["voy a matarlo", "es"],
   ] as const)("stops the diary for stated intent to harm someone: %j", (text, language) => {
     expect(screenForRisk(text)).toEqual({ risk: true, kind: "violence", language });
@@ -44,6 +49,8 @@ describe("the crisis screen", () => {
     "I hurt myself at the gym",
     "I was so angry I wanted to kill him",
     "estoy muerta de cansancio",
+    "eu me mato de trabalhar e ninguém vê",
+    "morrendo de vontade de comer pizza",
   ])("keeps listening to %j (an idiom or something to record)", (text) => {
     expect(screenForRisk(text)).toEqual({ risk: false });
   });

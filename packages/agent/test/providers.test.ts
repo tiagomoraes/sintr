@@ -149,6 +149,8 @@ describe("where a base URL may point", () => {
     "https://[::1]/v1",
     "https://gateway.internal/v1",
     "https://8.8.8.8/v1",
+    "https://localhost./v1",
+    "https://metadata.google.internal./computeMetadata",
   ])("is refused in SaaS mode when it is not https to a public name: %s", (url) => {
     expect(checkBaseUrl(url, "saas").ok).toBe(false);
   });
@@ -158,6 +160,28 @@ describe("where a base URL may point", () => {
       ok: true,
       url: "https://openrouter.ai/api/v1",
     });
+  });
+});
+
+describe("redirects", () => {
+  it("are refused in SaaS mode, so a public host cannot bounce a call inside", async () => {
+    const seen: RequestInit["redirect"][] = [];
+    const fetch = (async (_input: string | URL | Request, init?: RequestInit) => {
+      seen.push(init?.redirect);
+      return new Response(JSON.stringify(OPENAI_REPLY), { headers: { "content-type": "application/json" } });
+    }) as typeof globalThis.fetch;
+    const credentials = {
+      provider: "openai_compatible" as const,
+      baseUrl: "https://llm.example.test/v1",
+      model: "m",
+      apiKey: "k",
+    };
+    await generateText({ model: createLanguageModel(credentials, { mode: "saas", fetch }), prompt: "hi" });
+    await generateText({
+      model: createLanguageModel(credentials, { mode: "selfhost", fetch }),
+      prompt: "hi",
+    });
+    expect(seen).toEqual(["error", undefined]);
   });
 });
 

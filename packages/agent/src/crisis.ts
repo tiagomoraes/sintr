@@ -23,21 +23,35 @@ interface Pattern {
 
 /** Lower case, no accents, single spaces: "Não aguento" becomes "nao aguento". */
 function fold(text: string): string {
-  return text
-    .normalize("NFD")
-    .replace(/\p{M}+/gu, "")
-    .toLowerCase()
-    .replace(/[^\p{L}\p{N}' ]+/gu, " ")
-    .replace(/\s+/gu, " ")
-    .trim();
+  return (
+    text
+      .normalize("NFD")
+      .replace(/\p{M}+/gu, "")
+      // Phones type the curly apostrophe: "don\u2019t" must read as "don't".
+      .replace(/[\u2018\u2019\u02BC\u0060\u00B4]/gu, "'")
+      .toLowerCase()
+      .replace(/[^\p{L}\p{N}' ]+/gu, " ")
+      .replace(/\s+/gu, " ")
+      .trim()
+  );
 }
 
-/** Figures of speech that mention dying without meaning it. */
-const IDIOMS: RegExp[] = [
-  /\bmorr\w* de (?:vergonha|rir|riso|raiva|medo|sono|fome|frio|calor|tedio|saudade|inveja|cansaco|amor|ciume|preguica|curiosidade|vontade|ansiedade|nervoso)\b/gu,
-  /\bmorir(?:me)? de (?:verguenza|risa|miedo|sueno|hambre|frio|calor|aburrimiento|envidia|ganas|amor)\b/gu,
-  /\bdie of (?:embarrassment|shame|boredom|laughter|laughing|curiosity|envy)\b/gu,
-  /\bdying (?:to|of)\b/gu,
+/**
+ * Figures of speech that mention dying without meaning it. Only the figure
+ * is removed, never what follows it: "morrendo de vontade de me matar"
+ * becomes "vontade de me matar", which still stops the diary.
+ */
+const IDIOMS: [RegExp, string][] = [
+  [
+    /\bmorr\w* de (vergonha|rir|riso|raiva|medo|sono|fome|frio|calor|tedio|saudade|inveja|cansaco|amor|ciume|preguica|curiosidade|vontade|ansiedade|nervoso)\b/gu,
+    "$1",
+  ],
+  [
+    /\bmorir(?:me)? de (verguenza|risa|miedo|sueno|hambre|frio|calor|aburrimiento|envidia|ganas|amor)\b/gu,
+    "$1",
+  ],
+  [/\bdie of (embarrassment|shame|boredom|laughter|laughing|curiosity|envy)\b/gu, "$1"],
+  [/\bdying (to|of)\b/gu, "$1"],
 ];
 
 const P = (kind: RiskKind, language: CrisisLanguage, source: string): Pattern => ({
@@ -55,6 +69,8 @@ const PATTERNS: Pattern[] = [
     [
       "(?:quero|queria|tenho vontade de|vontade de|penso em|pensando em|pensei em) (?:me )?morrer",
       "(?:quero|queria|vou|vontade de|penso em|pensando em|pensei em|tentar|tentei) me matar",
+      // "eu me mato de trabalhar" is a figure of speech; "eu me mato" alone is not.
+      "eu me mato(?! de )",
       "suicid\\w*",
       "tirar (?:a )?minha (?:propria )?vida",
       "acabar com (?:a )?minha vida",
@@ -133,7 +149,7 @@ const PATTERNS: Pattern[] = [
 /** Screen one message. Idioms are removed before the patterns run. */
 export function screenForRisk(text: string): Screening {
   let folded = fold(text);
-  for (const idiom of IDIOMS) folded = folded.replace(idiom, " ");
+  for (const [idiom, keep] of IDIOMS) folded = folded.replace(idiom, keep);
   folded = folded.replace(/\s+/gu, " ");
   for (const { kind, language, pattern } of PATTERNS) {
     if (pattern.test(folded)) return { risk: true, kind, language };

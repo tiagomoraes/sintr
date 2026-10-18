@@ -47,7 +47,14 @@ export function createLanguageModel(credentials: ProviderCredentials, options: M
   if (!baseUrl) throw new ProviderSetupError("base_url_required");
   const checked = checkBaseUrl(baseUrl, options.mode);
   if (!checked.ok) throw new ProviderSetupError(checked.problem);
-  const fetchOption = options.fetch ? { fetch: options.fetch } : {};
+  // In SaaS mode a public host must not bounce the request somewhere internal.
+  const baseFetch = options.fetch ?? globalThis.fetch;
+  const fetchOption =
+    options.mode === "saas"
+      ? { fetch: ((input, init) => baseFetch(input, { ...init, redirect: "error" })) as typeof fetch }
+      : options.fetch
+        ? { fetch: options.fetch }
+        : {};
   switch (provider) {
     case "openai_compatible":
       return createOpenAICompatible({
@@ -75,8 +82,9 @@ const IP_LITERAL = /^(?:\d{1,3}(?:\.\d{1,3}){3}|\[[0-9a-f:.]+\])$/i;
 /**
  * Where a base URL may point. Self-host allows any http(s) address,
  * including a model on the same machine. SaaS allows only https to a public
- * host name: no IP literals, no local names. (Resolving names to catch DNS
- * tricks is F4 hardening.) A URL never carries credentials.
+ * host name: no IP literals, no local names, and redirects are refused.
+ * (Resolving names to catch DNS tricks is F4 hardening.) A URL never
+ * carries credentials.
  */
 export function checkBaseUrl(
   value: string,
@@ -92,7 +100,9 @@ export function checkBaseUrl(
   if (url.username || url.password) return { ok: false, problem: "credentials_in_url" };
   if (mode === "saas") {
     if (url.protocol !== "https:") return { ok: false, problem: "https_required" };
-    if (PRIVATE_HOST.test(url.hostname) || IP_LITERAL.test(url.hostname)) {
+    // "localhost." and "metadata.google.internal." are the same hosts.
+    const host = url.hostname.replace(/\.+$/u, "");
+    if (PRIVATE_HOST.test(host) || IP_LITERAL.test(host)) {
       return { ok: false, problem: "private_address" };
     }
   }

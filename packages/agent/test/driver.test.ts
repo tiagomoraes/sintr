@@ -457,6 +457,65 @@ describe("failures and privacy", () => {
   });
 });
 
+describe("recoverable tool problems", () => {
+  it("keeps the turn when a draft is refused for its shape and the model corrects it", async () => {
+    const model = scriptedModel([
+      { toolCalls: [{ toolName: "propose_checkin", input: { mood: 3.5 } }] },
+      { toolCalls: [{ toolName: "propose_checkin", input: { mood: 3 } }] },
+      { text: "Anotei o humor." },
+    ]);
+    const t = turn({ model, message: user("humor 3 hoje") });
+    const out = await t.run();
+    expect(out.types).not.toContain("error");
+    expect([...t.memory.proposals.values()].map((p) => [p.status, p.payload])).toEqual([
+      ["proposed", { mood: 3 }],
+    ]);
+    expect(t.responses).toHaveLength(1);
+  });
+
+  it("stores the stop even when a refused draft came before the crisis signal", async () => {
+    const model = scriptedModel([
+      {
+        toolCalls: [
+          { toolName: "propose_entry", input: { situation: 7 } },
+          { toolName: "signal_crisis", input: {} },
+        ],
+      },
+    ]);
+    const t = turn({ model, history: [user(SITUATION)], message: user("não vejo sentido em nada") });
+    await t.run();
+    expect(t.responses).toHaveLength(1);
+    expect(t.responses[0]!.parts.some((p) => p.type === "data-crisis")).toBe(true);
+  });
+});
+
+describe("retrying", () => {
+  it('does not take a retried "salva" as a new yes', async () => {
+    const model = scriptedModel([{ text: "ok" }]);
+    const t = turn({ model, history: [user(SITUATION), assistant("Aqui está o rascunho."), user("salva")] });
+    await t.memory.ports.createProposal({ kind: "entry", payload: { situation: SITUATION } });
+    await t.run();
+    expect(t.memory.confirmed).toEqual([]);
+  });
+});
+
+describe("times the model writes", () => {
+  it("reads a time without an offset where the person is, and refuses a bare date", async () => {
+    const model = scriptedModel([
+      proposeEntry({ situation: SITUATION, occurredAt: "2026-10-17" }),
+      proposeEntry({ situation: SITUATION, occurredAt: "2026-10-17T20:00" }),
+      { text: "ok" },
+    ]);
+    const t = turn({ model, message: user(SITUATION) });
+    await t.run();
+    expect(JSON.stringify(toolResultsOf(model.calls[1]!))).toContain("occurredAt needs a date and a time");
+    // 20:00 in São Paulo (UTC-3) is 23:00 UTC.
+    expect([...t.memory.proposals.values()][0]!.payload).toMatchObject({
+      occurredAt: "2026-10-17T23:00:00.000Z",
+    });
+  });
+});
+
 describe("the rehearsal assistant (the offline provider of the end-to-end tests)", () => {
   it("asks one question, then drafts the entry from the person's own sentences through the same checks", async () => {
     const first = turn({

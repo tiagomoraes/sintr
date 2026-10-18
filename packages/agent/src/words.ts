@@ -89,16 +89,16 @@ export function findVerbatim(personTexts: readonly string[], candidate: string):
   return null;
 }
 
+/**
+ * Small numbers written as words. Words that are also articles or ordinary
+ * words ("um", "uma", "one", "dos", "once") are left out, or every message
+ * would seem to state a 1 or a 2.
+ */
 const NUMBER_WORDS: Record<string, number> = {
   zero: 0,
-  um: 1,
-  uma: 1,
-  one: 1,
-  uno: 1,
   dois: 2,
   duas: 2,
   two: 2,
-  dos: 2,
   tres: 3,
   three: 3,
   quatro: 4,
@@ -122,7 +122,6 @@ const NUMBER_WORDS: Record<string, number> = {
   diez: 10,
   onze: 11,
   eleven: 11,
-  once: 11,
   doze: 12,
   twelve: 12,
   doce: 12,
@@ -180,6 +179,8 @@ const SAVE_COMMAND = new RegExp(
  * asks for a change ("salva, mas muda a intensidade") is not one.
  */
 export function isSaveCommand(text: string): boolean {
+  // "salva?" asks; it does not say yes.
+  if (text.includes("?")) return false;
   const normalized = stripAccents(text.toLowerCase())
     .replace(/[.!?;:…]+/gu, " ")
     .replace(/\s+/gu, " ")

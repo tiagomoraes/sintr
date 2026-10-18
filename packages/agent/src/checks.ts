@@ -8,8 +8,25 @@
  * A draft that breaks a rule is refused with a short reason the model can
  * act on, and nothing is stored.
  */
+import { momentIn } from "./moments";
 import type { CheckinDraft, EntryDraft } from "./shapes";
 import { findVerbatim, wasStated } from "./words";
+
+export interface CheckOptions {
+  /** The person's time zone, for a time written without an offset. */
+  timezone: string;
+}
+
+function moment(value: string | undefined, options: CheckOptions, problems: string[]): string | undefined {
+  if (value === undefined || value.trim() === "") return undefined;
+  const instant = momentIn(value, options.timezone);
+  if (!instant) {
+    problems.push(
+      "occurredAt needs a date and a time; if the person only said the day, leave it out and keep the day in the situation",
+    );
+  }
+  return instant ?? undefined;
+}
 
 export type Checked<D> = { ok: true; draft: D } | { ok: false; problems: string[] };
 
@@ -59,7 +76,11 @@ function stated(
   }
 }
 
-export function checkEntryDraft(draft: EntryDraft, personTexts: readonly string[]): Checked<EntryDraft> {
+export function checkEntryDraft(
+  draft: EntryDraft,
+  personTexts: readonly string[],
+  options: CheckOptions,
+): Checked<EntryDraft> {
   const problems: string[] = [];
   const thoughts = draft.thoughts
     ?.filter((thought) => thought.trim() !== "")
@@ -71,6 +92,7 @@ export function checkEntryDraft(draft: EntryDraft, personTexts: readonly string[
     emotionsAfter: emotionsChecked("emotionsAfter", draft.emotionsAfter, personTexts, problems),
     hotThought: verbatim("hotThought", draft.hotThought, personTexts, problems),
     alternative: verbatim("alternative", draft.alternative, personTexts, problems),
+    occurredAt: moment(draft.occurredAt, options, problems),
   };
   stated("alternativeBelief", draft.alternativeBelief, personTexts, problems);
   const said = [checked.situation, checked.notes, checked.title].some((v) => v && v.trim() !== "");
@@ -86,8 +108,10 @@ export function checkEntryDraft(draft: EntryDraft, personTexts: readonly string[
 export function checkCheckinDraft(
   draft: CheckinDraft,
   personTexts: readonly string[],
+  options: CheckOptions,
 ): Checked<CheckinDraft> {
   const problems: string[] = [];
+  const occurredAt = moment(draft.occurredAt, options, problems);
   stated("mood", draft.mood, personTexts, problems);
   stated("energy", draft.energy, personTexts, problems);
   stated("anxiety", draft.anxiety, personTexts, problems);
@@ -96,5 +120,9 @@ export function checkCheckinDraft(
   if (values.every((v) => v === undefined || (typeof v === "string" && v.trim() === ""))) {
     problems.push("the check-in is empty: record only what the person gave, and at least one value");
   }
-  return problems.length ? { ok: false, problems } : { ok: true, draft };
+  if (problems.length) return { ok: false, problems };
+  const checked: CheckinDraft = { ...draft };
+  if (occurredAt) checked.occurredAt = occurredAt;
+  else delete checked.occurredAt;
+  return { ok: true, draft: checked };
 }

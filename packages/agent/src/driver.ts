@@ -102,8 +102,10 @@ export function runCaptureTurn(turn: CaptureTurn): ReadableStream<SintrUIMessage
         }
       }
 
+      // Only a new message can say yes: retrying a failed reply to "salva"
+      // must not confirm the next older draft.
       let turnNote: string | undefined;
-      if (!inCrisis && text && isSaveCommand(text)) {
+      if (!inCrisis && turn.message && text && isSaveCommand(text)) {
         const pending = await turn.ports.pendingProposal();
         if (pending) {
           try {
@@ -127,6 +129,7 @@ export function runCaptureTurn(turn: CaptureTurn): ReadableStream<SintrUIMessage
         : captureTools({
             ports: turn.ports,
             personTexts: personTexts(messages),
+            timezone: person.timezone,
             proposedThisTurn,
             onCrisis: (language) => {
               signal.crisis = { language };
@@ -160,10 +163,9 @@ export function runCaptureTurn(turn: CaptureTurn): ReadableStream<SintrUIMessage
         ...(tools ? { tools } : {}),
         sendStart: false,
         sendFinish: false,
-        onError: (error) => {
-          failed = true;
-          return describeProviderError(error);
-        },
+        // Also called for a refused tool input or a failing tool, which the
+        // model can recover from; only an `error` chunk fails the turn.
+        onError: (error) => describeProviderError(error),
       }) as ReadableStream<SintrUIMessageChunk>;
       const reader = chunks.getReader();
       for (;;) {
@@ -188,6 +190,8 @@ export function runCaptureTurn(turn: CaptureTurn): ReadableStream<SintrUIMessage
         await withdraw();
       }
       if (signal.crisis) {
+        // A stopped diary is always stored, so the next turn stays stopped.
+        keepReply = true;
         await withdraw();
         log.info("agent.crisis", { code: "assistant" });
         writeCrisis(writer, "assistant", crisisLanguage(signal.crisis.language ?? person.language));

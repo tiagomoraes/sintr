@@ -15,6 +15,8 @@ export interface ToolContext {
   ports: CapturePorts;
   /** The person's own messages in this conversation, for the word checks. */
   personTexts: readonly string[];
+  /** The person's time zone, for a time the model writes without an offset. */
+  timezone: string;
   /** Drafts stored during this turn, so a crisis can withdraw them. */
   proposedThisTurn: string[];
   onCrisis(language: string | undefined): void;
@@ -32,7 +34,7 @@ export function captureTools(context: ToolContext) {
         "Show the person a draft of the thought record, for them to confirm, edit or discard. Saves nothing. Include only what the person actually said.",
       inputSchema: EntryDraft,
       execute: async (draft): Promise<ProposeResult<EntryDraft>> => {
-        const checked = checkEntryDraft(draft, context.personTexts);
+        const checked = checkEntryDraft(draft, context.personTexts, context);
         if (!checked.ok) return checked;
         const proposal = await context.ports.createProposal({
           kind: "entry",
@@ -48,7 +50,7 @@ export function captureTools(context: ToolContext) {
         "Show the person a draft of a quick check-in (mood, energy and anxiety from 0 to 5, sleep), with exactly what they gave. Saves nothing.",
       inputSchema: CheckinDraft,
       execute: async (draft): Promise<ProposeResult<CheckinDraft>> => {
-        const checked = checkCheckinDraft(draft, context.personTexts);
+        const checked = checkCheckinDraft(draft, context.personTexts, context);
         if (!checked.ok) return checked;
         const proposal = await context.ports.createProposal({
           kind: "checkin",
