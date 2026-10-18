@@ -1,7 +1,16 @@
 import { randomUUID } from "node:crypto";
 import { expect, test, type Page } from "@playwright/test";
 import postgres from "postgres";
-import { core, currentUserId, newEmail, say, setUpAssistant, signUp } from "./support";
+import {
+  closeCore,
+  core,
+  currentUserId,
+  newEmail,
+  say,
+  setUpAssistant,
+  signUp,
+  signUpQuietly,
+} from "./support";
 
 /**
  * F1, end to end: the production build with the offline rehearsal model.
@@ -19,7 +28,7 @@ const sql = postgres(process.env.SINTR_E2E_DATABASE_URL!, { max: 1, onnotice: ()
 
 test.afterAll(async () => {
   await sql.end();
-  await core().close();
+  await closeCore();
 });
 
 async function scopeOf(page: Page) {
@@ -70,7 +79,7 @@ test.describe("bring your own key", () => {
   });
 
   test("a conversation waits for a provider, but a crisis is answered without one", async ({ page }) => {
-    await signUp(page, newEmail("no-provider"));
+    await signUpQuietly(page, newEmail("no-provider"));
     await page.goto("/talk");
     await expect(page.getByText("The assistant needs a provider first.")).toBeVisible();
     await expect(page.getByRole("link", { name: "Call CVV, 188" })).toBeVisible();
@@ -173,7 +182,7 @@ test.describe("the capture conversation", () => {
   });
 
   test("lets the person fix a draft before saving it, or discard it and keep nothing", async ({ page }) => {
-    await signUp(page, newEmail("edit-draft"));
+    await signUpQuietly(page, newEmail("edit-draft"));
     await setUpAssistant(page);
     const scope = await scopeOf(page);
 
@@ -192,7 +201,7 @@ test.describe("the capture conversation", () => {
   });
 
   test('saves a drafted check-in when the person says "salva"', async ({ page }) => {
-    await signUp(page, newEmail("salva"));
+    await signUpQuietly(page, newEmail("salva"));
     await setUpAssistant(page);
     await page.goto("/talk");
     await say(page, "mood 3, energy 2, slept 6.5", DRAFTED);
@@ -210,7 +219,7 @@ test.describe("the capture conversation", () => {
   });
 
   test("stops the diary and points to human help when the person signals risk", async ({ page }) => {
-    await signUp(page, newEmail("crisis"));
+    await signUpQuietly(page, newEmail("crisis"));
     await setUpAssistant(page);
     await page.goto("/talk");
     await say(page, "não aguento mais viver", "Que bom que você me contou");
@@ -242,7 +251,7 @@ test.describe("the capture conversation", () => {
 
 test.describe("the quick check-in", () => {
   test("needs no conversation and keeps only what was given", async ({ page }) => {
-    await signUp(page, newEmail("checkin"));
+    await signUpQuietly(page, newEmail("checkin"));
     await page.getByRole("link", { name: "Check-ins", exact: true }).click();
     await page.getByRole("link", { name: "New check-in" }).click();
     await page.getByRole("group", { name: "Mood" }).getByRole("radio", { name: "4", exact: true }).check();
@@ -270,7 +279,7 @@ test.describe("the quick check-in", () => {
 
 test.describe("the new routes are scoped to their owner", () => {
   test("another person can open, change and confirm none of it", async ({ page, browser }) => {
-    await signUp(page, newEmail("alice"));
+    await signUpQuietly(page, newEmail("alice"));
     await setUpAssistant(page);
     await draftAnEntry(page);
     const conversationId = new URL(page.url()).pathname.split("/").at(-1)!;
@@ -281,7 +290,7 @@ test.describe("the new routes are scoped to their owner", () => {
 
     const bobContext = await browser.newContext();
     const bob = await bobContext.newPage();
-    await signUp(bob, newEmail("bob"));
+    await signUpQuietly(bob, newEmail("bob"));
     await setUpAssistant(bob);
 
     for (const path of [
@@ -331,7 +340,7 @@ test.describe("the new routes are scoped to their owner", () => {
       (await request.post(`/api/proposals/${randomUUID()}`, { data: { action: "confirm" } })).status(),
     ).toBe(401);
 
-    await signUp(page, newEmail("origin"));
+    await signUpQuietly(page, newEmail("origin"));
     const foreign = await page.request.post("/api/chat", {
       headers: { origin: "https://elsewhere.example" },
       data: { trigger: "submit-message", text: "x" },

@@ -1,10 +1,10 @@
 import { expect, test } from "@playwright/test";
-import { PASSWORD, core, currentUserId, newEmail, signUp } from "./support";
+import { PASSWORD, closeCore, core, currentUserId, newEmail, signUp } from "./support";
 
 const PROTECTED = ["/entries", "/checkins", "/therapy", "/reports", "/consent"];
 
 test.afterAll(async () => {
-  await core().close();
+  await closeCore();
 });
 
 test.describe("the app boots against a real Postgres", () => {
