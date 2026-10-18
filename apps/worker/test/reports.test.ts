@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import {
+  createLogger,
   generateMasterKey,
   loadConfig,
   memoryTransport,
@@ -180,13 +181,19 @@ describe("preparing reports on schedule", () => {
     const dan = await person("dan", false);
     for (const scope of [carol, dan])
       await scope.therapySettings.update({ sessionDay: 1, sessionTime: "20:00" });
-    const result = await prepareDueReports(runtime, new Date("2026-11-02T19:00:00Z"), {
+    const lines: string[] = [];
+    const log = createLogger({ write: (_level, line) => lines.push(line) });
+    const result = await prepareDueReports({ ...runtime, log }, new Date("2026-11-02T19:00:00Z"), {
       modelFor: async (scope) => {
-        if (scope.userId === carol.userId) throw new Error("boom");
+        if (scope.userId === carol.userId) throw new Error("the entry said: eu sempre deixo a desejar");
         return { model: null, problem: "not_configured" };
       },
     });
     expect(result).toEqual({ prepared: 1, failed: 1 });
+    // The failure is logged by name, never by its words.
+    const failure = lines.find((line) => line.includes("report.prepare_failed"));
+    expect(failure).toContain('"errorName":"Error"');
+    expect(lines.join("\n")).not.toContain("deixo a desejar");
     expect(await carol.reports.list()).toEqual([]);
     expect(await dan.reports.list()).toHaveLength(1);
   });
