@@ -25,6 +25,7 @@ Milestones **F0, the foundation**, **F1, capture**, and **F2, the weekly report*
 - **the timeline** of entries and check-ins, with a detail view; changing a saved record keeps a dated correction with what it said before;
 - **your therapy**: the day and time of your sessions in your time zone, a one-off date when a session moves, your therapist's name and email, and whether an approved report is sent or kept for you;
 - **the weekly report**: prepared an hour (or the lead you choose) before each session, covering exactly the days since the last one. It has the six sections of the pack's guide (how the week went, what to bring to the session, mood, energy and sleep with a chart of the last weeks, the moments that stood out, what repeated, what helped), written by your assistant in your language, with your own words quoted exactly as recorded and checked against your diary;
+- an example of what a therapist receives, from a fictional diary in Portuguese: [`docs/example-report.pdf`](docs/example-report.pdf);
 - **read, change, approve, send**: you read the report as a page, change its words, preview the PDF, and approve it; a second, explicit yes sends that PDF to your therapist by email, recorded with the date and the address. Nothing is ever sent on its own, and the PDFs of past reports stay available;
 - **email** (optional, any SMTP server): the approved report to your therapist, a "report ready" note to you if you ask for it, password reset and email confirmation;
 - settings for the assistant, your time zone and how long conversations are kept;
