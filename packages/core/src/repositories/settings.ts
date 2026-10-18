@@ -1,6 +1,6 @@
 import { eq } from "drizzle-orm";
 import { SEALED, openValues, sealValues } from "../db/sealed";
-import { profiles, therapySettings } from "../db/schema";
+import { profiles, therapySettings, users } from "../db/schema";
 import { ProfilePatch, TherapySettingsPatch, type Profile, type TherapySettings } from "../domain";
 import { parseInput } from "../errors";
 import type { ScopeContext } from "./context";
@@ -22,6 +22,15 @@ export function profileRepository({ db, userId, cipher }: ScopeContext) {
     async get(): Promise<Profile> {
       const [row] = await db.select().from(profiles).where(eq(profiles.userId, userId));
       return row ? decode(row) : { ...DEFAULT_PROFILE };
+    },
+
+    /** The account's email and whether it was verified: where sintr may write to the person. */
+    async account(): Promise<{ email: string; emailVerified: boolean }> {
+      const [row] = await db
+        .select({ email: users.email, emailVerified: users.emailVerified })
+        .from(users)
+        .where(eq(users.id, userId));
+      return row ?? { email: "", emailVerified: false };
     },
 
     async update(patch: ProfilePatch): Promise<Profile> {
@@ -49,6 +58,8 @@ export function therapySettingsRepository({ db, userId, cipher }: ScopeContext) 
       reportLeadMinutes: row.reportLeadMinutes,
       requireApproval: true,
       deliveryChannel: row.deliveryChannel,
+      nextSessionAt: row.nextSessionAt,
+      reportNoticeEmail: row.reportNoticeEmail,
     };
   };
 
@@ -64,6 +75,8 @@ export function therapySettingsRepository({ db, userId, cipher }: ScopeContext) 
         reportLeadMinutes: 60,
         requireApproval: true,
         deliveryChannel: "download",
+        nextSessionAt: null,
+        reportNoticeEmail: false,
       };
     },
 

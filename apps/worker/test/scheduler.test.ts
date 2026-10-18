@@ -96,6 +96,16 @@ describe("scheduler", () => {
 });
 
 describe("jobs", () => {
+  it("prepares due reports every minute, at the scheduler's moment", async () => {
+    const job = JOBS.find((j) => j.name === "prepare-reports");
+    expect(job?.intervalMs).toBe(60 * 1000);
+    const asked: Date[] = [];
+    const fake = { reportSchedules: async (now: Date) => (asked.push(now), []) };
+    const now = new Date("2026-10-19T20:00:00Z");
+    expect(await job!.run(fake as never, now)).toEqual({ prepared: 0, failed: 0 });
+    expect(asked).toEqual([now]);
+  });
+
   it("purges expired auth records hourly through the runtime", async () => {
     const job = JOBS.find((j) => j.name === "purge-expired-auth-records");
     expect(job?.intervalMs).toBe(60 * 60 * 1000);
@@ -103,7 +113,7 @@ describe("jobs", () => {
     const fake = {
       purgeExpiredAuthRecords: async () => (calls.push("purge"), { sessions: 2, verificationTokens: 0 }),
     };
-    expect(await job!.run(fake as never)).toEqual({ sessions: 2, verificationTokens: 0 });
+    expect(await job!.run(fake as never, new Date())).toEqual({ sessions: 2, verificationTokens: 0 });
     expect(calls).toEqual(["purge"]);
   });
 
@@ -114,7 +124,7 @@ describe("jobs", () => {
     const fake = {
       purgeExpiredConversations: async () => (calls.push("purge"), { conversations: 3 }),
     };
-    expect(await job!.run(fake as never)).toEqual({ conversations: 3 });
+    expect(await job!.run(fake as never, new Date())).toEqual({ conversations: 3 });
     expect(calls).toEqual(["purge"]);
   });
 });

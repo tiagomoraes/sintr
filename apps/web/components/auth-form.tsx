@@ -58,6 +58,8 @@ export function AuthForm({ mode, next }: { mode: Mode; next: string }) {
             password,
             // The auth table keeps no name; the server enforces it too.
             name: "",
+            // Where the confirmation link (sent when email is set up) lands.
+            callbackURL: "/settings?verified=1",
             // LGPD art. 11: the server refuses the account without it.
             ...({ consent: form.get("consent") === "on" } as Record<string, unknown>),
           })

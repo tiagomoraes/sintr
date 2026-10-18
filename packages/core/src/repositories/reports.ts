@@ -1,9 +1,33 @@
-import { and, desc, eq } from "drizzle-orm";
+import { and, asc, desc, eq } from "drizzle-orm";
 import { SEALED } from "../db/sealed";
-import { consents, reports } from "../db/schema";
-import { ConsentInput, ReportDraftInput, type Consent, type ConsentPurpose, type Report } from "../domain";
-import { ConsentRequiredError, InvalidStateError, NotFoundError, parseInput } from "../errors";
+import { consents, reportRevisions, reports } from "../db/schema";
+import {
+  ConsentInput,
+  ReportDraftInput,
+  type Consent,
+  type ConsentPurpose,
+  type Report,
+  type ReportRevision,
+  type ReportRevisionKind,
+} from "../domain";
+import {
+  ConsentRequiredError,
+  InvalidStateError,
+  NotFoundError,
+  ValidationError,
+  parseInput,
+} from "../errors";
+import { changedSections, parseContent } from "../report/content";
+import type { KnownReport } from "../report/period";
 import { isId, type ScopeContext } from "./context";
+import { inTransaction } from "./corrections";
+
+const CONTENT_MAX = 400_000;
+
+function contentValue(value: string): string {
+  if (value.length === 0 || value.length > CONTENT_MAX) throw new ValidationError(["content"]);
+  return value;
+}
 
 export function consentsRepository({ db, userId, cipher }: ScopeContext) {
   const spec = SEALED.consents;
@@ -70,9 +94,11 @@ export function reportsRepository({ db, userId, cipher }: ScopeContext) {
     hasPdf: row.pdf !== null,
     recipient: row.recipient ? cipher.openText(spec.columns.recipient, row.recipient) : null,
     generatedAt: row.generatedAt,
+    editedAt: row.editedAt,
     reviewedAt: row.reviewedAt,
     sentAt: row.sentAt,
     consentId: row.consentId,
+    notifiedAt: row.notifiedAt,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
   });
@@ -83,9 +109,54 @@ export function reportsRepository({ db, userId, cipher }: ScopeContext) {
     return row;
   };
 
+  /** Keep what the report said before a change, then apply the change. */
+  const revise = async (
+    id: string,
+    kind: ReportRevisionKind,
+    content: string,
+    set: Partial<typeof reports.$inferInsert>,
+    options: { untouched?: boolean } = {},
+  ): Promise<Report> =>
+    inTransaction(db, async (tx) => {
+      const [row] = await tx.select().from(reports).where(own(id)).for("update");
+      if (!row) throw new NotFoundError("report");
+      if (row.status === "sent") throw new InvalidStateError("a sent report cannot change");
+      if (options.untouched && (row.status !== "draft" || row.editedAt !== null)) {
+        throw new InvalidStateError("the person changed this report");
+      }
+      const previous = row.content ? cipher.openText(spec.columns.content, row.content) : null;
+      if (previous !== null && previous !== content) {
+        const before = parseContent(previous);
+        const after = parseContent(content);
+        await tx.insert(reportRevisions).values({
+          userId,
+          reportId: id,
+          kind,
+          sections: before && after ? changedSections(before, after) : [],
+          previous: cipher.sealJson(SEALED.reportRevisions.columns.previous, previous),
+        });
+      }
+      const now = new Date();
+      const [updated] = await tx
+        .update(reports)
+        .set({
+          ...set,
+          content: cipher.sealText(spec.columns.content, content),
+          // A change makes it a draft again: the person reviews this version.
+          status: "draft",
+          reviewedAt: null,
+          pdf: null,
+          updatedAt: now,
+        })
+        .where(own(id))
+        .returning();
+      return decode(updated!);
+    });
+
   return {
-    async createDraft(input: ReportDraftInput): Promise<Report> {
+    async createDraft(input: ReportDraftInput & { content?: string }): Promise<Report> {
       const value = parseInput(ReportDraftInput, input);
+      const content = input.content === undefined ? null : contentValue(input.content);
       const [row] = await db
         .insert(reports)
         .values({
@@ -93,6 +164,9 @@ export function reportsRepository({ db, userId, cipher }: ScopeContext) {
           periodStart: value.periodStart,
           periodEnd: value.periodEnd,
           sessionAt: value.sessionAt ?? null,
+          ...(content !== null
+            ? { content: cipher.sealText(spec.columns.content, content), generatedAt: new Date() }
+            : {}),
         })
         .returning();
       return decode(row!);
@@ -113,26 +187,86 @@ export function reportsRepository({ db, userId, cipher }: ScopeContext) {
       return rows.map(decode);
     },
 
-    /** Replace the draft's Markdown and/or PDF. A sent report is final. */
-    async setContent(id: string, value: { content?: string; pdf?: Uint8Array }): Promise<Report> {
+    /**
+     * The most recent reports as the planner weighs them: dates and states
+     * only, without opening any words (the scheduler asks every minute).
+     */
+    async recent(limit = 20): Promise<KnownReport[]> {
+      return db
+        .select({
+          id: reports.id,
+          status: reports.status,
+          sessionAt: reports.sessionAt,
+          periodStart: reports.periodStart,
+          periodEnd: reports.periodEnd,
+          editedAt: reports.editedAt,
+        })
+        .from(reports)
+        .where(eq(reports.userId, userId))
+        .orderBy(desc(reports.periodEnd))
+        .limit(Math.min(Math.max(limit, 1), 200));
+    },
+
+    /** The latest draft waiting for the person, without opening its words. */
+    async waiting(): Promise<{ id: string; sessionAt: Date | null; periodEnd: Date } | null> {
+      const [row] = await db
+        .select({ id: reports.id, sessionAt: reports.sessionAt, periodEnd: reports.periodEnd })
+        .from(reports)
+        .where(and(eq(reports.userId, userId), eq(reports.status, "draft")))
+        .orderBy(desc(reports.periodEnd))
+        .limit(1);
+      return row ?? null;
+    },
+
+    /**
+     * The person's own change to the words. The previous version is kept as
+     * a dated revision; the report is a draft again, to be reviewed as it
+     * now reads, and the scheduler no longer rewrites it.
+     */
+    async edit(id: string, content: string): Promise<Report> {
+      return revise(id, "edited", contentValue(content), { editedAt: new Date() });
+    },
+
+    /**
+     * A new preparation of the same report (asked by the person, or the
+     * scheduler following a moved session). The previous version is kept.
+     */
+    async prepareAgain(
+      id: string,
+      value: {
+        content: string;
+        periodEnd?: Date;
+        sessionAt?: Date | null;
+        /** The scheduler's own preparation: refused if the person touched the draft meanwhile. */
+        untouched?: boolean;
+      },
+    ): Promise<Report> {
+      const content = contentValue(value.content);
       const row = await getRow(id);
       if (!row) throw new NotFoundError("report");
-      if (row.status === "sent") throw new InvalidStateError("a sent report cannot change");
-      const [updated] = await db
-        .update(reports)
-        .set({
-          ...(value.content !== undefined
-            ? { content: cipher.sealText(spec.columns.content, value.content) }
-            : {}),
-          ...(value.pdf !== undefined ? { pdf: cipher.sealBytes(spec.columns.pdf, value.pdf) } : {}),
-          status: "draft",
+      if (value.periodEnd && value.periodEnd <= row.periodStart) throw new ValidationError(["periodEnd"]);
+      return revise(
+        id,
+        "prepared_again",
+        content,
+        {
           generatedAt: new Date(),
-          reviewedAt: null,
-          updatedAt: new Date(),
-        })
-        .where(own(id))
-        .returning();
-      return decode(updated!);
+          editedAt: null,
+          ...(value.periodEnd ? { periodEnd: value.periodEnd } : {}),
+          ...(value.sessionAt !== undefined ? { sessionAt: value.sessionAt } : {}),
+        },
+        { untouched: value.untouched === true },
+      );
+    },
+
+    /**
+     * Hold the report while it is being sent, so a second send of the same
+     * report waits and then finds it sent. Use inside a transaction.
+     */
+    async lockForSend(id: string): Promise<Report | null> {
+      if (!isId(id)) return null;
+      const [row] = await db.select().from(reports).where(own(id)).for("update");
+      return row ? decode(row) : null;
     },
 
     async readPdf(id: string): Promise<Buffer | null> {
@@ -140,16 +274,42 @@ export function reportsRepository({ db, userId, cipher }: ScopeContext) {
       return row?.pdf ? cipher.openBytes(spec.columns.pdf, row.pdf) : null;
     },
 
-    async markReviewed(id: string): Promise<Report> {
-      const row = await getRow(id);
-      if (!row) throw new NotFoundError("report");
-      if (row.status !== "draft") throw new InvalidStateError("only a draft can be reviewed");
-      const [updated] = await db
-        .update(reports)
-        .set({ status: "reviewed", reviewedAt: new Date(), updatedAt: new Date() })
-        .where(own(id))
-        .returning();
-      return decode(updated!);
+    /**
+     * The person approves the words. `content` (with its numbers frozen) and
+     * `pdf` are the version approved: what is sent is exactly this PDF.
+     */
+    async markReviewed(
+      id: string,
+      value: {
+        content?: string;
+        pdf?: Uint8Array;
+        /** The words the person approved: refused if the draft changed since (an edit, a new preparation). */
+        expected?: string;
+      } = {},
+    ): Promise<Report> {
+      return inTransaction(db, async (tx) => {
+        const [row] = await tx.select().from(reports).where(own(id)).for("update");
+        if (!row) throw new NotFoundError("report");
+        if (row.status !== "draft") throw new InvalidStateError("only a draft can be reviewed");
+        if (value.expected !== undefined) {
+          const stored = row.content ? cipher.openText(spec.columns.content, row.content) : null;
+          if (stored !== value.expected) throw new InvalidStateError("the report changed since it was read");
+        }
+        const [updated] = await tx
+          .update(reports)
+          .set({
+            status: "reviewed",
+            reviewedAt: new Date(),
+            ...(value.content !== undefined
+              ? { content: cipher.sealText(spec.columns.content, contentValue(value.content)) }
+              : {}),
+            ...(value.pdf !== undefined ? { pdf: cipher.sealBytes(spec.columns.pdf, value.pdf) } : {}),
+            updatedAt: new Date(),
+          })
+          .where(own(id))
+          .returning();
+        return decode(updated!);
+      });
     },
 
     /**
@@ -185,9 +345,39 @@ export function reportsRepository({ db, userId, cipher }: ScopeContext) {
           recipient: cipher.sealText(spec.columns.recipient, recipient),
           updatedAt: new Date(),
         })
-        .where(own(id))
+        .where(and(own(id), eq(reports.status, "reviewed")))
         .returning();
-      return decode(updated!);
+      if (!updated) throw new InvalidStateError("only a reviewed report can be sent");
+      return decode(updated);
+    },
+
+    /** The person was told (by email) that the report is ready. */
+    async markNotified(id: string): Promise<void> {
+      if (!isId(id)) throw new NotFoundError("report");
+      const rows = await db
+        .update(reports)
+        .set({ notifiedAt: new Date() })
+        .where(own(id))
+        .returning({ id: reports.id });
+      if (rows.length === 0) throw new NotFoundError("report");
+    },
+
+    /** What the report said before each change, oldest first. */
+    async revisions(id: string): Promise<ReportRevision[]> {
+      if (!isId(id)) return [];
+      const rows = await db
+        .select()
+        .from(reportRevisions)
+        .where(and(eq(reportRevisions.userId, userId), eq(reportRevisions.reportId, id)))
+        .orderBy(asc(reportRevisions.createdAt))
+        .limit(200);
+      return rows.map((row) => ({
+        id: row.id,
+        kind: row.kind,
+        sections: row.sections,
+        previous: cipher.openJson(SEALED.reportRevisions.columns.previous, row.previous) as string,
+        createdAt: row.createdAt,
+      }));
     },
 
     async remove(id: string): Promise<boolean> {

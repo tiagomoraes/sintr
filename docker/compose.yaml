@@ -20,6 +20,14 @@ x-app-env: &app-env
   SINTR_AUTH_SECRET: ${SINTR_AUTH_SECRET:?run make setup to create .env}
   SINTR_MASTER_KEY: ${SINTR_MASTER_KEY:?run make setup to create .env}
   SINTR_MASTER_KEY_ID: ${SINTR_MASTER_KEY_ID:-k1}
+  # Email (optional): the report send, the ready notice, password reset and
+  # email confirmation. Left empty, email is off and the app says so.
+  SINTR_SMTP_HOST: ${SINTR_SMTP_HOST:-}
+  SINTR_SMTP_PORT: ${SINTR_SMTP_PORT:-587}
+  SINTR_SMTP_SECURITY: ${SINTR_SMTP_SECURITY:-starttls}
+  SINTR_SMTP_USER: ${SINTR_SMTP_USER:-}
+  SINTR_SMTP_PASSWORD: ${SINTR_SMTP_PASSWORD:-}
+  SINTR_EMAIL_FROM: ${SINTR_EMAIL_FROM:-}
 
 services:
   db:

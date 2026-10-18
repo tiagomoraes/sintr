@@ -156,7 +156,11 @@ describe("tenant isolation", () => {
     expect(await b.therapyNotes.setDone(owned.note, true)).toBeNull();
     expect(await b.insights.archive(owned.insight)).toBeNull();
     expect(await b.apiTokens.revoke(owned.token)).toBe(false);
-    await expect(b.reports.setContent(owned.report, { content: "x" })).rejects.toBeInstanceOf(NotFoundError);
+    await expect(b.reports.edit(owned.report, "x")).rejects.toBeInstanceOf(NotFoundError);
+    await expect(b.reports.prepareAgain(owned.report, { content: "x" })).rejects.toBeInstanceOf(
+      NotFoundError,
+    );
+    await expect(b.reports.markNotified(owned.report)).rejects.toBeInstanceOf(NotFoundError);
     await expect(b.reports.markReviewed(owned.report)).rejects.toBeInstanceOf(NotFoundError);
     await expect(
       b.conversations.append(owned.conversation, { role: "user", content: "x" }),

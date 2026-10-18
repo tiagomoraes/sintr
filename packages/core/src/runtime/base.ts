@@ -1,8 +1,10 @@
 import { sql } from "drizzle-orm";
 import type { Config } from "../config";
 import { createDatabase, type DatabaseHandle } from "../db/client";
+import { createEmailTransport, type EmailTransport } from "../email";
 import { createLogger, type Logger } from "../log";
 import { purgeExpiredAuthRecords, purgeExpiredConversations } from "../maintenance";
+import { reportSchedules, type PersonSchedule } from "../report/schedules";
 import { createRepositories, type Repositories } from "../repositories";
 
 /**
@@ -15,6 +17,10 @@ export interface BaseRuntime {
   readonly config: Config;
   readonly log: Logger;
   readonly repositories: Repositories;
+  /** How email leaves this installation (`available` is false when it is off). */
+  readonly email: EmailTransport;
+  /** Everyone with a therapy session to prepare a report for. Clear metadata only. */
+  reportSchedules(now?: Date): Promise<PersonSchedule[]>;
   purgeExpiredAuthRecords(): Promise<{ sessions: number; verificationTokens: number }>;
   /** Conversations past their owner's retention setting (agent_settings). */
   purgeExpiredConversations(): Promise<{ conversations: number }>;
@@ -26,6 +32,8 @@ export interface BaseRuntime {
 export interface RuntimeOptions {
   service: string;
   poolSize?: number;
+  /** Replace the configured transport (tests). */
+  email?: EmailTransport;
 }
 
 /** @internal Shared by createBaseRuntime and createRuntime. */
@@ -39,6 +47,8 @@ export function openBaseRuntime(
     config,
     log,
     repositories: createRepositories(database.db, config.masterKey),
+    email: options.email ?? createEmailTransport(config.email),
+    reportSchedules: (now) => reportSchedules(database.db, now),
     purgeExpiredAuthRecords: () => purgeExpiredAuthRecords(database.db),
     purgeExpiredConversations: () => purgeExpiredConversations(database.db),
     async ping() {

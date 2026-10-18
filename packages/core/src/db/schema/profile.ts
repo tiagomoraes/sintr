@@ -1,5 +1,15 @@
 import { sql } from "drizzle-orm";
-import { boolean, check, integer, pgEnum, pgTable, smallint, text, time } from "drizzle-orm/pg-core";
+import {
+  boolean,
+  check,
+  integer,
+  pgEnum,
+  pgTable,
+  smallint,
+  text,
+  time,
+  timestamp,
+} from "drizzle-orm/pg-core";
 import { bytea, createdAt, updatedAt } from "../columns";
 import { users } from "./auth";
 
@@ -38,6 +48,13 @@ export const therapySettings = pgTable(
      */
     requireApproval: boolean("require_approval").notNull().default(true),
     deliveryChannel: deliveryChannel("delivery_channel").notNull().default("download"),
+    /**
+     * A one-off date for the next session, when it moved: it replaces the
+     * weekly session closest to it, and the weekly schedule resumes after it.
+     */
+    nextSessionAt: timestamp("next_session_at", { withTimezone: true }),
+    /** Email the person (at a verified address) when a report is ready. Opt-in. */
+    reportNoticeEmail: boolean("report_notice_email").notNull().default(false),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },

@@ -30,6 +30,18 @@ jobs:
           node-version-file: .nvmrc
           cache: pnpm
 
+      # The test browser (Playwright's Chromium, for the end-to-end suite and
+      # the report PDF) is downloaded only when the Playwright version changes.
+      - name: Playwright version
+        id: playwright
+        run: echo "version=$(node -p "require('./apps/web/package.json').devDependencies['@playwright/test']")" >> "$GITHUB_OUTPUT"
+
+      - name: cache the test browser
+        uses: actions/cache@v6
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ steps.playwright.outputs.version }}
+
       - name: make setup
         run: make setup
 

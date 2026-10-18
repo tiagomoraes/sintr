@@ -38,5 +38,6 @@ export {
   type ConnectionProblem,
   type ModelOptions,
 } from "./providers";
+export * from "./report";
 export * from "./shapes";
 export { findVerbatim, isSaveCommand, wasStated } from "./words";

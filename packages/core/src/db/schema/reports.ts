@@ -9,6 +9,7 @@ import {
   text,
   timestamp,
   unique,
+  uniqueIndex,
   uuid,
   type PgTableExtraConfigValue,
 } from "drizzle-orm/pg-core";
@@ -37,15 +38,27 @@ export const reports = pgTable(
     /** sealed: who it was sent to */
     recipient: bytea("recipient"),
     generatedAt: timestamp("generated_at", { withTimezone: true }),
+    /** The person changed the draft's words (the scheduler then leaves it alone). */
+    editedAt: timestamp("edited_at", { withTimezone: true }),
     reviewedAt: timestamp("reviewed_at", { withTimezone: true }),
     sentAt: timestamp("sent_at", { withTimezone: true }),
     consentId: uuid("consent_id"),
+    /** When the person was told by email that it is ready. */
+    notifiedAt: timestamp("notified_at", { withTimezone: true }),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
   (t): PgTableExtraConfigValue[] => [
     index("reports_user_id_period_end_idx").on(t.userId, t.periodEnd),
     unique("reports_id_user_id_key").on(t.id, t.userId),
+    // Two reports never end at the same moment: a second preparation of the
+    // same period (a retried tick, two workers) is refused by the database.
+    unique("reports_user_id_period_end_key").on(t.userId, t.periodEnd),
+    // One report per session: two preparations of the same session (two
+    // tabs, a retried request) cannot both be kept.
+    uniqueIndex("reports_user_id_session_at_key")
+      .on(t.userId, t.sessionAt)
+      .where(sql`${t.sessionAt} is not null`),
     foreignKey({
       name: "reports_consent_owner_fk",
       columns: [t.consentId, t.userId],
@@ -90,5 +103,35 @@ export const consents = pgTable(
       "consents_report_send_names_report",
       sql`${t.purpose} <> 'report_send' or ${t.reportId} is not null`,
     ),
+  ],
+);
+
+export const reportRevisionKind = pgEnum("report_revision_kind", ["edited", "prepared_again"]);
+
+/**
+ * What a report said before it changed: the person edited the draft, or
+ * asked for it to be prepared again. Like an entry's corrections, a change
+ * is never a silent rewrite. The section names are clear, the content sealed.
+ */
+export const reportRevisions = pgTable(
+  "report_revisions",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: ownerId(),
+    reportId: uuid("report_id").notNull(),
+    kind: reportRevisionKind("kind").notNull(),
+    /** The names of the sections that changed, never their words. */
+    sections: text("sections").array().notNull(),
+    /** sealed: the whole report content before the change, as JSON */
+    previous: bytea("previous").notNull(),
+    createdAt: createdAt(),
+  },
+  (t): PgTableExtraConfigValue[] => [
+    index("report_revisions_user_id_report_id_idx").on(t.userId, t.reportId, t.createdAt),
+    foreignKey({
+      name: "report_revisions_report_owner_fk",
+      columns: [t.reportId, t.userId],
+      foreignColumns: [reports.id, reports.userId],
+    }).onDelete("cascade"),
   ],
 );

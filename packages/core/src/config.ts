@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { parseMasterKey, type MasterKey } from "./crypto/keys";
+import type { EmailConfig } from "./email/transport";
 import type { LogLevel } from "./log";
 
 /**
@@ -19,6 +20,24 @@ const EnvSchema = z.object({
   SINTR_LOG_LEVEL: z.enum(["debug", "info", "warn", "error"]).default("info"),
   // Tests only (commented out in .env.example): see `fakeAgent` below.
   SINTR_FAKE_AGENT: z.enum(["0", "1"]).default("0"),
+  // Email (optional): an SMTP server for the report send, notices, password
+  // reset and email verification. Without it, those features say they are off.
+  SINTR_SMTP_HOST: z
+    .string()
+    .regex(/^[A-Za-z0-9.-]+$/, "must be a host name")
+    .optional(),
+  SINTR_SMTP_PORT: z.coerce.number().int().min(1).max(65_535).default(587),
+  SINTR_SMTP_SECURITY: z.enum(["starttls", "tls", "none"]).default("starttls"),
+  SINTR_SMTP_USER: z.string().optional(),
+  SINTR_SMTP_PASSWORD: z.string().optional(),
+  SINTR_EMAIL_FROM: z
+    .string()
+    .regex(/^[^\r\n]*@[^\r\n]*$/, "must be an address, such as sintr <diary@example.com>")
+    .optional(),
+  // Tests only: write emails to this directory instead of sending them.
+  SINTR_EMAIL_OUTBOX: z.string().optional(),
+  // The Chromium that prints reports; Playwright's own when unset.
+  SINTR_CHROMIUM_PATH: z.string().optional(),
 });
 
 export interface Config {
@@ -35,6 +54,10 @@ export interface Config {
    * Refused in SaaS mode.
    */
   fakeAgent: boolean;
+  /** How email leaves this installation, if at all. */
+  email: EmailConfig;
+  /** A Chromium binary to print reports with; null uses Playwright's own. */
+  chromiumPath: string | null;
 }
 
 export class ConfigError extends Error {
@@ -46,7 +69,9 @@ export class ConfigError extends Error {
  * their values, so a misconfigured secret is not echoed into logs.
  */
 export function loadConfig(env: Record<string, string | undefined> = process.env): Config {
-  const parsed = EnvSchema.safeParse(env);
+  // An empty value in .env means "not set".
+  const given = Object.fromEntries(Object.entries(env).filter(([, value]) => value !== ""));
+  const parsed = EnvSchema.safeParse(given);
   if (!parsed.success) {
     // Zod 4 issue messages describe the expectation, not the received value.
     const problems = parsed.error.issues.map(
@@ -58,6 +83,29 @@ export function loadConfig(env: Record<string, string | undefined> = process.env
   if (e.SINTR_FAKE_AGENT === "1" && e.SINTR_MODE === "saas") {
     throw new ConfigError("invalid configuration: SINTR_FAKE_AGENT: is not allowed in saas mode");
   }
+  if (e.SINTR_EMAIL_OUTBOX && e.SINTR_MODE === "saas") {
+    throw new ConfigError("invalid configuration: SINTR_EMAIL_OUTBOX: is not allowed in saas mode");
+  }
+  if (e.SINTR_SMTP_HOST && !e.SINTR_EMAIL_FROM) {
+    throw new ConfigError("invalid configuration: SINTR_EMAIL_FROM: is required with SINTR_SMTP_HOST");
+  }
+  if (e.SINTR_SMTP_HOST && e.SINTR_SMTP_SECURITY === "none" && e.SINTR_MODE === "saas") {
+    throw new ConfigError("invalid configuration: SINTR_SMTP_SECURITY: none is not allowed in saas mode");
+  }
+  const from = e.SINTR_EMAIL_FROM ?? "sintr <sintr@localhost>";
+  const email: EmailConfig = e.SINTR_EMAIL_OUTBOX
+    ? { kind: "outbox", dir: e.SINTR_EMAIL_OUTBOX, from }
+    : e.SINTR_SMTP_HOST
+      ? {
+          kind: "smtp",
+          host: e.SINTR_SMTP_HOST,
+          port: e.SINTR_SMTP_PORT,
+          security: e.SINTR_SMTP_SECURITY,
+          user: e.SINTR_SMTP_USER ?? null,
+          password: e.SINTR_SMTP_PASSWORD ?? null,
+          from,
+        }
+      : { kind: "off" };
   let masterKey: MasterKey;
   try {
     masterKey = parseMasterKey(e.SINTR_MASTER_KEY, e.SINTR_MASTER_KEY_ID);
@@ -73,5 +121,7 @@ export function loadConfig(env: Record<string, string | undefined> = process.env
     masterKey,
     logLevel: e.SINTR_LOG_LEVEL,
     fakeAgent: e.SINTR_FAKE_AGENT === "1",
+    email,
+    chromiumPath: e.SINTR_CHROMIUM_PATH ?? null,
   };
 }

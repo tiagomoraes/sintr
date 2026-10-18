@@ -14,7 +14,7 @@ export function createRuntime(config: Config, options: RuntimeOptions): Runtime 
   const { base, database } = openBaseRuntime(config, options);
   return {
     ...base,
-    auth: createAuth({ db: database.db, config, logger: base.log }),
+    auth: createAuth({ db: database.db, config, logger: base.log, email: base.email }),
     authenticateApiToken: (token) => authenticateApiToken(database.db, token),
   };
 }

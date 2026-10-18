@@ -8,3 +8,4 @@ test-results/
 LICENSE
 # Prose is reviewed by hand; scripts/check-copy.mjs enforces the copy rules.
 *.md
+packages/core/src/report/assets.generated.ts

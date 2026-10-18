@@ -43,6 +43,7 @@ describe("schema invariants", () => {
         "messages",
         "profiles",
         "proposals",
+        "report_revisions",
         "reports",
         "sessions",
         "therapy_notes",

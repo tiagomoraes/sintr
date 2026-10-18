@@ -1,4 +1,6 @@
 import { randomUUID } from "node:crypto";
+import { existsSync, readFileSync, readdirSync } from "node:fs";
+import { join } from "node:path";
 import { loadConfig } from "@sintr/core";
 import { createRuntime, type Runtime } from "@sintr/core/runtime";
 import { expect, test, type Page } from "@playwright/test";
@@ -13,6 +15,9 @@ export function core(): Runtime {
       SINTR_AUTH_SECRET: process.env.SINTR_E2E_AUTH_SECRET,
       SINTR_MASTER_KEY: process.env.SINTR_E2E_MASTER_KEY,
       SINTR_LOG_LEVEL: "error",
+      // Sign-ups made here send their confirmation link to the same outbox as the app's.
+      SINTR_EMAIL_OUTBOX: process.env.SINTR_E2E_OUTBOX,
+      SINTR_URL: process.env.SINTR_E2E_URL,
     }),
     { service: "e2e", poolSize: 2 },
   );
@@ -96,4 +101,22 @@ export async function signUpQuietly(page: Page, email: string = newEmail("person
     .addCookies([{ name: name!, value: value.join("="), url: test.info().project.use.baseURL! }]);
   await page.goto("/entries");
   await expect(page.getByRole("heading", { level: 1, name: "Entries" })).toBeVisible();
+}
+
+/** A message the app wrote to its test outbox instead of sending it. */
+export interface OutboxMessage {
+  to: string;
+  subject: string;
+  text: string;
+  attachments: { filename: string; contentType: string; content: string }[];
+}
+
+/** Every message written to the outbox for `to`, oldest first. */
+export function outbox(to: string): OutboxMessage[] {
+  const dir = process.env.SINTR_E2E_OUTBOX!;
+  if (!existsSync(dir)) return [];
+  return readdirSync(dir)
+    .sort()
+    .map((file) => JSON.parse(readFileSync(join(dir, file), "utf8")) as OutboxMessage)
+    .filter((message) => message.to === to);
 }

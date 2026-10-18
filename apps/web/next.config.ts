@@ -20,13 +20,23 @@ const config: NextConfig = {
   // The monorepo root, so the standalone build traces workspace packages.
   outputFileTracingRoot: resolve(process.cwd(), "../.."),
   transpilePackages: ["@sintr/core", "@sintr/ui", "@sintr/agent"],
-  serverExternalPackages: ["@node-rs/argon2"],
+  // Native code, and the browser driver that prints reports: required at run time, not bundled.
+  serverExternalPackages: ["@node-rs/argon2", "playwright-core"],
   poweredByHeader: false,
   reactStrictMode: true,
   // make lint runs ESLint for the whole repository.
   eslint: { ignoreDuringBuilds: true },
   async headers() {
-    return [{ source: "/:path*", headers: securityHeaders }];
+    return [
+      // A report's PDF may be shown inside its own page (same origin only); everything else, never.
+      { source: "/((?!api/reports/[^/]+/pdf$).*)", headers: securityHeaders },
+      {
+        source: "/api/reports/:id/pdf",
+        headers: securityHeaders.map((header) =>
+          header.key === "X-Frame-Options" ? { key: "X-Frame-Options", value: "SAMEORIGIN" } : header,
+        ),
+      },
+    ];
   },
 };
 
