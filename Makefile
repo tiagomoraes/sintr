@@ -19,7 +19,7 @@ COMPOSE := docker compose -f docker/compose.yaml $(if $(SINTR_DOCKER_SUBNET),-f 
 # CI passes --with-deps to also install the browser's system libraries.
 PLAYWRIGHT_INSTALL_FLAGS ?=
 
-.PHONY: help setup dev test lint typecheck build migrate db-generate selfhost-up selfhost-down db-up db-down
+.PHONY: help setup dev test lint typecheck build migrate db-generate report-assets selfhost-up selfhost-down db-up db-down
 
 help: ## List the targets
 	@grep -hE '^[a-z-]+:.*## ' Makefile | awk -F ':.*## ' '{printf "  make %-14s %s\n", $$1, $$2}'
@@ -44,6 +44,9 @@ migrate: db-up ## Apply database migrations to the development database
 
 db-generate: ## Write a new SQL migration after a schema change (name it with NAME=...)
 	$(PNPM) --filter @sintr/core db:generate --name $(or $(NAME),change)
+
+report-assets: ## Re-embed the report's fonts and light after changing them (LIGHT=1 renders the light again)
+	node scripts/report-assets.mjs $(if $(LIGHT),--light)
 
 dev: migrate ## Run the web app and the worker against the development database
 	$(PNPM) --parallel --filter @sintr/web --filter @sintr/worker dev
