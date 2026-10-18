@@ -22,6 +22,13 @@
       "when": 1792356851620,
       "tag": "0002_report",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1792359236978,
+      "tag": "0003_mcp",
+      "breakpoints": true
     }
   ]
 }

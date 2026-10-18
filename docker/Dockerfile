@@ -30,6 +30,8 @@ ENV NODE_ENV=production NEXT_TELEMETRY_DISABLED=1 PORT=3000 HOSTNAME=0.0.0.0 \
 WORKDIR /app
 COPY --from=build --chown=node:node /repo/apps/web/.next/standalone ./
 COPY --from=build --chown=node:node /repo/apps/web/.next/static ./apps/web/.next/static
+# The stdio bridge for local MCP clients (/sintr-mcp.mjs), bundled by the web build.
+COPY --from=build --chown=node:node /repo/apps/web/public ./apps/web/public
 COPY --from=build --chown=node:node /repo/apps/worker/dist ./worker
 COPY --from=build --chown=node:node /repo/packages/core/drizzle ./migrations
 USER node

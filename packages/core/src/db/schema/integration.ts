@@ -19,6 +19,8 @@ export const apiTokens = pgTable(
     tokenHash: text("token_hash").notNull().unique(),
     scopes: text("scopes").array().notNull(),
     lastUsedAt: timestamp("last_used_at", { withTimezone: true }),
+    /** The client's own name for itself at its last connection (MCP `clientInfo.name`), sanitised. */
+    lastClient: text("last_client"),
     expiresAt: timestamp("expires_at", { withTimezone: true }),
     revokedAt: timestamp("revoked_at", { withTimezone: true }),
     createdAt: createdAt(),

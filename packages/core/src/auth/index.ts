@@ -1,4 +1,4 @@
-export { authenticateApiToken, type ApiTokenPrincipal } from "./api-tokens";
+export { authenticateApiToken, clientName, type ApiTokenPrincipal } from "./api-tokens";
 export {
   DISABLED_AUTH_PATHS,
   EMAIL_AUTH_PATHS,

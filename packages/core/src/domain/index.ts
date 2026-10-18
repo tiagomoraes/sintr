@@ -396,12 +396,48 @@ export const ApiTokenInput = z.object({
 });
 export type ApiTokenInput = { name: string; scopes: ApiTokenScope[]; expiresAt?: Date | null };
 
+/**
+ * What a connection key may do, as the app offers it: three sets of the
+ * per-data-type scopes, and only those the MCP tools use. "read" sees the
+ * diary and saves nothing; "write" saves entries and check-ins and reads
+ * nothing back.
+ */
+export const API_TOKEN_ACCESS = {
+  read_write: [
+    "entries:read",
+    "checkins:read",
+    "therapy:read",
+    "reports:read",
+    "entries:write",
+    "checkins:write",
+  ],
+  read: ["entries:read", "checkins:read", "therapy:read", "reports:read"],
+  write: ["entries:write", "checkins:write"],
+} as const satisfies Record<string, readonly ApiTokenScope[]>;
+export type ApiTokenAccess = keyof typeof API_TOKEN_ACCESS;
+export const ApiTokenAccess = z.enum(Object.keys(API_TOKEN_ACCESS) as [ApiTokenAccess, ...ApiTokenAccess[]]);
+
+/** The access a set of scopes matches exactly, or null for any other set. */
+export function accessOf(scopes: readonly ApiTokenScope[]): ApiTokenAccess | null {
+  const held = new Set(scopes);
+  for (const [access, wanted] of Object.entries(API_TOKEN_ACCESS) as [ApiTokenAccess, readonly string[]][]) {
+    if (wanted.length === held.size && wanted.every((scope) => held.has(scope as ApiTokenScope)))
+      return access;
+  }
+  return null;
+}
+
+/** Keys a person may hold at once; revoked and expired ones do not count. */
+export const MAX_ACTIVE_API_TOKENS = 20;
+
 export interface ApiToken {
   id: string;
   name: string;
   tokenPrefix: string;
   scopes: ApiTokenScope[];
   lastUsedAt: Date | null;
+  /** The name the connected client gave for itself when it last connected (MCP `clientInfo`). */
+  lastClient: string | null;
   expiresAt: Date | null;
   revokedAt: Date | null;
   createdAt: Date;
@@ -415,6 +451,8 @@ export const AuditAction = z.enum([
   "consent.recorded",
   "api_token.created",
   "api_token.revoked",
+  "mcp.entry_saved",
+  "mcp.checkin_saved",
   "report.prepared",
   "report.edited",
   "report.reviewed",

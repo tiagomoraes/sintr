@@ -19,10 +19,12 @@ const config: NextConfig = {
   output: process.env.SINTR_STANDALONE === "1" ? "standalone" : undefined,
   // The monorepo root, so the standalone build traces workspace packages.
   outputFileTracingRoot: resolve(process.cwd(), "../.."),
-  transpilePackages: ["@sintr/core", "@sintr/ui", "@sintr/agent"],
+  transpilePackages: ["@sintr/core", "@sintr/ui", "@sintr/agent", "@sintr/mcp"],
   // Native code, and the browser driver that prints reports: required at run time, not bundled.
   serverExternalPackages: ["@node-rs/argon2", "playwright-core"],
   poweredByHeader: false,
+  // `next dev` prints request lines; /mcp/<key> carries a key, so it never does.
+  logging: { incomingRequests: { ignore: [/^\/mcp\//] } },
   reactStrictMode: true,
   // make lint runs ESLint for the whole repository.
   eslint: { ignoreDuringBuilds: true },

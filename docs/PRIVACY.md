@@ -1,6 +1,6 @@
 # Privacy and data protection
 
-This describes what sintr does with personal data **as implemented today** (milestones F0, F1 and F2), so it can be checked against the code. Where something is planned but not built, it says so. The product rules behind it are in [`PRODUCT.md`](PRODUCT.md) (Security and privacy, Invariants) and [`CONVENTIONS.md`](CONVENTIONS.md) (Non-negotiable rules).
+This describes what sintr does with personal data **as implemented today** (milestones F0 to F3), so it can be checked against the code. Where something is planned but not built, it says so. The product rules behind it are in [`PRODUCT.md`](PRODUCT.md) (Security and privacy, Invariants) and [`CONVENTIONS.md`](CONVENTIONS.md) (Non-negotiable rules).
 
 A diary kept in sintr is sensitive personal data: health data under LGPD art. 11. The posture is built around four ideas: the person's specific consent, encryption by the application before anything is stored, strict separation between people, and nothing sent anywhere without approval.
 
@@ -57,10 +57,11 @@ A diary kept in sintr is sensitive personal data: health data under LGPD art. 11
 - Sign-in is limited to 10 attempts a minute and sign-up to 10 every 10 minutes, per IP address (then HTTP 429). A wrong password and an unknown email get the same answer.
 - Every page that shows data checks the session on the server; a forged or revoked cookie is redirected to sign in.
 - Browser requests to the auth API from any origin other than `SINTR_URL` are refused (CSRF); browsers always send the origin on these requests. The app sends a nonce-based Content Security Policy (no third-party scripts, styles, fonts or frames), `X-Frame-Options: DENY`, `Referrer-Policy: no-referrer` and a restrictive `Permissions-Policy`.
-- API tokens for external agents (F3) are stored only as a SHA-256 hash, carry scopes per data type, can expire and can be revoked. The token itself is shown once.
+- Connection keys for a person's own assistant (MCP, F3) are stored only as a SHA-256 hash, carry scopes per data type, can expire and are revoked with one click. The key itself is shown once. It is the only credential of the MCP endpoint, which never reads the session cookie, refuses browsers on other origins and sends no CORS headers. Wrong keys are limited per address, and calls per key.
 
 ## Logs and telemetry
 
+- MCP requests are logged as their status, the key's id and their duration, and tool calls as their name and outcome; never the key, the address that carries it, or any word.
 - Logs go through one boundary: a logger that writes only fields it knows to be operational (ids, counts, durations, codes). Anything else becomes `[redacted]`; errors keep only their name and code, because database messages can echo values. `console` is banned by lint in the code.
 - Database errors are reduced to their SQLSTATE and constraint name before they leave the core.
 - Caddy keeps no access log. Next.js and Better Auth telemetry are disabled. Fonts are self-hosted; the app loads nothing from third parties.
@@ -75,6 +76,16 @@ The embedded assistant talks to a language model **the person chooses, with thei
 - **A message that signals acute risk** stops the diary before anything is sent to the provider: the reply that points to CVV 188 and SAMU 192 is written in advance, and works even without a provider.
 - **For the weekly report** (F2), the assistant receives the digest of the period: every entry of the period in full (title, situation, thoughts, emotions with intensities, body, behaviour, context, tags, notes and the working of a thought), the check-in values and notes of those days, the averages, and the person's open "things to bring up" and tasks. That is what it needs to write the report; nothing outside the period, and nothing else from the diary. What it writes is checked before it is kept (quotes against the diary, no causes, no clinical labels), and a report is never sent by it. The worker prepares reports only for people whose consent to process their health data is granted in its current wording. Without a provider, sintr prepares the parts it can alone and sends nothing to any model.
 - The hosted offer will use zero-data-retention routes; this document will say which.
+
+## Your own assistant (MCP)
+
+A person can connect the assistant they already use (Claude, ChatGPT, Gemini, Hermes) with a key made on the Connect screen. The full guide is [`MCP.md`](MCP.md).
+
+- **What their assistant's provider receives** is decided by that assistant: everything said in that conversation, as always, plus what sintr answers its tools. With a key that may read: a summary of the last days (dates, titles or the start of the situation, emotions with intensities, check-in values), an entry it opens in full, the session schedule and open therapy notes (never the therapist's name or address), and the entries and check-in notes of the next report's period when it helps the person prepare. A "Save only" key reads nothing back. That provider's terms and retention apply, not sintr's.
+- **What sintr receives** is what the assistant asks to save, checked against the person's own messages (`personWords`), which are read for the checks and dropped, never stored. What is saved is sealed like everything else.
+- **Nothing is sent to anyone from MCP.** No tool approves or sends a report; the therapist only ever receives a report through the per-report consent above.
+- **The crisis protocol** applies to every save: words that signal acute risk save nothing and answer with the fixed message that points to CVV 188 and SAMU 192.
+- **The record of it**: making and revoking a key, and each entry or check-in an assistant saved, are in the audit log with the key's id; each key shows when it was last used and the name its client gave. The endpoint refuses every call until the current consent to process health data is on record.
 
 ## Email
 
@@ -111,5 +122,8 @@ Recorded here so they are not mistaken for features:
 - The app connects to Postgres as the database owner; a least-privilege role is part of F4 hardening.
 - Session IP addresses and user agents are kept for the life of the session.
 - No MFA yet (F5).
+- sintr offers no OAuth for MCP yet. ChatGPT cannot send a key of its own, so for it (and for Claude without request headers) the key travels inside the address, which makes the address a secret.
+- Over MCP, the person's yes to a draft happens in their assistant's conversation, which sintr cannot see; sintr requires the assistant to declare it and checks the words, but cannot prove it.
+- MCP rate limits are counted per web process, in memory.
 
 This is a description of the software, not legal advice or a compliance claim.

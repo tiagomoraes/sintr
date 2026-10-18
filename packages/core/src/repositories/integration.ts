@@ -1,8 +1,15 @@
 import { createHash, randomBytes } from "node:crypto";
-import { and, desc, eq, isNull } from "drizzle-orm";
+import { and, count, desc, eq, gt, isNull, or } from "drizzle-orm";
 import { apiTokens, auditLog } from "../db/schema";
-import { ApiTokenInput, AuditInput, type ApiToken, type ApiTokenScope, type AuditEvent } from "../domain";
-import { parseInput } from "../errors";
+import {
+  ApiTokenInput,
+  AuditInput,
+  MAX_ACTIVE_API_TOKENS,
+  type ApiToken,
+  type ApiTokenScope,
+  type AuditEvent,
+} from "../domain";
+import { InvalidStateError, parseInput } from "../errors";
 import { isId, type ScopeContext } from "./context";
 
 export const API_TOKEN_PREFIX = "sintr_";
@@ -18,6 +25,7 @@ function decodeToken(row: typeof apiTokens.$inferSelect): ApiToken {
     tokenPrefix: row.tokenPrefix,
     scopes: row.scopes as ApiTokenScope[],
     lastUsedAt: row.lastUsedAt,
+    lastClient: row.lastClient,
     expiresAt: row.expiresAt,
     revokedAt: row.revokedAt,
     createdAt: row.createdAt,
@@ -26,11 +34,22 @@ function decodeToken(row: typeof apiTokens.$inferSelect): ApiToken {
 
 export function apiTokensRepository({ db, userId }: ScopeContext) {
   const own = (id: string) => and(eq(apiTokens.id, id), eq(apiTokens.userId, userId));
+  const active = () =>
+    and(
+      eq(apiTokens.userId, userId),
+      isNull(apiTokens.revokedAt),
+      or(isNull(apiTokens.expiresAt), gt(apiTokens.expiresAt, new Date())),
+    );
 
   return {
-    /** Returns the token once. Only its hash is stored. */
+    /**
+     * Returns the token once. Only its hash is stored. A person holds at
+     * most MAX_ACTIVE_API_TOKENS keys that still work.
+     */
     async create(input: ApiTokenInput): Promise<{ token: string; apiToken: ApiToken }> {
       const value = parseInput(ApiTokenInput, input);
+      const [held] = await db.select({ n: count() }).from(apiTokens).where(active());
+      if ((held?.n ?? 0) >= MAX_ACTIVE_API_TOKENS) throw new InvalidStateError("too many active tokens");
       const token = `${API_TOKEN_PREFIX}${randomBytes(32).toString("base64url")}`;
       const [row] = await db
         .insert(apiTokens)
@@ -53,6 +72,12 @@ export function apiTokensRepository({ db, userId }: ScopeContext) {
         .where(eq(apiTokens.userId, userId))
         .orderBy(desc(apiTokens.createdAt));
       return rows.map(decodeToken);
+    },
+
+    async get(id: string): Promise<ApiToken | null> {
+      if (!isId(id)) return null;
+      const [row] = await db.select().from(apiTokens).where(own(id));
+      return row ? decodeToken(row) : null;
     },
 
     async revoke(id: string): Promise<boolean> {

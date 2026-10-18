@@ -7,7 +7,8 @@ export { createBaseRuntime, type BaseRuntime, type RuntimeOptions } from "./base
 /** The web shell's runtime: the base plus Better Auth and API token lookup. */
 export interface Runtime extends BaseRuntime {
   readonly auth: Auth;
-  authenticateApiToken(token: string): Promise<ApiTokenPrincipal | null>;
+  /** Resolve an MCP bearer token; `client` is the name the client gave at `initialize`. */
+  authenticateApiToken(token: string, use?: { client?: string | null }): Promise<ApiTokenPrincipal | null>;
 }
 
 export function createRuntime(config: Config, options: RuntimeOptions): Runtime {
@@ -15,6 +16,6 @@ export function createRuntime(config: Config, options: RuntimeOptions): Runtime 
   return {
     ...base,
     auth: createAuth({ db: database.db, config, logger: base.log, email: base.email }),
-    authenticateApiToken: (token) => authenticateApiToken(database.db, token),
+    authenticateApiToken: (token, use) => authenticateApiToken(database.db, token, use),
   };
 }

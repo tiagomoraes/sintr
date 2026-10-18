@@ -1,6 +1,7 @@
 import { sql } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { authenticateApiToken } from "../src/auth/api-tokens";
+import { authenticateApiToken, clientName } from "../src/auth/api-tokens";
+import { API_TOKEN_ACCESS, MAX_ACTIVE_API_TOKENS, accessOf } from "../src/domain";
 import { ConsentRequiredError, DataAccessError, InvalidStateError, ValidationError } from "../src/errors";
 import { createRepositories, type UserScope } from "../src/repositories";
 import { createUser, openTestDatabase, testMasterKey } from "./support";
@@ -238,6 +239,50 @@ describe("API tokens and the audit log", () => {
     await expect(
       scope.apiTokens.create({ name: "x", scopes: ["everything" as "entries:read"] }),
     ).rejects.toBeInstanceOf(ValidationError);
+  });
+
+  it("names the three kinds of access, and nothing else", () => {
+    expect(accessOf([...API_TOKEN_ACCESS.read_write])).toBe("read_write");
+    expect(accessOf(["checkins:read", "entries:read", "reports:read", "therapy:read"])).toBe("read");
+    expect(accessOf(["entries:write", "checkins:write"])).toBe("write");
+    expect(accessOf(["entries:read"])).toBeNull();
+    expect(accessOf([...API_TOKEN_ACCESS.read, "insights:read"])).toBeNull();
+  });
+
+  it("records when a token was used and the name its client gave, cleaned", async () => {
+    const { token, apiToken } = await scope.apiTokens.create({ name: "agent", scopes: ["entries:read"] });
+    expect(apiToken.lastUsedAt).toBeNull();
+    await authenticateApiToken(handle.db, token, { client: "claude-ai" });
+    let stored = await scope.apiTokens.get(apiToken.id);
+    expect(stored?.lastUsedAt).toBeInstanceOf(Date);
+    expect(stored?.lastClient).toBe("claude-ai");
+    // A later call without a name keeps the last one.
+    await authenticateApiToken(handle.db, token);
+    stored = await scope.apiTokens.get(apiToken.id);
+    expect(stored?.lastClient).toBe("claude-ai");
+    expect(clientName("Gemini CLI (MCP) 1.2/3")).toBe("Gemini CLI (MCP) 1.2/3");
+    expect(clientName("<script>x</script>")).toBe("scriptx/script");
+    expect(clientName("a".repeat(100))).toHaveLength(60);
+    expect(clientName("   ")).toBeNull();
+    expect(clientName(42)).toBeNull();
+  });
+
+  it("holds at most a fixed number of working tokens per person", async () => {
+    const id = await createUser(handle.db, "many");
+    await repositories.provision(id);
+    const many = await repositories.forUser(id);
+    const made = [];
+    for (let i = 0; i < MAX_ACTIVE_API_TOKENS; i += 1) {
+      made.push(await many.apiTokens.create({ name: `key ${i}`, scopes: ["entries:read"] }));
+    }
+    await expect(
+      many.apiTokens.create({ name: "one more", scopes: ["entries:read"] }),
+    ).rejects.toBeInstanceOf(InvalidStateError);
+    // A revoked key frees its place.
+    await many.apiTokens.revoke(made[0]!.apiToken.id);
+    await expect(
+      many.apiTokens.create({ name: "one more", scopes: ["entries:read"] }),
+    ).resolves.toBeDefined();
   });
 
   it("accepts identifiers in audit metadata and refuses nested content", async () => {
