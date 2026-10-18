@@ -65,6 +65,7 @@ export default tseslint.config(
             { name: "drizzle-orm", message: "Use the user-scoped repositories from @sintr/core." },
             { name: "postgres", message: "Use the user-scoped repositories from @sintr/core." },
             { name: "@sintr/core/schema", message: "Use the user-scoped repositories from @sintr/core." },
+            { name: "@sintr/core/db", message: "Use the runtime from @sintr/core/runtime." },
           ],
         },
       ],
