@@ -12,8 +12,10 @@ export NEXT_TELEMETRY_DISABLED := 1
 
 PNPM ?= pnpm
 PNPM_VERSION := 11.20.0
-COMPOSE_DEV := docker compose -f docker/compose.dev.yaml --env-file .env
-COMPOSE := docker compose -f docker/compose.yaml --env-file .env
+# One dev database per checkout (worktrees run side by side), named after its path.
+DEV_PROJECT ?= sintr-dev-$(shell printf '%s' "$(CURDIR)" | cksum | cut -d' ' -f1)
+COMPOSE_DEV := docker compose -p $(DEV_PROJECT) -f docker/compose.dev.yaml --env-file .env
+COMPOSE := docker compose -f docker/compose.yaml $(if $(SINTR_DOCKER_SUBNET),-f docker/compose.subnet.yaml) --env-file .env
 # CI passes --with-deps to also install the browser's system libraries.
 PLAYWRIGHT_INSTALL_FLAGS ?=
 
@@ -23,7 +25,7 @@ help: ## List the targets
 	@grep -hE '^[a-z-]+:.*## ' Makefile | awk -F ':.*## ' '{printf "  make %-14s %s\n", $$1, $$2}'
 
 .env: .env.example
-	@node scripts/init-env.mjs
+	@sh scripts/init-env.sh
 	@touch .env
 
 setup: .env ## Install dependencies, create .env with fresh secrets, fetch the test browser

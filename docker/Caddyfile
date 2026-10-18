@@ -1,0 +1,13 @@
+# The edge of the self-host stack. SINTR_SITE_ADDRESS is ":80" for local
+# HTTP, or a bare domain name, in which case Caddy obtains and renews a TLS
+# certificate itself and redirects HTTP to HTTPS. No access log is kept:
+# request lines are not written anywhere.
+{
+	admin off
+}
+
+{$SINTR_SITE_ADDRESS::80} {
+	encode zstd gzip
+	header -Server
+	reverse_proxy app:3000
+}

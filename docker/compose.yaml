@@ -1,0 +1,97 @@
+# The self-host stack: Caddy in front, the app and the worker, Postgres.
+# Configured entirely by .env (see .env.example). Start it with
+# `make selfhost-up`; stop it with `make selfhost-down` (data is kept).
+name: sintr
+
+x-image: &image
+  image: ${SINTR_IMAGE:-sintr-app:local}
+  build:
+    context: ..
+    dockerfile: docker/Dockerfile
+
+x-database-url: &database-url postgres://${POSTGRES_USER:-sintr}:${POSTGRES_PASSWORD:?run make setup to create .env}@db:5432/${POSTGRES_DB:-sintr}
+
+x-app-env: &app-env
+  DATABASE_URL: *database-url
+  SINTR_URL: ${SINTR_URL:-http://localhost:3000}
+  SINTR_MODE: ${SINTR_MODE:-selfhost}
+  SINTR_SIGNUP: ${SINTR_SIGNUP:-open}
+  SINTR_LOG_LEVEL: ${SINTR_LOG_LEVEL:-info}
+  SINTR_AUTH_SECRET: ${SINTR_AUTH_SECRET:?run make setup to create .env}
+  SINTR_MASTER_KEY: ${SINTR_MASTER_KEY:?run make setup to create .env}
+  SINTR_MASTER_KEY_ID: ${SINTR_MASTER_KEY_ID:-k1}
+
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-sintr}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?run make setup to create .env}
+      POSTGRES_DB: ${POSTGRES_DB:-sintr}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 3s
+      timeout: 3s
+      retries: 30
+
+  migrate:
+    <<: *image
+    command: ["node", "worker/migrate.mjs"]
+    environment:
+      DATABASE_URL: *database-url
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: "no"
+
+  app:
+    <<: *image
+    restart: unless-stopped
+    environment: *app-env
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:3000/api/health').then((r) => process.exit(r.ok ? 0 : 1), () => process.exit(1))",
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 24
+
+  worker:
+    <<: *image
+    command: ["node", "worker/worker.mjs"]
+    restart: unless-stopped
+    environment: *app-env
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - "${SINTR_BIND:-127.0.0.1}:${SINTR_HTTP_PORT:-3000}:80"
+      - "${SINTR_BIND:-127.0.0.1}:${SINTR_HTTPS_PORT:-3443}:443"
+    environment:
+      SINTR_SITE_ADDRESS: ${SINTR_SITE_ADDRESS:-:80}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      app:
+        condition: service_healthy
+
+volumes:
+  pgdata:
+  caddy_data:
+  caddy_config:
