@@ -106,4 +106,15 @@ describe("jobs", () => {
     expect(await job!.run(fake as never)).toEqual({ sessions: 2, verificationTokens: 0 });
     expect(calls).toEqual(["purge"]);
   });
+
+  it("purges conversations past their retention through the runtime", async () => {
+    const job = JOBS.find((j) => j.name === "purge-expired-conversations");
+    expect(job?.intervalMs).toBe(60 * 60 * 1000);
+    const calls: string[] = [];
+    const fake = {
+      purgeExpiredConversations: async () => (calls.push("purge"), { conversations: 3 }),
+    };
+    expect(await job!.run(fake as never)).toEqual({ conversations: 3 });
+    expect(calls).toEqual(["purge"]);
+  });
 });
