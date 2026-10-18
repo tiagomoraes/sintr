@@ -24,11 +24,12 @@ describe("the report service", () => {
   let userId: string;
   let content: ReportContent;
 
+  // One report per session: each draft here is for its own (shifted) session.
   async function newDraft(end: Date = DEMO_PERIOD.end) {
     return scope.reports.createDraft({
       periodStart: DEMO_PERIOD.start,
       periodEnd: end,
-      sessionAt: DEMO_PERIOD.session,
+      sessionAt: new Date(end.getTime() + (DEMO_PERIOD.session.getTime() - DEMO_PERIOD.end.getTime())),
       content: serializeContent(content),
     });
   }
@@ -62,6 +63,19 @@ describe("the report service", () => {
     expect((await reportView(scope, reviewed))!.numbers.counts).toEqual(view.numbers.counts);
     expect((await scope.auditLog.list()).map((e) => e.action)).toContain("report.reviewed");
     await expect(approveReport(scope, draft.id, fakePdf)).rejects.toBeInstanceOf(InvalidStateError);
+  });
+
+  it("refuses to approve a draft that changed while its PDF was printing, and keeps the change", async () => {
+    const draft = await newDraft(new Date(DEMO_PERIOD.end.getTime() + 7));
+    const stored = parseContent(draft.content)!;
+    const editMeanwhile = async (html: string) => {
+      await scope.reports.edit(draft.id, serializeContent({ ...stored, week: "Mudei enquanto imprimia." }));
+      return fakePdf(html);
+    };
+    await expect(approveReport(scope, draft.id, editMeanwhile)).rejects.toBeInstanceOf(InvalidStateError);
+    const now = await scope.reports.get(draft.id);
+    expect(now?.status).toBe("draft");
+    expect(parseContent(now!.content)?.week).toBe("Mudei enquanto imprimia.");
   });
 
   it("lets the person change the prose and remove items, never a moment's own words", async () => {
@@ -127,6 +141,21 @@ describe("the report service", () => {
     );
   });
 
+  it("sends a report once, even when two sends arrive together", async () => {
+    const email = memoryTransport();
+    const draft = await newDraft(new Date(DEMO_PERIOD.end.getTime() + 6));
+    await approveReport(scope, draft.id, fakePdf);
+    const results = await Promise.allSettled([
+      sendReport({ scope, email, reportId: draft.id, recipient: THERAPIST, log }),
+      sendReport({ scope, email, reportId: draft.id, recipient: THERAPIST, log }),
+    ]);
+    expect(results.map((r) => r.status).sort()).toEqual(["fulfilled", "rejected"]);
+    expect((results.find((r) => r.status === "rejected") as PromiseRejectedResult).reason).toBeInstanceOf(
+      InvalidStateError,
+    );
+    expect(email.sent).toHaveLength(1);
+  });
+
   it("marks nothing sent when the email fails, and says so in the audit log", async () => {
     const email = memoryTransport();
     email.failing = true;
@@ -141,6 +170,8 @@ describe("the report service", () => {
       recipient: null,
     });
     expect((await scope.auditLog.list()).map((e) => e.action)).toContain("report.send_failed");
+    // The person's yes stays on record, though nothing left.
+    expect((await scope.consents.list()).some((c) => c.reportId === draft.id && c.granted)).toBe(true);
   });
 
   it("keeps a report the person chose to keep, and refuses to send without email", async () => {

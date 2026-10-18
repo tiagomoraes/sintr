@@ -49,6 +49,14 @@ export function escapeHtml(text: string): string {
     .replace(/'/gu, "&#39;");
 }
 
+/**
+ * A CSS string literal. The text (the person's name) sits inside a <style>
+ * element, so "<" is escaped too: it can never close the element.
+ */
+export function cssString(text: string): string {
+  return `"${text.replace(/[\\"<>\r\n]/gu, (c) => `\\${c.codePointAt(0)!.toString(16)} `)}"`;
+}
+
 /** Escape, and set the person's verified quotes under the highlighter. */
 function inline(text: string, check: Pick<ReportCheck, "verified">): string {
   return splitQuotes(text)
@@ -348,7 +356,7 @@ export function reportDocument(input: ReportDocumentInput): string {
       : [`<div class="cover cover--flow">${cover.join("")}</div>`, ...rest, footHtml];
 
   const running = s.running(name, period.label);
-  const css = `${REPORT_CSS}\n@page { @bottom-left { content: "${running.replace(/["\\]/gu, "\\$&")}"; } @bottom-right { content: counter(page) " / " counter(pages); } }`;
+  const css = `${REPORT_CSS}\n@page { @bottom-left { content: ${cssString(running)}; } @bottom-right { content: counter(page) " / " counter(pages); } }`;
   const lang = content.language === "pt" ? "pt-BR" : content.language;
   const title = [s.doc, name, period.label].filter(Boolean).join(" · ");
   const fonts = [

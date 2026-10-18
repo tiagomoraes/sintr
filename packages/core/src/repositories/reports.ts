@@ -115,11 +115,15 @@ export function reportsRepository({ db, userId, cipher }: ScopeContext) {
     kind: ReportRevisionKind,
     content: string,
     set: Partial<typeof reports.$inferInsert>,
+    options: { untouched?: boolean } = {},
   ): Promise<Report> =>
     inTransaction(db, async (tx) => {
       const [row] = await tx.select().from(reports).where(own(id)).for("update");
       if (!row) throw new NotFoundError("report");
       if (row.status === "sent") throw new InvalidStateError("a sent report cannot change");
+      if (options.untouched && (row.status !== "draft" || row.editedAt !== null)) {
+        throw new InvalidStateError("the person changed this report");
+      }
       const previous = row.content ? cipher.openText(spec.columns.content, row.content) : null;
       if (previous !== null && previous !== content) {
         const before = parseContent(previous);
@@ -229,18 +233,40 @@ export function reportsRepository({ db, userId, cipher }: ScopeContext) {
      */
     async prepareAgain(
       id: string,
-      value: { content: string; periodEnd?: Date; sessionAt?: Date | null },
+      value: {
+        content: string;
+        periodEnd?: Date;
+        sessionAt?: Date | null;
+        /** The scheduler's own preparation: refused if the person touched the draft meanwhile. */
+        untouched?: boolean;
+      },
     ): Promise<Report> {
       const content = contentValue(value.content);
       const row = await getRow(id);
       if (!row) throw new NotFoundError("report");
       if (value.periodEnd && value.periodEnd <= row.periodStart) throw new ValidationError(["periodEnd"]);
-      return revise(id, "prepared_again", content, {
-        generatedAt: new Date(),
-        editedAt: null,
-        ...(value.periodEnd ? { periodEnd: value.periodEnd } : {}),
-        ...(value.sessionAt !== undefined ? { sessionAt: value.sessionAt } : {}),
-      });
+      return revise(
+        id,
+        "prepared_again",
+        content,
+        {
+          generatedAt: new Date(),
+          editedAt: null,
+          ...(value.periodEnd ? { periodEnd: value.periodEnd } : {}),
+          ...(value.sessionAt !== undefined ? { sessionAt: value.sessionAt } : {}),
+        },
+        { untouched: value.untouched === true },
+      );
+    },
+
+    /**
+     * Hold the report while it is being sent, so a second send of the same
+     * report waits and then finds it sent. Use inside a transaction.
+     */
+    async lockForSend(id: string): Promise<Report | null> {
+      if (!isId(id)) return null;
+      const [row] = await db.select().from(reports).where(own(id)).for("update");
+      return row ? decode(row) : null;
     },
 
     async readPdf(id: string): Promise<Buffer | null> {
@@ -252,25 +278,38 @@ export function reportsRepository({ db, userId, cipher }: ScopeContext) {
      * The person approves the words. `content` (with its numbers frozen) and
      * `pdf` are the version approved: what is sent is exactly this PDF.
      */
-    async markReviewed(id: string, value: { content?: string; pdf?: Uint8Array } = {}): Promise<Report> {
-      const row = await getRow(id);
-      if (!row) throw new NotFoundError("report");
-      if (row.status !== "draft") throw new InvalidStateError("only a draft can be reviewed");
-      const [updated] = await db
-        .update(reports)
-        .set({
-          status: "reviewed",
-          reviewedAt: new Date(),
-          ...(value.content !== undefined
-            ? { content: cipher.sealText(spec.columns.content, contentValue(value.content)) }
-            : {}),
-          ...(value.pdf !== undefined ? { pdf: cipher.sealBytes(spec.columns.pdf, value.pdf) } : {}),
-          updatedAt: new Date(),
-        })
-        .where(and(own(id), eq(reports.status, "draft")))
-        .returning();
-      if (!updated) throw new InvalidStateError("only a draft can be reviewed");
-      return decode(updated);
+    async markReviewed(
+      id: string,
+      value: {
+        content?: string;
+        pdf?: Uint8Array;
+        /** The words the person approved: refused if the draft changed since (an edit, a new preparation). */
+        expected?: string;
+      } = {},
+    ): Promise<Report> {
+      return inTransaction(db, async (tx) => {
+        const [row] = await tx.select().from(reports).where(own(id)).for("update");
+        if (!row) throw new NotFoundError("report");
+        if (row.status !== "draft") throw new InvalidStateError("only a draft can be reviewed");
+        if (value.expected !== undefined) {
+          const stored = row.content ? cipher.openText(spec.columns.content, row.content) : null;
+          if (stored !== value.expected) throw new InvalidStateError("the report changed since it was read");
+        }
+        const [updated] = await tx
+          .update(reports)
+          .set({
+            status: "reviewed",
+            reviewedAt: new Date(),
+            ...(value.content !== undefined
+              ? { content: cipher.sealText(spec.columns.content, contentValue(value.content)) }
+              : {}),
+            ...(value.pdf !== undefined ? { pdf: cipher.sealBytes(spec.columns.pdf, value.pdf) } : {}),
+            updatedAt: new Date(),
+          })
+          .where(own(id))
+          .returning();
+        return decode(updated!);
+      });
     },
 
     /**

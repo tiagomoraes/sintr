@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { REPORT_ASSETS } from "../src/report/assets.generated";
 import { buildCorpus, checkReport, entryTexts } from "../src/report/check";
 import { buildDigest, digestNumbers } from "../src/report/digest";
-import { reportDocument } from "../src/report/document";
+import { cssString, reportDocument } from "../src/report/document";
 import { draftContent } from "../src/report/draft";
 import { REPORT_STRINGS } from "../src/report/strings";
 import { DEMO_PERIOD, DEMO_TZ, demoRecords } from "./report-fixtures";
@@ -95,6 +95,12 @@ describe("the report document", () => {
     const html = render({ week: 'Escreveu <script>alert(1)</script> & "eu sempre deixo a desejar".' });
     expect(html).toContain("&lt;script&gt;alert(1)&lt;/script&gt; &amp;");
     expect(html).not.toContain("<script>alert");
+  });
+
+  it("keeps a name inside the running foot's CSS, whatever it holds", () => {
+    expect(cssString('Ana </style><script>x</script> "B"\nC')).toBe(
+      '"Ana \\3c /style\\3e \\3c script\\3e x\\3c /script\\3e  \\22 B\\22 \\a C"',
+    );
   });
 
   it("uses no dashes in what it prints", () => {

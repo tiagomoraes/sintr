@@ -81,6 +81,19 @@ describe("reports: changes keep what the report said before", () => {
     expect(parseContent(revisions[1]!.previous)?.mood).toBe("Escrito pela pessoa.");
   });
 
+  it("never lets the scheduler rewrite a draft the person changed in the meantime", async () => {
+    const report = await scope.reports.createDraft({
+      periodStart: new Date("2026-06-01T00:00:00Z"),
+      periodEnd: new Date("2026-06-08T00:00:00Z"),
+      content: serializeContent(content),
+    });
+    await scope.reports.edit(report.id, serializeContent({ ...content, week: "Meu texto." }));
+    await expect(
+      scope.reports.prepareAgain(report.id, { content: serializeContent(content), untouched: true }),
+    ).rejects.toBeInstanceOf(InvalidStateError);
+    expect(parseContent((await scope.reports.get(report.id))!.content)?.week).toBe("Meu texto.");
+  });
+
   it("approves a draft once, and refuses an end before the start", async () => {
     const report = await scope.reports.createDraft({
       periodStart: new Date("2026-08-01T00:00:00Z"),
@@ -107,6 +120,22 @@ describe("reports: changes keep what the report said before", () => {
       name: "DataAccessError",
       constraint: "reports_user_id_period_end_key",
     } satisfies Partial<DataAccessError>);
+  });
+
+  it("never holds two reports for the same session (two tabs preparing at once)", async () => {
+    const sessionAt = new Date("2026-05-11T21:00:00Z");
+    await scope.reports.createDraft({
+      periodStart: new Date("2026-05-04T20:00:00Z"),
+      periodEnd: new Date("2026-05-09T10:00:00Z"),
+      sessionAt,
+    });
+    await expect(
+      scope.reports.createDraft({
+        periodStart: new Date("2026-05-04T20:00:00Z"),
+        periodEnd: new Date("2026-05-09T10:00:01Z"),
+        sessionAt,
+      }),
+    ).rejects.toMatchObject({ name: "DataAccessError", constraint: "reports_user_id_session_at_key" });
   });
 
   it("records the notice, and keeps all of it from another person", async () => {

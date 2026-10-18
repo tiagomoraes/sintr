@@ -16,8 +16,8 @@ import { MOMENT_PROSE, ReportContent, parseContent, serializeContent, type Repor
 import { digestNumbers, type DigestNumbers } from "./digest";
 import { reportDocument } from "./document";
 import { formatSession } from "./format";
-import type { ReportPeriod } from "./period";
-import { isoWeek, localDay } from "./time";
+import { calendarWeek, type ReportPeriod } from "./period";
+import { localDay } from "./time";
 
 /** A stored report's period, as the planner and the document know it. */
 export function periodOf(
@@ -34,7 +34,7 @@ export function periodOf(
       }
     : {
         kind: "week",
-        label: isoWeek(localDay(report.periodStart, timeZone)),
+        label: calendarWeek(timeZone, report.periodStart).label,
         start: report.periodStart,
         end: report.periodEnd,
         session: null,
@@ -115,7 +115,12 @@ export async function approveReport(
   if (!view) throw new InvalidStateError("the report has no content");
   const content: ReportContent = { ...view.content, numbers: view.numbers };
   const pdf = await render(reportHtml({ ...view, content, report: { ...report, status: "reviewed" } }));
-  const reviewed = await scope.reports.markReviewed(reportId, { content: serializeContent(content), pdf });
+  // Refused if the draft changed while the PDF was printing: what is approved is what was read.
+  const reviewed = await scope.reports.markReviewed(reportId, {
+    content: serializeContent(content),
+    pdf,
+    ...(report.content !== null ? { expected: report.content } : {}),
+  });
   await scope.auditLog.record({ action: "report.reviewed", targetType: "report", targetId: reportId });
   return reviewed;
 }
@@ -178,66 +183,86 @@ export async function sendReport(input: {
   recipient: string;
   log: Logger;
 }): Promise<Report> {
-  const { scope, email, reportId, log } = input;
-  const report = await scope.reports.get(reportId);
-  if (!report) throw new NotFoundError("report");
-  if (report.status !== "reviewed") throw new InvalidStateError("approve the report before sending it");
-  const [settings, profile] = await Promise.all([scope.therapySettings.get(), scope.profile.get()]);
-  const recipient = settings.therapistContact;
-  if (settings.deliveryChannel !== "email") throw new InvalidStateError("this report is kept, not sent");
-  if (!recipient || !isEmailAddress(recipient) || recipient !== input.recipient) {
-    throw new ValidationError(["recipient"]);
-  }
+  const { email, reportId, log } = input;
+  const checked = async (scope: UserScope) => {
+    const report = await scope.reports.lockForSend(reportId);
+    if (!report) throw new NotFoundError("report");
+    if (report.status !== "reviewed") throw new InvalidStateError("approve the report before sending it");
+    const [settings, profile] = await Promise.all([scope.therapySettings.get(), scope.profile.get()]);
+    const recipient = settings.therapistContact;
+    if (settings.deliveryChannel !== "email") throw new InvalidStateError("this report is kept, not sent");
+    if (!recipient || !isEmailAddress(recipient) || recipient !== input.recipient) {
+      throw new ValidationError(["recipient"]);
+    }
+    return { report, profile, recipient };
+  };
   if (!email.available) throw new EmailError("email_off");
-  const pdf = await scope.reports.readPdf(reportId);
-  const content = parseContent(report.content);
-  if (!pdf || !content) throw new InvalidStateError("the approved report has no PDF");
-  const period = periodOf(report, profile.timezone);
 
-  const consent = await scope.consents.record({
-    purpose: "report_send",
-    version: REPORT_SEND_CONSENT_VERSION,
-    granted: true,
-    reportId,
-    recipient,
-  });
-  await scope.auditLog.record({
-    action: "consent.recorded",
-    targetType: "consent",
-    targetId: consent.id,
-    metadata: { purpose: "report_send", version: REPORT_SEND_CONSENT_VERSION },
-  });
-  try {
-    await email.send(
-      reportEmail({
-        to: recipient,
-        language: content.language,
-        personName: profile.displayName,
-        session: sessionText(period, profile.timezone, content.language),
-        pdf,
-        filename: reportFilename(period),
-      }),
-    );
-  } catch (error) {
-    const code = error instanceof EmailError ? error.code : "send_failed";
-    await scope.auditLog.record({
-      action: "report.send_failed",
-      targetType: "report",
-      targetId: reportId,
-      metadata: { code },
+  // First the person's yes, on record before anything leaves (its own transaction, kept whatever follows).
+  const consent = await input.scope.transaction(async (scope) => {
+    const { recipient } = await checked(scope);
+    const recorded = await scope.consents.record({
+      purpose: "report_send",
+      version: REPORT_SEND_CONSENT_VERSION,
+      granted: true,
+      reportId,
+      recipient,
     });
-    log.warn("report.send_failed", { reportId, code });
-    throw error instanceof EmailError ? error : new EmailError("send_failed");
-  }
-  const sent = await scope.reports.markSent(reportId, consent.id);
-  await scope.auditLog.record({
-    action: "report.sent",
-    targetType: "report",
-    targetId: reportId,
-    metadata: { channel: "email", consent_id: consent.id },
+    await scope.auditLog.record({
+      action: "consent.recorded",
+      targetType: "consent",
+      targetId: recorded.id,
+      metadata: { purpose: "report_send", version: REPORT_SEND_CONSENT_VERSION },
+    });
+    return recorded;
   });
+
+  // Then the send, with the report row held: a second send of the same report
+  // waits, then finds it sent, so the therapist never gets it twice.
+  const outcome = await input.scope.transaction(
+    async (scope): Promise<{ sent: Report } | { failed: string }> => {
+      const { report, profile, recipient } = await checked(scope);
+      const pdf = await scope.reports.readPdf(reportId);
+      const content = parseContent(report.content);
+      if (!pdf || !content) throw new InvalidStateError("the approved report has no PDF");
+      const period = periodOf(report, profile.timezone);
+      try {
+        await email.send(
+          reportEmail({
+            to: recipient,
+            language: content.language,
+            personName: profile.displayName,
+            session: sessionText(period, profile.timezone, content.language),
+            pdf,
+            filename: reportFilename(period),
+          }),
+        );
+      } catch (error) {
+        const code = error instanceof EmailError ? error.code : "send_failed";
+        await scope.auditLog.record({
+          action: "report.send_failed",
+          targetType: "report",
+          targetId: reportId,
+          metadata: { code },
+        });
+        return { failed: code };
+      }
+      const sent = await scope.reports.markSent(reportId, consent.id);
+      await scope.auditLog.record({
+        action: "report.sent",
+        targetType: "report",
+        targetId: reportId,
+        metadata: { channel: "email", consent_id: consent.id },
+      });
+      return { sent };
+    },
+  );
+  if ("failed" in outcome) {
+    log.warn("report.send_failed", { reportId, code: outcome.failed });
+    throw new EmailError("send_failed");
+  }
   log.info("report.sent", { reportId });
-  return sent;
+  return outcome.sent;
 }
 
 /**
