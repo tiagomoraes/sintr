@@ -6,6 +6,7 @@ import {
   InvalidStateError,
   MAX_ACTIVE_API_TOKENS,
   type ApiTokenScope,
+  type UserScope,
 } from "@sintr/core";
 import { revalidatePath } from "next/cache";
 import { requireScope } from "@/lib/server/runtime";
@@ -18,6 +19,17 @@ export interface MakeKeyState {
 
 const DEFAULT_NAME = "My assistant";
 
+/** "My assistant", then "My assistant 2", so keys made without a name stay tellable apart. */
+async function defaultName(scope: UserScope): Promise<string> {
+  const taken = new Set(
+    (await scope.apiTokens.list()).filter((key) => !key.revokedAt).map((key) => key.name),
+  );
+  for (let n = 1; ; n += 1) {
+    const name = n === 1 ? DEFAULT_NAME : `${DEFAULT_NAME} ${n}`;
+    if (!taken.has(name)) return name;
+  }
+}
+
 /**
  * Make a connection key in one step: a name and an access are optional
  * (read and save by default). Only a hash is stored; the key goes back to
@@ -27,7 +39,7 @@ const DEFAULT_NAME = "My assistant";
 export async function makeKey(_state: MakeKeyState, form: FormData): Promise<MakeKeyState> {
   const { scope } = await requireScope();
   const rawName = form.get("name");
-  const name = (typeof rawName === "string" ? rawName.trim() : "").slice(0, 80) || DEFAULT_NAME;
+  const name = (typeof rawName === "string" ? rawName.trim() : "").slice(0, 80) || (await defaultName(scope));
   const access = ApiTokenAccess.safeParse(form.get("access") ?? "read_write");
   if (!access.success) return { key: null, problem: "Choose what your assistant may do." };
   try {
