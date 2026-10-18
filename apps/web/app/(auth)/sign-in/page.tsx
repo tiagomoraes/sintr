@@ -4,7 +4,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { AuthForm } from "@/components/auth-form";
 import { safeNext } from "@/lib/redirect";
-import { getSession } from "@/lib/server/runtime";
+import { getSession, runtime } from "@/lib/server/runtime";
 
 export const metadata: Metadata = { title: "Sign in" };
 
@@ -22,6 +22,13 @@ export default async function SignInPage({
       <div className="mt-10">
         <AuthForm mode="sign-in" next={next} />
       </div>
+      {runtime().email.available ? (
+        <p className="mt-6 text-[0.9375rem]">
+          <Link href="/forgot-password" className={linkStyles}>
+            Forgot your password?
+          </Link>
+        </p>
+      ) : null}
       <p className="mt-10 text-[0.9375rem] text-ink-3">
         New here?{" "}
         <Link href="/sign-up" className={linkStyles}>
