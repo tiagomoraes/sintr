@@ -14,7 +14,7 @@ import {
 } from "../domain";
 import { InvalidStateError, NotFoundError, parseInput } from "../errors";
 import { isId, type ScopeContext } from "./context";
-import { inTransaction } from "./corrections";
+import { diffFields, inTransaction } from "./corrections";
 import { checkinsRepository, entriesRepository } from "./ledger";
 
 /** Long keys show their last four characters; short ones show nothing. */
@@ -46,9 +46,18 @@ export function agentSettingsRepository({ db, userId, cipher }: ScopeContext) {
       return decode(await read());
     },
 
-    /** `apiKey`: a string replaces the key, null removes it, absent keeps it. */
+    /**
+     * `apiKey`: a string replaces the key, null removes it, absent keeps it,
+     * unless the provider or its address changes: a key is never sent to a
+     * service it was not saved for, so it is removed then.
+     */
     async update(patch: AgentSettingsPatch): Promise<AgentSettings> {
-      const { apiKey, ...clear } = parseInput(AgentSettingsPatch, patch);
+      const { apiKey: given, ...clear } = parseInput(AgentSettingsPatch, patch);
+      const current = await read();
+      const moved =
+        (clear.provider !== undefined && clear.provider !== (current?.provider ?? null)) ||
+        (clear.baseUrl !== undefined && clear.baseUrl !== (current?.baseUrl ?? null));
+      const apiKey = given === undefined && moved ? null : given;
       const values = {
         ...clear,
         ...(apiKey === undefined
@@ -175,10 +184,14 @@ export function proposalsRepository({ db, userId, cipher }: ScopeContext) {
         if (!row) throw new NotFoundError("proposal");
         if (row.status !== "proposed") throw new InvalidStateError("this proposal was already decided");
         const stored = decode(row);
-        const payload = edits === undefined ? stored.payload : validPayload(stored.kind, edits);
+        const original = validPayload(stored.kind, stored.payload);
+        // Edits are laid over the draft: a field the person left alone (such
+        // as a time shown unchanged) keeps the drafted value.
+        const payload =
+          edits === undefined ? original : validPayload(stored.kind, { ...stored.payload, ...edits });
         const edited =
           edits !== undefined &&
-          JSON.stringify(payload) !== JSON.stringify(validPayload(stored.kind, stored.payload));
+          diffFields(original, payload, Object.keys({ ...original, ...payload })).fields.length > 0;
         const scoped = { db: tx, userId, cipher };
         const record =
           stored.kind === "entry"

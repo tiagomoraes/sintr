@@ -154,6 +154,28 @@ describe("proposals", () => {
     expect(await scope.entries.get(record.id)).toMatchObject(edits);
   });
 
+  it("lay the person's edits over the draft: what they left alone keeps the drafted value", async () => {
+    const conversation = await scope.conversations.create();
+    const drafted = { ...draft, occurredAt: "2026-10-16T23:00:00.000Z" };
+    const proposal = await scope.proposals.create({
+      conversationId: conversation.id,
+      kind: "entry",
+      payload: drafted,
+    });
+    // The form sends every field, null for the empty ones, and no time when it was left as shown.
+    const untouched = {
+      ...draft,
+      title: null,
+      body: null,
+      tags: null,
+      emotionsAfter: null,
+      alternativeBelief: null,
+    };
+    const { proposal: saved, record } = await scope.proposals.confirm(proposal.id, untouched);
+    expect(saved.edited).toBe(false);
+    expect(record.occurredAt.toISOString()).toBe("2026-10-16T23:00:00.000Z");
+  });
+
   it("are decided once: no second save, no discard after saving", async () => {
     const conversation = await scope.conversations.create();
     const proposal = await scope.proposals.create({
@@ -276,6 +298,28 @@ describe("the assistant's settings", () => {
     await own.agentSettings.update({ apiKey: null });
     expect(await own.agentSettings.get()).toMatchObject({ hasKey: false, keyHint: null });
     expect((await own.agentSettings.credentials())?.apiKey).toBeNull();
+  });
+
+  it("never carry a saved key to another provider or another address", async () => {
+    const own = await repositories.forUser(await createUser(handle.db));
+    await own.agentSettings.update({ provider: "anthropic", model: "m", apiKey: "sk-ant-0123456789abcdef" });
+    await own.agentSettings.update({ model: "another" });
+    expect((await own.agentSettings.get()).hasKey).toBe(true);
+    await own.agentSettings.update({
+      provider: "openai_compatible",
+      baseUrl: "https://gateway.example.test/v1",
+    });
+    expect((await own.agentSettings.get()).hasKey).toBe(false);
+
+    await own.agentSettings.update({ apiKey: "sk-gw-0123456789abcdef" });
+    await own.agentSettings.update({ baseUrl: "https://elsewhere.example.test/v1" });
+    expect((await own.agentSettings.credentials())?.apiKey).toBeNull();
+    // A new key given with the change is kept.
+    await own.agentSettings.update({
+      baseUrl: "https://third.example.test/v1",
+      apiKey: "sk-third-0123456789ab",
+    });
+    expect((await own.agentSettings.credentials())?.apiKey).toBe("sk-third-0123456789ab");
   });
 
   it("refuse a base URL that is not http or https, and retention off the range", async () => {
