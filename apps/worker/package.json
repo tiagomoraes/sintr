@@ -11,10 +11,13 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@sintr/core": "workspace:*"
+    "@sintr/agent": "workspace:*",
+    "@sintr/core": "workspace:*",
+    "ai": "7.0.143"
   },
   "devDependencies": {
     "esbuild": "0.25.12",
+    "postgres": "3.4.9",
     "tsx": "4.23.15",
     "vite": "8.3.4",
     "vitest": "5.0.5"

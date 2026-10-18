@@ -102,13 +102,22 @@ importers:
 
   apps/worker:
     dependencies:
+      '@sintr/agent':
+        specifier: workspace:*
+        version: link:../../packages/agent
       '@sintr/core':
         specifier: workspace:*
         version: link:../../packages/core
+      ai:
+        specifier: 7.0.143
+        version: 7.0.143(zod@4.6.7)
     devDependencies:
       esbuild:
         specifier: 0.25.12
         version: 0.25.12
+      postgres:
+        specifier: 3.4.9
+        version: 3.4.9
       tsx:
         specifier: 4.23.15
         version: 4.23.15
