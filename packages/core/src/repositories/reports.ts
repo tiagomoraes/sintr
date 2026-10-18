@@ -38,6 +38,7 @@ export function consentsRepository({ db, userId, cipher }: ScopeContext) {
     granted: row.granted,
     reportId: row.reportId,
     recipient: row.recipient ? cipher.openText(spec.columns.recipient, row.recipient) : null,
+    linkId: row.linkId,
     createdAt: row.createdAt,
   });
 
@@ -54,6 +55,7 @@ export function consentsRepository({ db, userId, cipher }: ScopeContext) {
           granted: value.granted,
           reportId: value.reportId ?? null,
           recipient: value.recipient ? cipher.sealText(spec.columns.recipient, value.recipient) : null,
+          linkId: value.linkId ?? null,
         })
         .returning();
       return decode(row!);
@@ -99,6 +101,7 @@ export function reportsRepository({ db, userId, cipher }: ScopeContext) {
     sentAt: row.sentAt,
     consentId: row.consentId,
     notifiedAt: row.notifiedAt,
+    sharedAt: row.sharedAt,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
   });
@@ -121,6 +124,7 @@ export function reportsRepository({ db, userId, cipher }: ScopeContext) {
       const [row] = await tx.select().from(reports).where(own(id)).for("update");
       if (!row) throw new NotFoundError("report");
       if (row.status === "sent") throw new InvalidStateError("a sent report cannot change");
+      if (row.sharedAt) throw new InvalidStateError("a shared report cannot change");
       if (options.untouched && (row.status !== "draft" || row.editedAt !== null)) {
         throw new InvalidStateError("the person changed this report");
       }

@@ -139,6 +139,7 @@ export async function editReport(scope: UserScope, reportId: string, edited: unk
   const report = await scope.reports.get(reportId);
   if (!report) throw new NotFoundError("report");
   if (report.status === "sent") throw new InvalidStateError("a sent report cannot change");
+  if (report.sharedAt) throw new InvalidStateError("a shared report cannot change");
   const stored = parseContent(report.content);
   if (!stored) throw new InvalidStateError("the report has no content");
   const parsed = ReportContent.safeParse(edited);

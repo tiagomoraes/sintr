@@ -12,11 +12,15 @@ export {
 } from "./errors";
 export { REDACTED, createLogger, redact, type LogFields, type LogLevel, type Logger } from "./log";
 export * from "./report";
+export { formatInviteCode, normalizeInviteCode } from "./practice/code";
 export {
   API_TOKEN_PREFIX,
+  SELF_HOST_PLAN,
   createRepositories,
   hashApiToken,
+  type AcceptInvite,
   type ListRange,
   type Repositories,
+  type RepositoryOptions,
   type UserScope,
 } from "./repositories";

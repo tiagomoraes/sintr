@@ -238,3 +238,163 @@ describe("tenant isolation", () => {
     await expect(repositories.forUser("nobody")).rejects.toBeInstanceOf(NotFoundError);
   });
 });
+
+/**
+ * F4: a practice sees nothing of a person without an active link, and
+ * nothing beyond what the link carries (the reports the person shared);
+ * another practice, or another person, reaches none of it. Each assertion
+ * fails if the scope it relies on (the practice of the account, the person
+ * of the link, the link's status) is removed from the query.
+ */
+describe("tenant isolation between people and practices", () => {
+  const handle = openTestDatabase();
+  const repositories = createRepositories(handle.db, testMasterKey);
+  const fakePdf = new Uint8Array(Buffer.from("%PDF-1.7 approved %%EOF"));
+  let person: UserScope;
+  let stranger: UserScope;
+  let practice: UserScope;
+  let otherPractice: UserScope;
+  let linkId: string;
+  let shareId: string;
+  let reportId: string;
+  let draftId: string;
+  let personInvite: { id: string; code: string };
+  let practiceInvite: { id: string; code: string };
+
+  async function scopeFor(label: string): Promise<UserScope> {
+    const id = await createUser(handle.db, label);
+    await repositories.provision(id);
+    return repositories.forUser(id);
+  }
+
+  async function approvedReport(scope: UserScope, day: string): Promise<string> {
+    const report = await scope.reports.createDraft({
+      periodStart: new Date(`2026-10-${day}T00:00:00Z`),
+      periodEnd: new Date(`2026-10-${day}T12:00:00Z`),
+      content: "{}",
+    });
+    await scope.reports.markReviewed(report.id, { pdf: fakePdf });
+    return report.id;
+  }
+
+  const snapshot = (word: string) => ({
+    v: 1 as const,
+    content: { word },
+    period: { kind: "week" as const, label: "2026-W41", start: "", end: "", session: null },
+    verified: [],
+    timeZone: "UTC",
+    personName: null,
+  });
+
+  beforeAll(async () => {
+    person = await scopeFor("patient");
+    stranger = await scopeFor("stranger");
+    practice = await scopeFor("practice");
+    otherPractice = await scopeFor("other-practice");
+    await practice.practice.open({ professionalName: "Dr. Linked" });
+    await otherPractice.practice.open({ professionalName: "Dr. Elsewhere" });
+
+    const invite = await practice.practice.createInvite();
+    linkId = (await person.sharing.acceptInvite(invite.code, { consent: true, personName: "Gabi" })).id;
+    reportId = await approvedReport(person, "05");
+    draftId = (
+      await person.reports.createDraft({
+        periodStart: new Date("2026-10-06T00:00:00Z"),
+        periodEnd: new Date("2026-10-06T12:00:00Z"),
+        content: "{}",
+      })
+    ).id;
+    await person.entries.create({ situation: "never shared" });
+    shareId = (await person.sharing.deliver({ reportId, linkId, snapshot: snapshot("shared"), pdf: fakePdf }))
+      .id;
+    personInvite = await person.sharing.createInvite({ personName: "Gabi" });
+    practiceInvite = await practice.practice.createInvite({ note: "for someone" });
+  });
+
+  afterAll(() => handle.close());
+
+  it("gives the linked practice the shared report and the chosen name, nothing else", async () => {
+    expect((await practice.practice.reports()).map((r) => r.id)).toEqual([shareId]);
+    expect((await practice.practice.patients()).map((p) => p.personName)).toEqual(["Gabi"]);
+    expect((await practice.practice.readReport(shareId))?.snapshot.content).toEqual({ word: "shared" });
+    // The practice's own diary scope is its own: the person's records are not in it.
+    expect(await practice.reports.get(reportId)).toBeNull();
+    expect(await practice.reports.get(draftId)).toBeNull();
+    expect(await practice.entries.list()).toEqual([]);
+    expect(await practice.sharing.links()).toEqual([]);
+  });
+
+  it("gives another practice none of it", async () => {
+    expect(await otherPractice.practice.reports()).toEqual([]);
+    expect(await otherPractice.practice.patients()).toEqual([]);
+    expect(await otherPractice.practice.readReport(shareId)).toBeNull();
+    expect(await otherPractice.practice.reportPdf(shareId)).toBeNull();
+    expect(await otherPractice.practice.endLink(linkId)).toBe(false);
+    expect(await otherPractice.practice.revokeInvite(practiceInvite.id)).toBe(false);
+    expect((await otherPractice.practice.invites()).map((i) => i.id)).not.toContain(practiceInvite.id);
+    expect((await otherPractice.notices.list()).map((n) => n.linkId)).not.toContain(linkId);
+  });
+
+  it("gives an account without a practice no practice side at all", async () => {
+    expect(await stranger.practice.get()).toBeNull();
+    expect(await stranger.practice.reports()).toEqual([]);
+    expect(await stranger.practice.patients()).toEqual([]);
+    expect(await stranger.practice.readReport(shareId)).toBeNull();
+    expect(await stranger.practice.endLink(linkId)).toBe(false);
+    await expect(stranger.practice.createInvite()).rejects.toBeInstanceOf(NotFoundError);
+    await expect(stranger.practice.seats()).rejects.toBeInstanceOf(NotFoundError);
+  });
+
+  it("does not let another person see, change, end or use the person's link", async () => {
+    expect(await stranger.sharing.links()).toEqual([]);
+    expect(await stranger.sharing.end(linkId)).toBe(false);
+    expect(await stranger.sharing.setShareMode(linkId, "auto")).toBe(false);
+    expect(await stranger.sharing.rename(linkId, "taken")).toBe(false);
+    expect(await stranger.sharing.revokeInvite(personInvite.id)).toBe(false);
+    expect((await stranger.sharing.invites()).map((i) => i.id)).not.toContain(personInvite.id);
+    await expect(stranger.sharing.confirm(linkId, { consent: true })).rejects.toBeInstanceOf(NotFoundError);
+    // Neither the person's report nor the stranger's own can travel through the person's link.
+    const own = await approvedReport(stranger, "07");
+    await expect(
+      stranger.sharing.deliver({ reportId: own, linkId, snapshot: snapshot("x"), pdf: fakePdf }),
+    ).rejects.toBeInstanceOf(NotFoundError);
+    await expect(
+      stranger.sharing.deliver({ reportId, linkId, snapshot: snapshot("x"), pdf: fakePdf }),
+    ).rejects.toBeInstanceOf(NotFoundError);
+    expect(await stranger.notices.list()).toEqual([]);
+    expect((await person.sharing.links())[0]).toMatchObject({ personName: "Gabi", shareMode: "ask" });
+  });
+
+  it("never lets a draft through a link", async () => {
+    await expect(
+      person.sharing.deliver({ reportId: draftId, linkId, snapshot: snapshot("draft"), pdf: fakePdf }),
+    ).rejects.toBeInstanceOf(InvalidStateError);
+  });
+
+  it("refuses reading through a link that is not active, even if a copy were left behind", async () => {
+    // Simulate a link ended without its copies removed: the status alone must refuse.
+    await handle.db.execute(sql`update links set status = 'pending' where id = ${linkId}`);
+    expect(await practice.practice.readReport(shareId)).toBeNull();
+    expect(await practice.practice.reportPdf(shareId)).toBeNull();
+    expect(await practice.practice.reports()).toEqual([]);
+    await handle.db.execute(sql`update links set status = 'active' where id = ${linkId}`);
+    expect(await practice.practice.readReport(shareId)).not.toBeNull();
+  });
+
+  it("cannot open what a link carries with another link's key", async () => {
+    const invite = await otherPractice.practice.createInvite();
+    const otherLink = await stranger.sharing.acceptInvite(invite.code, { consent: true });
+    // Move the share's sealed copy onto a share of the other link: the other link's key refuses it.
+    const own = await approvedReport(stranger, "08");
+    const theirs = await stranger.sharing.deliver({
+      reportId: own,
+      linkId: otherLink.id,
+      snapshot: snapshot("theirs"),
+      pdf: fakePdf,
+    });
+    await handle.db.execute(
+      sql`update shared_reports set snapshot = (select snapshot from shared_reports where id = ${shareId}) where id = ${theirs.id}`,
+    );
+    await expect(otherPractice.practice.readReport(theirs.id)).rejects.toThrow();
+  });
+});

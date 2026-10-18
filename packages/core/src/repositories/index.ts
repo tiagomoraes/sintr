@@ -2,18 +2,22 @@ import { eq } from "drizzle-orm";
 import { createFieldCipher, type MasterKey } from "../crypto";
 import type { Database } from "../db/client";
 import { profiles, therapySettings, users } from "../db/schema";
+import type { InvitePreview, PracticePlan } from "../domain";
 import { sanitizeError } from "../errors";
 import { agentSettingsRepository, proposalsRepository } from "./agent";
-import type { ScopeContext } from "./context";
 import { conversationsRepository } from "./conversations";
 import { loadDataKey } from "./data-keys";
 import { apiTokensRepository, auditLogRepository } from "./integration";
 import { checkinsRepository, entriesRepository, insightsRepository, therapyNotesRepository } from "./ledger";
+import type { SharingContext } from "./links";
+import { practiceRepository } from "./practice";
 import { consentsRepository, reportsRepository } from "./reports";
 import { profileRepository, therapySettingsRepository } from "./settings";
+import { noticesRepository, previewInvite, sharingRepository } from "./sharing";
 
 export { API_TOKEN_PREFIX, hashApiToken } from "./integration";
 export type { ListRange } from "./ledger";
+export type { AcceptInvite } from "./sharing";
 
 /**
  * Data access for one user. Every repository below is bound to `userId` at
@@ -34,6 +38,11 @@ export interface UserScope {
   readonly proposals: ReturnType<typeof proposalsRepository>;
   readonly apiTokens: ReturnType<typeof apiTokensRepository>;
   readonly auditLog: ReturnType<typeof auditLogRepository>;
+  /** The practice this account opened, if any: the professional's side. */
+  readonly practice: ReturnType<typeof practiceRepository>;
+  /** The person's links with practices and what they share through them. */
+  readonly sharing: ReturnType<typeof sharingRepository>;
+  readonly notices: ReturnType<typeof noticesRepository>;
   /** Run several operations atomically, with the same scope. */
   transaction<T>(fn: (scope: UserScope) => Promise<T>): Promise<T>;
   /** Hard delete: the account and, by cascade, every row it owns. */
@@ -44,7 +53,16 @@ export interface Repositories {
   forUser(userId: string): Promise<UserScope>;
   /** Create the key, profile and therapy settings rows of a new user. */
   provision(userId: string): Promise<void>;
+  /** Who is inviting with this code, for /join; `viewerId` is the signed-in account, if any. */
+  previewInvite(code: string, viewerId: string | null, now?: Date): Promise<InvitePreview>;
 }
+
+export interface RepositoryOptions {
+  /** The plan and seats of a practice without a grant of its own. Unlimited by default. */
+  practiceDefaults?: PracticePlan;
+}
+
+export const SELF_HOST_PLAN: PracticePlan = { plan: "Self-hosted", seats: null };
 
 /** Wrap every method so driver errors leave the core sanitized. */
 function guard<T extends object>(repository: T): T {
@@ -64,7 +82,7 @@ function guard<T extends object>(repository: T): T {
   return out as T;
 }
 
-function buildScope(ctx: ScopeContext): UserScope {
+function buildScope(ctx: SharingContext): UserScope {
   return {
     userId: ctx.userId,
     profile: guard(profileRepository(ctx)),
@@ -80,6 +98,9 @@ function buildScope(ctx: ScopeContext): UserScope {
     proposals: guard(proposalsRepository(ctx)),
     apiTokens: guard(apiTokensRepository(ctx)),
     auditLog: guard(auditLogRepository(ctx)),
+    practice: guard(practiceRepository(ctx)),
+    sharing: guard(sharingRepository(ctx)),
+    notices: guard(noticesRepository(ctx)),
     async transaction(fn) {
       try {
         return await ctx.db.transaction((tx) => fn(buildScope({ ...ctx, db: tx })));
@@ -97,12 +118,31 @@ function buildScope(ctx: ScopeContext): UserScope {
   };
 }
 
-export function createRepositories(db: Database, masterKey: MasterKey): Repositories {
+export function createRepositories(
+  db: Database,
+  masterKey: MasterKey,
+  options: RepositoryOptions = {},
+): Repositories {
+  const practiceDefaults = options.practiceDefaults ?? SELF_HOST_PLAN;
   return {
     async forUser(userId) {
       try {
         const dek = await loadDataKey(db, masterKey, userId);
-        return buildScope({ db, userId, cipher: createFieldCipher(dek, userId) });
+        return buildScope({
+          db,
+          userId,
+          cipher: createFieldCipher(dek, userId),
+          kek: masterKey,
+          practiceDefaults,
+        });
+      } catch (error) {
+        throw sanitizeError(error);
+      }
+    },
+
+    async previewInvite(code, viewerId, now) {
+      try {
+        return await previewInvite(db, { kek: masterKey }, code, viewerId, now);
       } catch (error) {
         throw sanitizeError(error);
       }

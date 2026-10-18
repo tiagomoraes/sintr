@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { getTableName, is, sql } from "drizzle-orm";
 import { PgTable } from "drizzle-orm/pg-core";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -7,9 +8,10 @@ import {
   ENVELOPE_VERSION,
   createFieldCipher,
   unwrapDataKey,
+  unwrapLinkKey,
 } from "../src/crypto";
 import { SEALED } from "../src/db/sealed";
-import { agentSettings, entries, userKeys } from "../src/db/schema";
+import { agentSettings, entries, links, userKeys } from "../src/db/schema";
 import * as schema from "../src/db/schema";
 import { createRepositories, type UserScope } from "../src/repositories";
 import { createUser, marker, openTestDatabase, testMasterKey } from "./support";
@@ -125,6 +127,44 @@ describe("encryption at rest", () => {
       { behavior: remember("corrected behavior") },
       { note: remember("correction note") },
     );
+
+    // F4: this account opens a practice and invites someone (the professional's side),
+    // invites its own therapist, and links to another practice to share a report with it.
+    await scope.practice.open({
+      professionalName: remember("professional name"),
+      practiceName: remember("practice name"),
+      registration: remember("registration"),
+    });
+    await scope.practice.createInvite({ note: remember("invite note") });
+    await scope.sharing.createInvite({ personName: remember("ipn") });
+    const otherId = await createUser(handle.db, "other-practice");
+    await repositories.provision(otherId);
+    const other = await repositories.forUser(otherId);
+    await other.practice.open({ professionalName: "Dr. Other" });
+    const invite = await other.practice.createInvite();
+    const link = await scope.sharing.acceptInvite(invite.code, {
+      consent: true,
+      personName: remember("lpn"),
+    });
+    const shared = await scope.reports.createDraft({
+      periodStart: new Date("2026-10-14T18:00:00Z"),
+      periodEnd: new Date("2026-10-21T17:00:00Z"),
+      content: remember("shared report draft"),
+    });
+    await scope.reports.markReviewed(shared.id, { pdf: Buffer.from(remember("shared pdf"), "utf8") });
+    await scope.sharing.deliver({
+      reportId: shared.id,
+      linkId: link.id,
+      snapshot: {
+        v: 1,
+        content: { week: remember("shared snapshot") },
+        period: { kind: "week", label: "2026-W43", start: "", end: "", session: null },
+        verified: [],
+        timeZone: "UTC",
+        personName: null,
+      },
+      pdf: Buffer.from(remember("shared copy pdf"), "utf8"),
+    });
   });
 
   afterAll(() => handle.close());
@@ -151,8 +191,10 @@ describe("encryption at rest", () => {
     }
     // display name, 2 therapy, 14 entry, 2 check-in, task, insight, report (3), consent, conversation,
     // message, then F1: the API key, a proposal payload, a correction's previous values and note,
-    // then F2: the report's previous words in its revision
-    expect(checked).toBe(32);
+    // then F2: the report's previous words in its revision, then F4: the practice (3), two invites
+    // (each a code, plus the note or the name), the link's name, two more consents (the link and the
+    // share name the practice), the second report (content and PDF) and its shared copy (page and PDF)
+    expect(checked).toBe(32 + 3 + 4 + 1 + 2 + 2 + 2);
   });
 
   it("leaves no trace of the content in a text dump of the whole database", async () => {
@@ -203,6 +245,34 @@ describe("encryption at rest", () => {
       .where(sql`${entries.userId} = ${userId}`);
     const cipher = createFieldCipher(dek, userId);
     expect(cipher.openText(SEALED.entries.columns.situation, stored!.situation!)).toBe(words.situation);
+  });
+
+  it("seals what a link carries with the link's own key, wrapped by the master key and bound to the link", async () => {
+    const [row] = await handle.db
+      .select()
+      .from(links)
+      .where(sql`${links.userId} = ${userId}`);
+    expect(row?.kekId).toBe(testMasterKey.id);
+    const key = unwrapLinkKey(testMasterKey, row!.wrappedKey!, row!.id);
+    expect(row!.wrappedKey!.includes(key)).toBe(false);
+    expect(() => unwrapLinkKey(testMasterKey, row!.wrappedKey!, randomUUID())).toThrow(DecryptionError);
+    // Not the person's key: their own cipher cannot open the name they chose for the link.
+    const dek = unwrapDataKey(
+      testMasterKey,
+      (
+        await handle.db
+          .select()
+          .from(userKeys)
+          .where(sql`${userKeys.userId} = ${userId}`)
+      )[0]!.wrappedDek,
+      userId,
+    );
+    expect(() =>
+      createFieldCipher(dek, userId).openText(SEALED.links.columns.personName, row!.personName!),
+    ).toThrow(DecryptionError);
+    expect(createFieldCipher(key, row!.id).openText(SEALED.links.columns.personName, row!.personName!)).toBe(
+      words.lpn,
+    );
   });
 
   it("refuses ciphertext moved to another column", async () => {

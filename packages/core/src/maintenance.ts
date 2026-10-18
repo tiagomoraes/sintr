@@ -1,6 +1,6 @@
-import { lt, sql } from "drizzle-orm";
+import { lt, or, sql } from "drizzle-orm";
 import type { Executor } from "./db/client";
-import { agentSettings, conversations, sessions, verificationTokens } from "./db/schema";
+import { agentSettings, conversations, invites, sessions, verificationTokens } from "./db/schema";
 import { sanitizeError } from "./errors";
 
 /**
@@ -51,6 +51,26 @@ export async function purgeExpiredConversations(
       )
       .returning({ id: conversations.id });
     return { conversations: removed.length };
+  } catch (error) {
+    throw sanitizeError(error);
+  }
+}
+
+/** How long a used, revoked or expired invite is kept (its sealed code and note) before it is removed. */
+export const STALE_INVITE_DAYS = 30;
+
+/**
+ * Remove invites that can no longer be used, a month after they stopped
+ * being usable: accepted, revoked or expired. Links do not depend on them.
+ */
+export async function purgeStaleInvites(db: Executor, now: Date = new Date()): Promise<{ invites: number }> {
+  const before = new Date(now.getTime() - STALE_INVITE_DAYS * 24 * 60 * 60 * 1000);
+  try {
+    const removed = await db
+      .delete(invites)
+      .where(or(lt(invites.expiresAt, before), lt(invites.acceptedAt, before), lt(invites.revokedAt, before)))
+      .returning({ id: invites.id });
+    return { invites: removed.length };
   } catch (error) {
     throw sanitizeError(error);
   }
