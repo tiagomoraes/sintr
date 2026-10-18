@@ -42,3 +42,27 @@ export async function currentUserId(page: Page): Promise<string> {
   expect(body?.user.id).toBeTruthy();
   return body!.user.id;
 }
+
+/** A key that looks real, so the at-rest checks have something to look for. */
+export function newKey(): string {
+  return `sk-e2e-${randomUUID().replaceAll("-", "")}`;
+}
+
+/** Choose a provider and save a key through the settings screen. */
+export async function setUpAssistant(page: Page, key: string = newKey()): Promise<string> {
+  await page.goto("/settings");
+  await page.getByRole("button", { name: "OpenRouter" }).click();
+  await page.getByLabel("Model", { exact: true }).fill("vendor/model");
+  await page.getByLabel("API key", { exact: true }).fill(key);
+  await page.getByRole("button", { name: "Save the assistant" }).click();
+  await expect(page.getByText(`A key is saved, ending in ${key.slice(-4)}.`)).toBeVisible();
+  return key;
+}
+
+/** Send one message in the conversation and wait for the assistant's reply. */
+export async function say(page: Page, text: string, reply: string | RegExp): Promise<void> {
+  const box = page.getByLabel("Your message");
+  await box.fill(text);
+  await box.press("Enter");
+  await expect(page.getByRole("log").getByText(reply).last()).toBeVisible();
+}

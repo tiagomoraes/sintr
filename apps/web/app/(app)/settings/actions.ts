@@ -90,12 +90,13 @@ export async function saveAssistant(_state: AssistantFormState, form: FormData):
 export async function testAssistant(_state: ConnectionState): Promise<ConnectionState> {
   const { scope } = await requireScope();
   const { config, log } = runtime();
+  const credentials = await scope.agentSettings.credentials();
+  if (!credentials)
+    return { tested: true, ok: false, problem: "not_configured", rehearsal: config.fakeAgent };
   if (config.fakeAgent) {
     const result = await testConnection(rehearsalModel(), log);
     return { tested: true, ok: result.ok, problem: result.ok ? null : result.problem, rehearsal: true };
   }
-  const credentials = await scope.agentSettings.credentials();
-  if (!credentials) return { tested: true, ok: false, problem: "not_configured", rehearsal: false };
   try {
     const result = await testConnection(createLanguageModel(credentials, { mode: config.mode }), log);
     return { tested: true, ok: result.ok, problem: result.ok ? null : result.problem, rehearsal: false };

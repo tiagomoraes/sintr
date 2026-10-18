@@ -14,16 +14,17 @@ import { runtime } from "./runtime";
 export type AssistantProblem = "not_configured" | ProviderSetupError["code"];
 
 /**
- * The model behind this person's conversation: their own provider and key,
- * or, when SINTR_FAKE_AGENT is set (tests), the offline rehearsal model.
+ * The model behind this person's conversation: their own provider and key.
+ * With SINTR_FAKE_AGENT (tests) the settings are still required, and only
+ * the call is replaced by the offline rehearsal model.
  */
 export async function assistantFor(
   scope: UserScope,
 ): Promise<{ model: LanguageModel; rehearsal: boolean } | { problem: AssistantProblem }> {
   const { config } = runtime();
-  if (config.fakeAgent) return { model: rehearsalModel(), rehearsal: true };
   const credentials = await scope.agentSettings.credentials();
   if (!credentials) return { problem: "not_configured" };
+  if (config.fakeAgent) return { model: rehearsalModel(), rehearsal: true };
   try {
     return { model: createLanguageModel(credentials, { mode: config.mode }), rehearsal: false };
   } catch (error) {
@@ -32,9 +33,8 @@ export async function assistantFor(
   }
 }
 
-/** Is there an assistant to talk to? (Rehearsal mode always has one.) */
+/** Is there an assistant to talk to? */
 export async function assistantReady(scope: UserScope): Promise<boolean> {
-  if (runtime().config.fakeAgent) return true;
   return (await scope.agentSettings.credentials()) !== null;
 }
 
