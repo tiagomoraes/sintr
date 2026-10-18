@@ -183,13 +183,78 @@ function checkinIn(text: string): Record<string, number> | null {
   return Object.keys(given).length > 0 ? given : null;
 }
 
+interface DigestView {
+  counts?: { entries?: number; daysWithCheckin?: number };
+  toBring?: string[];
+  entries?: {
+    id: string;
+    day: string;
+    title: string | null;
+    situation: string | null;
+    thoughts: string[];
+    peakIntensity: number | null;
+  }[];
+}
+
+const WEEKDAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+
+/**
+ * The rehearsal's weekly report: plain sentences, the person's own topics,
+ * the strongest entries as moments, and one of their thoughts quoted word
+ * for word, so the quote check and the highlighter are exercised.
+ */
+export function rehearsalReport(digestText: string, retry: boolean): Record<string, unknown> {
+  const json = /<digest>\n?([\s\S]*?)\n?<\/digest>/u.exec(digestText)?.[1];
+  let digest: DigestView = {};
+  try {
+    digest = json ? (JSON.parse(json) as DigestView) : {};
+  } catch {
+    digest = {};
+  }
+  const entries = [...(digest.entries ?? [])].sort(
+    (a, b) => (b.peakIntensity ?? -1) - (a.peakIntensity ?? -1),
+  );
+  const strongest = entries[0];
+  const quoted = !retry && strongest?.thoughts[0] ? strongest : undefined;
+  const weekday = quoted ? WEEKDAYS[new Date(`${quoted.day}T12:00:00Z`).getUTCDay()] : undefined;
+  const moments = entries.length;
+  const days = digest.counts?.daysWithCheckin ?? 0;
+  return {
+    week: [
+      `A week with ${moments === 1 ? "one moment" : `${moments} moments`} recorded and check-ins on ${days === 1 ? "one day" : `${days} days`}.`,
+      quoted ? `On ${weekday}, "${quoted.thoughts[0]}".` : "",
+    ]
+      .filter(Boolean)
+      .join(" "),
+    topics: [
+      ...(digest.toBring ?? []).slice(0, 3).map((text) => ({ text, suggested: false })),
+      ...(moments > 0 ? [{ text: "The moments of this week.", suggested: true }] : []),
+    ],
+    mood:
+      days > 0
+        ? `Check-ins on ${days === 1 ? "one day" : `${days} days`} this week.`
+        : "No check-ins this week.",
+    momentsIntro: moments > 0 ? "The strongest moments of the week." : "",
+    moments: entries.slice(0, 3).map((entry) => ({ entryId: entry.id, title: entry.title ?? "A moment" })),
+    patterns: [],
+    helped: [],
+  };
+}
+
 /**
  * The scripted assistant behind SINTR_FAKE_AGENT. It follows the capture
  * flow closely enough to exercise the whole app: it acknowledges and asks
  * one question, then drafts the entry from the person's own sentences, and
- * drafts a check-in when the message reads like one.
+ * drafts a check-in when the message reads like one. Asked for the weekly
+ * report, it writes one from the digest.
  */
 export const rehearsalScript: Script = (call) => {
+  if (call.tools.includes("write_report")) {
+    const refused = call.toolResults.some((r) => (r.output as { ok?: boolean } | null)?.ok === false);
+    return {
+      toolCalls: [{ toolName: "write_report", input: rehearsalReport(call.userTexts.join("\n"), refused) }],
+    };
+  }
   if (call.instructions.includes("the diary is paused")) {
     return {
       text: "I am still here with you. Please talk to a person now: in Brazil CVV answers on 188, free and at any hour, and SAMU on 192 in an emergency. When you are ready to write again, you can start a new conversation.",
