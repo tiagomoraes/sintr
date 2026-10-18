@@ -20,8 +20,13 @@ COPY . .
 RUN SINTR_STANDALONE=1 pnpm --filter @sintr/web build && pnpm --filter @sintr/worker build
 
 FROM node:${NODE_VERSION}-alpine AS runtime
+# Chromium prints the weekly report to PDF (through playwright-core, with
+# JavaScript off and no network). The report embeds its own fonts; DejaVu
+# covers the person's words in scripts those fonts do not have.
+RUN apk add --no-cache chromium font-dejavu
 ENV NODE_ENV=production NEXT_TELEMETRY_DISABLED=1 PORT=3000 HOSTNAME=0.0.0.0 \
-    SINTR_MIGRATIONS_DIR=/app/migrations
+    SINTR_MIGRATIONS_DIR=/app/migrations SINTR_CHROMIUM_PATH=/usr/bin/chromium-browser \
+    PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1
 WORKDIR /app
 COPY --from=build --chown=node:node /repo/apps/web/.next/standalone ./
 COPY --from=build --chown=node:node /repo/apps/web/.next/static ./apps/web/.next/static
