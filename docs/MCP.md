@@ -215,7 +215,7 @@ The full text is in `packages/mcp/src/instructions.ts` and, in the app, under "D
 
 - **Endpoint.** `POST /mcp` and `POST /mcp/{key}`, MCP over Streamable HTTP in stateless mode with JSON responses (`@modelcontextprotocol/sdk` 1.32). No session id, no server-sent stream: `GET`, `DELETE` and anything else answer `405`. Each request runs a fresh server for its key's owner, inside that person's scope.
 - **Authentication.** The key is the only credential. A missing, wrong, revoked or expired key answers `401` with `WWW-Authenticate: Bearer realm="sintr"`. Cookies are never read. A request with an `Origin` header other than sintr's own is refused (`403`), and no CORS headers are sent, so no web page can call it. sintr does not offer OAuth yet.
-- **Limits, per web process.** 120 calls a minute per key, 20 wrong keys a minute per address (then `429` with `Retry-After`), 1 MB per request (`413`).
+- **Limits, per web process.** 120 calls a minute per key, each message of a batch counting as one; 20 wrong keys a minute per address, after which that address's wrong keys answer `429` with `Retry-After` (a working key from the same address still goes on, since services such as ChatGPT call from shared addresses); 1 MB per request (`413`).
 - **Consent.** `403` until the current health data consent is on record.
 - **Errors.** A refused tool call answers `isError: true` with `problems` that name fields and rules, never values. A failure inside sintr answers a plain sentence and logs a code.
 - **Annotations.** Reads carry `readOnlyHint: true`; the saves `readOnlyHint: false` and `destructiveHint: false`; all `openWorldHint: false`.
