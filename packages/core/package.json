@@ -8,7 +8,8 @@
     "./auth": "./src/auth/index.ts",
     "./db": "./src/db/index.ts",
     "./schema": "./src/db/schema/index.ts",
-    "./runtime": "./src/runtime.ts"
+    "./runtime": "./src/runtime/index.ts",
+    "./runtime/base": "./src/runtime/base.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit",
