@@ -1,5 +1,5 @@
 import { prepareReport, reportModel } from "@sintr/agent";
-import { notifyReportReady, planScheduledReport, type KnownReport, type UserScope } from "@sintr/core";
+import { notifyReportReady, planScheduledReport, type UserScope } from "@sintr/core";
 import type { BaseRuntime } from "@sintr/core/runtime/base";
 import type { LanguageModel } from "ai";
 
@@ -7,21 +7,6 @@ import type { LanguageModel } from "ai";
 export type ReportRuntime = Pick<BaseRuntime, "reportSchedules" | "repositories" | "email" | "log"> & {
   config: Pick<BaseRuntime["config"], "mode" | "fakeAgent" | "url">;
 };
-
-/** The reports the planner weighs: the most recent ones are enough. */
-const KNOWN = 20;
-
-async function knownReports(scope: UserScope): Promise<KnownReport[]> {
-  const reports = await scope.reports.list();
-  return reports.slice(0, KNOWN).map((r) => ({
-    id: r.id,
-    status: r.status,
-    sessionAt: r.sessionAt,
-    periodStart: r.periodStart,
-    periodEnd: r.periodEnd,
-    editedAt: r.editedAt,
-  }));
-}
 
 /**
  * Prepare every report that is due at `now`: for each person with a
@@ -45,7 +30,7 @@ export async function prepareDueReports(
       const plan = planScheduledReport({
         schedule: person.schedule,
         timeZone: person.timeZone,
-        reports: await knownReports(scope),
+        reports: await scope.reports.recent(),
         now,
       });
       if (plan.action === "wait") continue;

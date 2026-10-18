@@ -1,6 +1,5 @@
 import { prepareReport, reportModel } from "@sintr/agent";
 import { planReportNow } from "@sintr/core";
-import { known } from "@/lib/server/reports";
 import { apiError, apiScope, runtime } from "@/lib/server/runtime";
 
 export const dynamic = "force-dynamic";
@@ -19,14 +18,9 @@ export async function POST(request: Request) {
   const [settings, profile, reports] = await Promise.all([
     scope.therapySettings.get(),
     scope.profile.get(),
-    scope.reports.list(),
+    scope.reports.recent(),
   ]);
-  const plan = planReportNow({
-    schedule: settings,
-    timeZone: profile.timezone,
-    reports: known(reports),
-    now: new Date(),
-  });
+  const plan = planReportNow({ schedule: settings, timeZone: profile.timezone, reports, now: new Date() });
   if (plan.action === "open") return Response.json({ id: plan.reportId, created: false });
   try {
     const { model, problem } = await reportModel(scope, config);
@@ -42,7 +36,7 @@ export async function POST(request: Request) {
       const again = planReportNow({
         schedule: settings,
         timeZone: profile.timezone,
-        reports: known(await scope.reports.list()),
+        reports: await scope.reports.recent(),
         now: new Date(),
       });
       return again.action === "open"

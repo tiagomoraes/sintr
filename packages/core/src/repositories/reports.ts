@@ -18,6 +18,7 @@ import {
   parseInput,
 } from "../errors";
 import { changedSections, parseContent } from "../report/content";
+import type { KnownReport } from "../report/period";
 import { isId, type ScopeContext } from "./context";
 import { inTransaction } from "./corrections";
 
@@ -180,6 +181,26 @@ export function reportsRepository({ db, userId, cipher }: ScopeContext) {
         .orderBy(desc(reports.periodEnd))
         .limit(200);
       return rows.map(decode);
+    },
+
+    /**
+     * The most recent reports as the planner weighs them: dates and states
+     * only, without opening any words (the scheduler asks every minute).
+     */
+    async recent(limit = 20): Promise<KnownReport[]> {
+      return db
+        .select({
+          id: reports.id,
+          status: reports.status,
+          sessionAt: reports.sessionAt,
+          periodStart: reports.periodStart,
+          periodEnd: reports.periodEnd,
+          editedAt: reports.editedAt,
+        })
+        .from(reports)
+        .where(eq(reports.userId, userId))
+        .orderBy(desc(reports.periodEnd))
+        .limit(Math.min(Math.max(limit, 1), 200));
     },
 
     /** The latest draft waiting for the person, without opening its words. */

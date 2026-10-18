@@ -115,6 +115,9 @@ describe("reports: changes keep what the report said before", () => {
     expect((await scope.reports.get(report!.id))?.notifiedAt).not.toBeNull();
 
     expect(await other.reports.revisions(report!.id)).toEqual([]);
+    expect(await other.reports.recent()).toEqual([]);
+    expect(await other.reports.waiting()).toBeNull();
+    expect((await scope.reports.recent()).map((r) => r.id)).toContain(report!.id);
     await expect(other.reports.markNotified(report!.id)).rejects.toBeInstanceOf(NotFoundError);
     await expect(other.reports.edit(report!.id, serializeContent(content))).rejects.toBeInstanceOf(
       NotFoundError,

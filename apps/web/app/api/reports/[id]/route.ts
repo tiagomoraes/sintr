@@ -11,7 +11,7 @@ import {
 } from "@sintr/core";
 import { PdfRenderError } from "@sintr/core/pdf";
 import { z } from "zod";
-import { known, printPdf } from "@/lib/server/reports";
+import { printPdf } from "@/lib/server/reports";
 import { apiError, apiScope, runtime } from "@/lib/server/runtime";
 
 export const dynamic = "force-dynamic";
@@ -53,7 +53,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       case "prepare_again": {
         if (report.status === "sent") return apiError(409, "invalid_state");
         const [settings, profile] = await Promise.all([scope.therapySettings.get(), scope.profile.get()]);
-        const period = periodAgain(known([report])[0]!, settings, profile.timezone, new Date());
+        const period = periodAgain(report, settings, profile.timezone, new Date());
         const { model, problem } = await reportModel(scope, config);
         await prepareReport({
           scope,
