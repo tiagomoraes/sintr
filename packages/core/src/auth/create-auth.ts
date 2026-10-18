@@ -57,15 +57,14 @@ const HOUR = 60 * 60;
 export function createAuth({ db, config, logger, email = emailOff }: AuthOptions) {
   const repositories = createRepositories(db, config.masterKey);
   const log = logger.child({ service: "auth" });
-  // Sending is awaited but never throws back: a failed email must not tell
-  // the browser whether an address has an account. Only codes are logged.
+  // Sending is not awaited and never throws back: neither a failure nor the
+  // time a mail server takes may tell the browser whether an address has an
+  // account. Only codes are logged.
   const deliver = async (message: EmailMessage, kind: string) => {
-    try {
-      await email.send(message);
-      log.info("auth.email_sent", { code: kind });
-    } catch (error) {
-      log.warn("auth.email_failed", { code: kind, error });
-    }
+    void email.send(message).then(
+      () => log.info("auth.email_sent", { code: kind }),
+      (error: unknown) => log.warn("auth.email_failed", { code: kind, error }),
+    );
   };
 
   return betterAuth({
