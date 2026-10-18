@@ -38,8 +38,8 @@ export function momentIn(value: string, timeZone: string): string | null {
     const instant = Date.parse(value.trim().replace(" ", "T"));
     return Number.isNaN(instant) ? null : new Date(instant).toISOString();
   }
-  const [y, mo, d, h, mi, sec] = match.slice(1, 7).map((part) => Number(part ?? 0)) as number[];
-  const wall = Date.UTC(y!, mo! - 1, d!, h!, mi!, sec!);
+  const part = (index: number) => Number(match[index] ?? 0);
+  const wall = Date.UTC(part(1), part(2) - 1, part(3), part(4), part(5), part(6));
   // Two passes settle the offset across a daylight-saving change.
   let guess = wall - offsetAt(wall, timeZone);
   guess = wall - offsetAt(guess, timeZone);
