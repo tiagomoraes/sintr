@@ -2,7 +2,7 @@
 
 import { Button, FieldError, NotebookCard, NotebookFoot, NotebookHead, linkStyles } from "@sintr/ui";
 import Link from "next/link";
-import { useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import { CheckinFields } from "@/components/ledger/checkin-fields";
 import { CheckinValues, type CheckinView } from "@/components/ledger/checkin-values";
 import { EntryFields } from "@/components/ledger/entry-fields";
@@ -25,6 +25,9 @@ interface Props {
 
 const STATUS_TAG = { proposed: "Draft, not saved", saved: "Saved", discarded: "Discarded" } as const;
 
+/** Where keyboard focus goes after the card changes, so it is never lost. */
+type FocusTarget = "form" | "edit" | "discard" | "discardIt" | "result" | null;
+
 /**
  * A draft from the conversation, for the person to review. Nothing in it is
  * a record until they press Confirm (or say "salva"). Edit lets them fix any
@@ -35,13 +38,43 @@ export function ProposalCard({ proposalId, kind, draft, view, onView, locale }: 
   const [busy, setBusy] = useState(false);
   const [problems, setProblems] = useState<FormProblems>({});
   const [failure, setFailure] = useState<string | null>(null);
+  // Read after the next render, once the element to focus exists.
+  const focusNext = useRef<FocusTarget>(null);
+  const formRef = useRef<HTMLFormElement>(null);
+  const editRef = useRef<HTMLButtonElement>(null);
+  const discardRef = useRef<HTMLButtonElement>(null);
+  const discardItRef = useRef<HTMLButtonElement>(null);
+  const resultRef = useRef<HTMLParagraphElement>(null);
+
   const status = view?.status ?? "proposed";
+  // A draft decided elsewhere (for example by "salva") leaves edit mode.
+  const editing = mode === "edit" && status === "proposed";
+  const askingToDiscard = mode === "discard" && status === "proposed";
   // Once saved with changes, the card shows what was saved.
   const shown = (view?.edited && view.payload ? view.payload : draft) as EntryView &
     CheckinView & { occurredAt?: string };
   const noun = kind === "entry" ? "entry" : "check-in";
   const recordHref = view?.recordId ? `/${kind === "entry" ? "entries" : "checkins"}/${view.recordId}` : null;
   const moment = shown.occurredAt ? formatMoment(new Date(shown.occurredAt), locale) : null;
+
+  useEffect(() => {
+    const wanted = focusNext.current;
+    if (!wanted) return;
+    focusNext.current = null;
+    const target = {
+      form: formRef.current?.querySelector<HTMLElement>("input, textarea"),
+      edit: editRef.current,
+      discard: discardRef.current,
+      discardIt: discardItRef.current,
+      result: resultRef.current,
+    }[wanted];
+    target?.focus();
+  });
+
+  function show(next: "view" | "edit" | "discard", focus: FocusTarget) {
+    focusNext.current = focus;
+    setMode(next);
+  }
 
   async function decide(body: Record<string, unknown>) {
     setBusy(true);
@@ -56,10 +89,10 @@ export function ProposalCard({ proposalId, kind, draft, view, onView, locale }: 
         (ProposalView & { code?: string; proposal?: ProposalView; fields?: string[] }) | null;
       if (response.ok && result) {
         onView(result);
-        setMode("view");
+        show("view", "result");
       } else if (response.status === 409 && result?.proposal) {
         onView(result.proposal);
-        setMode("view");
+        show("view", "result");
       } else if (response.status === 400 && result?.code === "invalid") {
         setFailure("Some of it could not be kept as it is. Check the fields and try again.");
       } else {
@@ -83,8 +116,9 @@ export function ProposalCard({ proposalId, kind, draft, view, onView, locale }: 
     } else {
       const parsed = checkinFromForm(form, locale.timezone);
       if (!parsed.ok) return setProblems(parsed.problems);
-      if (isEmptyCheckin(parsed.values))
+      if (isEmptyCheckin(parsed.values)) {
         return setProblems({ mood: "Give at least one value, or discard the draft." });
+      }
       setProblems({});
       void decide({ action: "confirm", values: parsed.values });
     }
@@ -92,7 +126,12 @@ export function ProposalCard({ proposalId, kind, draft, view, onView, locale }: 
 
   if (status === "discarded") {
     return (
-      <p className="rounded-file border border-rule px-5 py-3.5 text-[0.9375rem] text-ink-3">
+      <p
+        ref={resultRef}
+        tabIndex={-1}
+        role="status"
+        className="rounded-file border border-rule px-5 py-3.5 text-[0.9375rem] text-ink-3"
+      >
         <span className="font-serif italic">Draft discarded.</span> Nothing from it was saved.
       </p>
     );
@@ -114,8 +153,8 @@ export function ProposalCard({ proposalId, kind, draft, view, onView, locale }: 
         }
         tag={STATUS_TAG[status]}
       />
-      {mode === "edit" ? (
-        <form onSubmit={saveEdits} className="py-6 pl-11 pr-5" aria-label={`Edit this ${noun}`}>
+      {editing ? (
+        <form ref={formRef} onSubmit={saveEdits} className="py-6 pl-11 pr-5" aria-label={`Edit this ${noun}`}>
           {kind === "entry" ? (
             <EntryFields defaults={shown} timezone={locale.timezone} problems={problems} />
           ) : (
@@ -130,7 +169,7 @@ export function ProposalCard({ proposalId, kind, draft, view, onView, locale }: 
               type="button"
               variant="quiet"
               size="inline"
-              onClick={() => setMode("view")}
+              onClick={() => show("view", "edit")}
               disabled={busy}
             >
               Cancel
@@ -142,9 +181,9 @@ export function ProposalCard({ proposalId, kind, draft, view, onView, locale }: 
       ) : (
         <CheckinValues checkin={shown} />
       )}
-      {mode === "edit" ? null : status === "saved" ? (
+      {editing ? null : status === "saved" ? (
         <NotebookFoot>
-          <p className="text-[0.9375rem] text-ink-2">
+          <p ref={resultRef} tabIndex={-1} role="status" className="text-[0.9375rem] text-ink-2">
             {view?.edited
               ? `Saved with your changes.`
               : `Saved to your ${kind === "entry" ? "entries" : "check-ins"}.`}{" "}
@@ -155,15 +194,20 @@ export function ProposalCard({ proposalId, kind, draft, view, onView, locale }: 
             ) : null}
           </p>
         </NotebookFoot>
-      ) : mode === "discard" ? (
+      ) : askingToDiscard ? (
         <NotebookFoot>
           <p className="w-full text-[0.9375rem] text-ink-2">
             Discard this draft? Nothing from it will be saved.
           </p>
-          <Button size="sm" onClick={() => void decide({ action: "discard" })} disabled={busy}>
+          <Button
+            ref={discardItRef}
+            size="sm"
+            onClick={() => void decide({ action: "discard" })}
+            disabled={busy}
+          >
             Discard it
           </Button>
-          <Button variant="quiet" size="inline" onClick={() => setMode("view")} disabled={busy}>
+          <Button variant="quiet" size="inline" onClick={() => show("view", "discard")} disabled={busy}>
             Keep it
           </Button>
         </NotebookFoot>
@@ -172,10 +216,22 @@ export function ProposalCard({ proposalId, kind, draft, view, onView, locale }: 
           <Button size="sm" onClick={() => void decide({ action: "confirm" })} disabled={busy}>
             Confirm
           </Button>
-          <Button variant="outline" size="sm" onClick={() => setMode("edit")} disabled={busy}>
+          <Button
+            ref={editRef}
+            variant="outline"
+            size="sm"
+            onClick={() => show("edit", "form")}
+            disabled={busy}
+          >
             Edit
           </Button>
-          <Button variant="quiet" size="inline" onClick={() => setMode("discard")} disabled={busy}>
+          <Button
+            ref={discardRef}
+            variant="quiet"
+            size="inline"
+            onClick={() => show("discard", "discardIt")}
+            disabled={busy}
+          >
             Discard
           </Button>
           {failure ? <FieldError className="mt-0 w-full">{failure}</FieldError> : null}

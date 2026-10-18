@@ -36,6 +36,8 @@ export async function POST(request: Request) {
   const { conversationId, trigger } = parsed.data;
   const text = parsed.data.text ?? "";
   if (trigger === "submit-message" && text.trim() === "") return apiError(400, "empty_message");
+  // A retry continues a stored conversation; there is nothing to retry without one.
+  if (trigger === "regenerate-message" && !conversationId) return apiError(409, "nothing_to_retry");
 
   // Without a provider the crisis screen still answers a message that
   // signals risk; it runs before any model is called.

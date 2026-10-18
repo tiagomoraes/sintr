@@ -174,7 +174,7 @@ export function AssistantForm({
           />
           <FieldHint>
             {settings.hasKey
-              ? `A key is saved${settings.keyHint ? `, ending in ${settings.keyHint}` : ""}. It is never shown again.`
+              ? `A key is saved${settings.keyHint ? `, ending in ${settings.keyHint}` : ""}. It is never shown again, and changing the provider or its address removes it.`
               : provider === "openai_compatible"
                 ? "Optional for a local endpoint such as Ollama."
                 : "From your account with the provider."}

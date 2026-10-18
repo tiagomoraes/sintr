@@ -6,7 +6,7 @@ import { Button, cn } from "@sintr/ui";
 import { DefaultChatTransport } from "ai";
 import Link from "next/link";
 import { useEffect, useRef, useState, type FormEvent, type KeyboardEvent } from "react";
-import { MAX_MESSAGE_LENGTH, problemCopy } from "@/lib/chat";
+import { MAX_MESSAGE_LENGTH, needsSetup, problemCopy } from "@/lib/chat";
 import type { ProposalView } from "@/lib/proposals";
 import { CrisisPanel } from "./crisis-panel";
 import { ProposalCard } from "./proposal-card";
@@ -20,6 +20,8 @@ interface Props {
   locale: { language: string; timezone: string };
   /** The offline, scripted assistant of the tests (SINTR_FAKE_AGENT). */
   rehearsal: boolean;
+  /** False while no provider is saved: the conversation can be read, not continued. */
+  ready?: boolean;
 }
 
 function textOf(message: SintrUIMessage): string {
@@ -94,10 +96,13 @@ export function Conversation({
   initialProposals,
   locale,
   rehearsal,
+  ready = true,
 }: Props) {
   const [serverId, setServerId] = useState<string | null>(conversationId);
   const [proposals, setProposals] = useState(initialProposals);
   const [input, setInput] = useState("");
+  // Read out once a reply is complete, instead of every streamed word.
+  const [announcement, setAnnouncement] = useState("");
   const endRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -105,6 +110,9 @@ export function Conversation({
     ...(conversationId ? { id: conversationId } : {}),
     messages: initialMessages,
     transport,
+    onFinish: ({ message }) => {
+      if (message.role === "assistant") setAnnouncement(`sintr: ${textOf(message)}`);
+    },
     onData: (part) => {
       if (part.type === "data-conversation") {
         setServerId(part.data.conversationId);
@@ -168,7 +176,7 @@ export function Conversation({
         </section>
       ) : null}
 
-      <div role="log" aria-label="Conversation" className="flex flex-1 flex-col gap-3 pb-6">
+      <div role="log" aria-label="Conversation" aria-live="off" className="flex flex-1 flex-col gap-3 pb-6">
         {messages.map((message) => {
           if (message.role === "user") {
             return (
@@ -227,16 +235,18 @@ export function Conversation({
           <div className="rounded-file border border-rule px-5 py-4" role="alert">
             <p className="text-[0.9375rem] text-ink">{problemCopy(error.message)}</p>
             <div className="mt-3 flex flex-wrap items-center gap-x-6 gap-y-2">
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => {
-                  clearError();
-                  void regenerate({ body: serverId ? { conversationId: serverId } : {} });
-                }}
-              >
-                Try again
-              </Button>
+              {needsSetup(error.message) ? null : (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => {
+                    clearError();
+                    void regenerate({ body: serverId ? { conversationId: serverId } : {} });
+                  }}
+                >
+                  Try again
+                </Button>
+              )}
               <Link
                 href="/settings"
                 className="text-[0.9375rem] text-ink-2 underline decoration-rule-strong underline-offset-[0.28em] hover:text-ink"
@@ -263,7 +273,22 @@ export function Conversation({
             whenever you are ready.
           </p>
         ) : null}
-        <form onSubmit={submit} className="flex items-end gap-3">
+        <p className="sr-only" role="status">
+          {announcement}
+        </p>
+        {ready ? null : (
+          <p className="mb-3 text-[0.9375rem] text-ink-2">
+            Set up the assistant in{" "}
+            <Link
+              href="/settings"
+              className="text-ink underline decoration-rule-strong underline-offset-[0.28em] hover:decoration-ink"
+            >
+              Settings
+            </Link>{" "}
+            to continue this conversation.
+          </p>
+        )}
+        <form onSubmit={submit} className={cn("flex items-end gap-3", !ready && "hidden")}>
           <label htmlFor="talk-message" className="sr-only">
             Your message
           </label>

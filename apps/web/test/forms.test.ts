@@ -43,6 +43,11 @@ describe("the entry form", () => {
     });
   });
 
+  it("reads line breaks the same whatever the browser sent, so unchanged words stay unchanged", () => {
+    const parsed = entryFromForm(form([["situation", "first line\r\nsecond line"]]), "UTC");
+    expect(parsed.ok && parsed.values.situation).toBe("first line\nsecond line");
+  });
+
   it("keeps an emotion without a number, and refuses a number off the scale or without a name", () => {
     expect(
       entryFromForm(

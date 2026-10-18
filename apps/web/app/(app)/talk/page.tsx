@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Conversation } from "@/components/talk/conversation";
@@ -23,6 +24,9 @@ export default async function TalkPage() {
     <>
       {ready ? (
         <Conversation
+          // A new one each time the page is opened, even from a conversation
+          // whose address the browser took over after its first message.
+          key={randomUUID()}
           conversationId={null}
           initialMessages={[]}
           initialProposals={{}}

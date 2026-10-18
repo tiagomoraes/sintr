@@ -4,7 +4,6 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { PageHeading } from "@/components/empty-state";
 import { Conversation } from "@/components/talk/conversation";
-import { SetupNotice } from "@/components/talk/setup-notice";
 import { formatMoment } from "@/lib/format";
 import type { ProposalView } from "@/lib/proposals";
 import { assistantReady, loadMessages, proposalView } from "@/lib/server/assistant";
@@ -38,17 +37,13 @@ export default async function ConversationPage({ params }: { params: Promise<{ i
           New conversation
         </Link>
       </div>
-      {ready ? null : (
-        <div className="mb-10">
-          <SetupNotice />
-        </div>
-      )}
       <Conversation
         conversationId={id}
         initialMessages={messages}
         initialProposals={views}
         locale={locale}
         rehearsal={runtime().config.fakeAgent}
+        ready={ready}
       />
       <details className="group mt-14 border-t border-rule pt-6">
         <summary className="cursor-pointer list-none text-[0.9375rem] font-medium text-ink-2 hover:text-ink [&::-webkit-details-marker]:hidden">

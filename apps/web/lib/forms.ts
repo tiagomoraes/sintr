@@ -12,18 +12,26 @@ export type Parsed<T> = { ok: true; values: T; note: string | null } | { ok: fal
 
 type Source = Pick<FormData, "get" | "getAll">;
 
+/**
+ * Line endings only: a form posted as multipart turns a textarea's line
+ * breaks into CRLF, which would make unchanged words look corrected.
+ */
+function lines(value: string): string {
+  return value.replace(/\r\n?/gu, "\n");
+}
+
 function raw(form: Source, name: string): string {
   const value = form.get(name);
-  return typeof value === "string" ? value : "";
+  return typeof value === "string" ? lines(value) : "";
 }
 
 function words(form: Source, name: string): string | null {
-  const value = form.get(name);
-  return typeof value === "string" && value.trim().length > 0 ? value : null;
+  const value = raw(form, name);
+  return value.trim().length > 0 ? value : null;
 }
 
 function all(form: Source, name: string): string[] {
-  return form.getAll(name).map((value) => (typeof value === "string" ? value : ""));
+  return form.getAll(name).map((value) => (typeof value === "string" ? lines(value) : ""));
 }
 
 function score(value: string, max: number): number | null | "invalid" {

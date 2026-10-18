@@ -243,9 +243,17 @@ test.describe("the capture conversation", () => {
     // A crisis opening is not listed under those words.
     expect((await scope.conversations.get(conversationId))?.title).toBeNull();
 
-    // After a reload too.
-    await page.reload();
+    // A new conversation starts fresh when the person is ready, straight
+    // from the paused one (whose address the page took over).
+    await page.getByRole("link", { name: "Start a new conversation" }).click();
+    await expect(page.getByRole("heading", { level: 1, name: "Tell me what happened." })).toBeVisible();
+    await expect(page.getByRole("region", { name: "Human help, now" })).toHaveCount(0);
+    await say(page, SITUATION, QUESTION);
+
+    // The paused conversation stays paused when opened again.
+    await page.goto(`/talk/${conversationId}`);
     await expect(page.getByRole("region", { name: "Human help, now" })).toBeVisible();
+    await expect(page.getByText("The diary is paused here.")).toBeVisible();
   });
 });
 

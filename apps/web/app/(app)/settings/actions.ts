@@ -53,9 +53,15 @@ export async function saveAssistant(_state: AssistantFormState, form: FormData):
   // The key field is never prefilled: empty means "keep the saved one".
   const key = text(form, "apiKey");
   const removeKey = form.get("removeKey") === "on" && !key;
+  // A saved key stays only with the provider and address it was saved for.
   const current = await scope.agentSettings.get();
-  if (provider.data !== "openai_compatible" && !key && (removeKey || !current.hasKey)) {
-    problems.apiKey = "This provider needs an API key.";
+  const keyStays =
+    current.hasKey && !removeKey && current.provider === provider.data && current.baseUrl === baseUrl;
+  if (provider.data !== "openai_compatible" && !key && !keyStays) {
+    problems.apiKey =
+      current.hasKey && !removeKey
+        ? "The saved key belongs to another provider. Paste the key for this one."
+        : "This provider needs an API key.";
   }
   if (Object.keys(problems).length > 0) return { saved: false, problems };
 

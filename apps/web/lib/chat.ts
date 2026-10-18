@@ -20,6 +20,7 @@ const PROBLEMS: Record<string, string> = {
   timeout: "The provider took too long to answer. Try again in a moment.",
   signed_out: "Your session has ended. Sign in again to continue.",
   not_found: "This conversation is not available.",
+  nothing_to_retry: "There is nothing to try again here. Write your message once more.",
 };
 
 const FALLBACK = "The assistant could not answer just now. Your message is kept, and you can try again.";
@@ -35,4 +36,12 @@ export function problemCopy(message: string | undefined): string {
     // A bare code.
   }
   return PROBLEMS[code] ?? FALLBACK;
+}
+
+/** Problems that a retry cannot fix: the person has to change something first. */
+export function needsSetup(message: string | undefined): boolean {
+  const text = message ?? "";
+  return /"?(not_configured|key_required|base_url_required|invalid_url|credentials_in_url|https_required|private_address|nothing_to_retry)"?/.test(
+    text,
+  );
 }
