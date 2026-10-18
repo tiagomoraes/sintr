@@ -1,6 +1,6 @@
-import { lt } from "drizzle-orm";
+import { lt, sql } from "drizzle-orm";
 import type { Executor } from "./db/client";
-import { sessions, verificationTokens } from "./db/schema";
+import { agentSettings, conversations, sessions, verificationTokens } from "./db/schema";
 import { sanitizeError } from "./errors";
 
 /**
@@ -21,6 +21,36 @@ export async function purgeExpiredAuthRecords(
       .where(lt(verificationTokens.expiresAt, now))
       .returning({ id: verificationTokens.id });
     return { sessions: expiredSessions.length, verificationTokens: expiredTokens.length };
+  } catch (error) {
+    throw sanitizeError(error);
+  }
+}
+
+/**
+ * Delete conversations older than their owner's retention setting: a
+ * conversation whose last message is more than `conversation_retention_days`
+ * days old goes, with its messages and drafts (by cascade). People without a
+ * retention setting keep their conversations. Entries and check-ins saved
+ * from a conversation are records of their own and stay.
+ */
+export async function purgeExpiredConversations(
+  db: Executor,
+  now: Date = new Date(),
+): Promise<{ conversations: number }> {
+  try {
+    const removed = await db
+      .delete(conversations)
+      .where(
+        sql`exists (
+          select 1 from ${agentSettings}
+          where ${agentSettings.userId} = ${conversations.userId}
+            and ${agentSettings.conversationRetentionDays} is not null
+            and coalesce(${conversations.lastMessageAt}, ${conversations.createdAt})
+              < ${now.toISOString()}::timestamptz - make_interval(days => ${agentSettings.conversationRetentionDays})
+        )`,
+      )
+      .returning({ id: conversations.id });
+    return { conversations: removed.length };
   } catch (error) {
     throw sanitizeError(error);
   }

@@ -2,7 +2,7 @@ import { sql } from "drizzle-orm";
 import type { Config } from "../config";
 import { createDatabase, type DatabaseHandle } from "../db/client";
 import { createLogger, type Logger } from "../log";
-import { purgeExpiredAuthRecords } from "../maintenance";
+import { purgeExpiredAuthRecords, purgeExpiredConversations } from "../maintenance";
 import { createRepositories, type Repositories } from "../repositories";
 
 /**
@@ -16,6 +16,8 @@ export interface BaseRuntime {
   readonly log: Logger;
   readonly repositories: Repositories;
   purgeExpiredAuthRecords(): Promise<{ sessions: number; verificationTokens: number }>;
+  /** Conversations past their owner's retention setting (agent_settings). */
+  purgeExpiredConversations(): Promise<{ conversations: number }>;
   /** Readiness: true when the database answers. */
   ping(): Promise<boolean>;
   close(): Promise<void>;
@@ -38,6 +40,7 @@ export function openBaseRuntime(
     log,
     repositories: createRepositories(database.db, config.masterKey),
     purgeExpiredAuthRecords: () => purgeExpiredAuthRecords(database.db),
+    purgeExpiredConversations: () => purgeExpiredConversations(database.db),
     async ping() {
       try {
         await database.db.execute(sql`select 1`);

@@ -25,7 +25,7 @@ On the first run this:
 3. starts Postgres, applies the database migrations (the `migrate` service runs once and exits), then the app, the worker and Caddy;
 4. waits until every service is healthy and prints the address.
 
-Open `http://localhost:3000`, create your account and give the consent it asks for. That is all.
+Open `http://localhost:3000`, create your account and give the consent it asks for. Then open Settings and choose the assistant's provider (see below).
 
 ```bash
 make selfhost-down   # stop the stack; the volumes (your data) are kept
@@ -49,6 +49,16 @@ SINTR_HTTPS_PORT=443
 Caddy obtains and renews the certificate by itself and redirects HTTP to HTTPS. With an `https://` URL, cookies are marked Secure, HSTS is sent, and the CSP upgrades insecure requests. Ports 80 and 443 must be free and reachable.
 
 **Keep it on localhost.** The default (`SINTR_BIND=127.0.0.1`) publishes nothing to the network. To use it from your phone on the same network, prefer a VPN such as Tailscale over binding to `0.0.0.0` without TLS.
+
+## The assistant
+
+sintr's assistant talks to a model you choose, with your own key. In Settings:
+
+- **OpenAI-compatible** covers OpenAI (`https://api.openai.com/v1`), OpenRouter (`https://openrouter.ai/api/v1`) and anything that speaks the same API. For a model on the same machine (Ollama, LiteLLM), use `http://host.docker.internal:11434/v1` (or the port it listens on): inside the stack, `localhost` is the app container itself, and the compose file maps `host.docker.internal` to the host. A local endpoint needs no key.
+- **Anthropic** and **Google** take a key and a model name.
+- **Test the connection** makes one short request with the saved settings and tells you whether the key and the model work.
+
+The key is encrypted with your data key before it is stored and is never shown again. What the provider receives is described in [`PRIVACY.md`](PRIVACY.md). Conversations are kept until you delete them, unless you choose a retention in Settings; the worker removes older ones every hour.
 
 ## The keys, and backups
 
@@ -103,7 +113,7 @@ Logs are JSON lines with event names, ids, counts and error codes. They never co
 | --- | --- | --- |
 | `caddy` | `caddy:2-alpine` | the edge: HTTP or automatic HTTPS, compression, reverse proxy to the app |
 | `app` | `sintr-app:local` | the Next.js app (UI, API, auth) on port 3000, inside the network only |
-| `worker` | `sintr-app:local` | background jobs; today it removes expired sessions every hour |
+| `worker` | `sintr-app:local` | background jobs: removes expired sessions, and conversations past their retention, every hour |
 | `migrate` | `sintr-app:local` | applies migrations, then exits |
 | `db` | `postgres:16-alpine` | the database, on the `pgdata` volume |
 

@@ -4,11 +4,14 @@ import { checkins, entries, insights, therapyNotes } from "../db/schema";
 import {
   CheckinContent,
   CheckinInput,
+  CorrectionNote,
   EntryContent,
   EntryInput,
   InsightInput,
   TherapyNoteInput,
   type Checkin,
+  type Corrected,
+  type Correction,
   type Emotion,
   type Entry,
   type Insight,
@@ -18,6 +21,7 @@ import {
 } from "../domain";
 import { parseInput } from "../errors";
 import { isId, type ScopeContext } from "./context";
+import { correctionsRepository, diffFields, inTransaction } from "./corrections";
 
 export interface ListRange {
   /** Inclusive lower bound on when it happened. */
@@ -39,6 +43,20 @@ function peakIntensity(emotions: Emotion[] | null | undefined): number | null {
 }
 
 const SEALED_ENTRY_KEYS = Object.keys(SEALED.entries.fields) as (keyof typeof SEALED.entries.fields)[];
+const ENTRY_FIELDS = ["occurredAt", "alternativeBelief", ...SEALED_ENTRY_KEYS] as const;
+const CHECKIN_FIELDS = [
+  "occurredAt",
+  "mood",
+  "energy",
+  "anxiety",
+  "sleepHours",
+  "sleepQuality",
+  "note",
+] as const;
+
+function correctionNote(note: string | null | undefined): string | null {
+  return note ? parseInput(CorrectionNote, note) : null;
+}
 
 function pickSealed<T extends Record<string, unknown>, K extends string>(value: T, keys: readonly K[]) {
   const out: Partial<Record<K, unknown>> = {};
@@ -115,6 +133,40 @@ export function entriesRepository({ db, userId, cipher }: ScopeContext) {
         .where(own(id))
         .returning();
       return row ? decode(row) : null;
+    },
+
+    /**
+     * Change an entry the way the pack asks: the live entry shows the new
+     * words, and a dated correction keeps what each changed field held
+     * before. Fields equal to what is stored are not part of the change; if
+     * nothing differs, nothing is written.
+     */
+    async correct(
+      id: string,
+      patch: EntryInput,
+      options: { note?: string | null } = {},
+    ): Promise<Corrected<Entry> | null> {
+      if (!isId(id)) return null;
+      const value = parseInput(EntryInput, patch);
+      const note = correctionNote(options.note);
+      return inTransaction(db, async (tx) => {
+        const [row] = await tx.select().from(entries).where(own(id)).for("update");
+        if (!row) return null;
+        const current = decode(row);
+        const change = diffFields(current, value, ENTRY_FIELDS);
+        if (change.fields.length === 0) return { record: current, correction: null };
+        const next = Object.fromEntries(change.fields.map((key) => [key, value[key as keyof typeof value]]));
+        const scoped = { db: tx, userId, cipher };
+        const record = await entriesRepository(scoped).update(id, next);
+        const correction = await correctionsRepository(scoped).record({ entryId: id }, change, note);
+        return { record: record!, correction };
+      });
+    },
+
+    /** The dated corrections of one entry, oldest first. */
+    async corrections(id: string): Promise<Correction[]> {
+      if (!isId(id)) return [];
+      return correctionsRepository({ db, userId, cipher }).list({ entryId: id });
     },
 
     async remove(id: string): Promise<boolean> {
@@ -194,6 +246,34 @@ export function checkinsRepository({ db, userId, cipher }: ScopeContext) {
         .where(own(id))
         .returning();
       return row ? decode(row) : null;
+    },
+
+    /** Like `entries.correct`: the change is dated and the old values kept. */
+    async correct(
+      id: string,
+      patch: CheckinInput,
+      options: { note?: string | null } = {},
+    ): Promise<Corrected<Checkin> | null> {
+      if (!isId(id)) return null;
+      const value = parseInput(CheckinInput, patch);
+      const note = correctionNote(options.note);
+      return inTransaction(db, async (tx) => {
+        const [row] = await tx.select().from(checkins).where(own(id)).for("update");
+        if (!row) return null;
+        const current = decode(row);
+        const change = diffFields(current, value, CHECKIN_FIELDS);
+        if (change.fields.length === 0) return { record: current, correction: null };
+        const next = Object.fromEntries(change.fields.map((key) => [key, value[key as keyof typeof value]]));
+        const scoped = { db: tx, userId, cipher };
+        const record = await checkinsRepository(scoped).update(id, next);
+        const correction = await correctionsRepository(scoped).record({ checkinId: id }, change, note);
+        return { record: record!, correction };
+      });
+    },
+
+    async corrections(id: string): Promise<Correction[]> {
+      if (!isId(id)) return [];
+      return correctionsRepository({ db, userId, cipher }).list({ checkinId: id });
     },
 
     async remove(id: string): Promise<boolean> {

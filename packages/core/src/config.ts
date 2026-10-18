@@ -17,6 +17,8 @@ const EnvSchema = z.object({
   SINTR_MASTER_KEY: z.string().min(1, "is required"),
   SINTR_MASTER_KEY_ID: z.string().default("k1"),
   SINTR_LOG_LEVEL: z.enum(["debug", "info", "warn", "error"]).default("info"),
+  // Tests only (commented out in .env.example): see `fakeAgent` below.
+  SINTR_FAKE_AGENT: z.enum(["0", "1"]).default("0"),
 });
 
 export interface Config {
@@ -27,6 +29,12 @@ export interface Config {
   authSecret: string;
   masterKey: MasterKey;
   logLevel: LogLevel;
+  /**
+   * Replace every assistant provider with a scripted, offline one, so the
+   * end-to-end tests never reach a real model. The app says so on screen.
+   * Refused in SaaS mode.
+   */
+  fakeAgent: boolean;
 }
 
 export class ConfigError extends Error {
@@ -47,6 +55,9 @@ export function loadConfig(env: Record<string, string | undefined> = process.env
     throw new ConfigError(`invalid configuration: ${problems.join("; ")}`);
   }
   const e = parsed.data;
+  if (e.SINTR_FAKE_AGENT === "1" && e.SINTR_MODE === "saas") {
+    throw new ConfigError("invalid configuration: SINTR_FAKE_AGENT: is not allowed in saas mode");
+  }
   let masterKey: MasterKey;
   try {
     masterKey = parseMasterKey(e.SINTR_MASTER_KEY, e.SINTR_MASTER_KEY_ID);
@@ -61,5 +72,6 @@ export function loadConfig(env: Record<string, string | undefined> = process.env
     authSecret: e.SINTR_AUTH_SECRET,
     masterKey,
     logLevel: e.SINTR_LOG_LEVEL,
+    fakeAgent: e.SINTR_FAKE_AGENT === "1",
   };
 }

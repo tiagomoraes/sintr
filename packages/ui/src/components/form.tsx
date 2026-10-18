@@ -32,6 +32,25 @@ export function Input({ className, type = "text", ...props }: ComponentProps<"in
   );
 }
 
+/** A multi-line field for the person's words, styled like Input. */
+export function Textarea({ className, rows = 3, ...props }: ComponentProps<"textarea">) {
+  return (
+    <textarea
+      rows={rows}
+      className={cn(
+        "block w-full resize-y rounded-command border border-rule-strong bg-paper px-4 py-3",
+        "font-sans text-body leading-[1.55] text-ink placeholder:text-ink-3",
+        "transition-[border-color] duration-300 ease-out-expo hover:border-ink-soft",
+        "focus-visible:border-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink",
+        "aria-[invalid=true]:border-ink",
+        "disabled:cursor-not-allowed disabled:opacity-60",
+        className,
+      )}
+      {...props}
+    />
+  );
+}
+
 /**
  * A drawn checkbox: a 16px square, 1.5px Soft Ink outline when open, an ink
  * fill with a white check when done. It is a native input, so it works with

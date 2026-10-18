@@ -15,15 +15,19 @@ There is no filesystem dependency: the ledger lives in Postgres, encrypted per p
 
 ## Where it is today
 
-This is milestone **F0, the foundation** (see [`docs/PRODUCT.md`](docs/PRODUCT.md) for the milestones). What works:
+Milestones **F0, the foundation**, and **F1, capture** (see [`docs/PRODUCT.md`](docs/PRODUCT.md) for the milestones). What works:
 
 - sign up (email, password and the health data consent) and sign in, with Argon2id passwords and sliding sessions;
-- the authenticated shell with calm, empty sections for entries, check-ins, therapy and reports;
-- the full data model in Postgres, with every sensitive field encrypted before it is stored;
-- user-scoped data access, with tests that prove one person cannot read another's data;
+- **talking to the assistant inside sintr**: tell it what happened, it acknowledges, asks a question or two and drafts a thought record in your own words, which you confirm, edit or discard. Nothing becomes an entry until you say so (the Confirm button, or "salva");
+- **bring your own key**: an OpenAI-compatible endpoint (OpenAI, OpenRouter, a local Ollama or LiteLLM), Anthropic or Google, with the key encrypted like your diary and never shown again;
+- **the crisis protocol**: a message that signals acute risk stops the diary and points to human help (CVV 188, SAMU 192), before any model is called;
+- **quick check-ins** (mood, energy, anxiety, sleep, a note) without the conversation;
+- **the timeline** of entries and check-ins, with a detail view; changing a saved record keeps a dated correction with what it said before;
+- settings for the assistant, your time zone and how long conversations are kept;
+- the full data model in Postgres, every sensitive field encrypted before it is stored, and tests that prove one person cannot read another's data;
 - the self-host stack (Caddy, app, worker, Postgres) behind one command.
 
-Not yet: writing entries and check-ins with the embedded agent (F1), the weekly report and its approved send (F2), the MCP server (F3), the hosted offer (F4), export, deletion and retention in the UI (F5). `packages/mcp` and `packages/agent` hold their typed contracts only.
+Not yet: the weekly report and its approved send (F2), the MCP server (F3), the hosted offer (F4), export, deletion and the audit view in the UI (F5). `packages/mcp` holds its typed contract only.
 
 ## Self-host
 
@@ -35,7 +39,7 @@ cd sintr-app
 make selfhost-up
 ```
 
-The first run writes `.env` with fresh secrets, builds the image and starts the stack. Open `http://localhost:3000` and create your account. `make selfhost-down` stops it and keeps your data.
+The first run writes `.env` with fresh secrets, builds the image and starts the stack. Open `http://localhost:3000`, create your account, and choose your assistant's provider and key in Settings. `make selfhost-down` stops it and keeps your data.
 
 Back up `SINTR_MASTER_KEY` from `.env` somewhere other than the database backup: without it nothing can be read, and with it next to the database the encryption protects nothing. [`docs/SELFHOST.md`](docs/SELFHOST.md) covers a public domain with TLS, closing sign-up, backups and upgrades.
 
@@ -57,18 +61,23 @@ make help         # everything else
 
 The app serves `http://localhost:3000`. Each checkout gets its own dev database container on `127.0.0.1`, at the port in `SINTR_DEV_DB_PORT`, so worktrees do not share data.
 
+The assistant talks to the provider saved in Settings. To try the app without a key, set `SINTR_FAKE_AGENT=1` in `.env` and run `make dev`: replies then come from a scripted, offline assistant, and the page says so. `make test` always runs that way; no test reaches a real model.
+
 ## Repository
 
 ```
 apps/
   web/        Next.js 15 (App Router): UI, API and auth routes
-  worker/     background jobs (F0: expired auth records); also the migration runner
+  worker/     background jobs (expired auth records, conversation retention);
+              also the migration runner
 packages/
   core/       domain (Zod), Postgres schema and migrations (Drizzle), envelope
               encryption, user-scoped repositories, Better Auth, the redacting logger
   ui/         the sintr design system: tokens, fonts, shadcn/ui components
+  agent/      the embedded assistant: the capture conversation (Vercel AI SDK),
+              bring-your-own-key providers, the crisis protocol, the checks
+              that keep drafts in the person's words, an offline test model
   mcp/        the MCP contract (interfaces only)
-  agent/      the capture driver contract (interfaces only)
 docker/       the self-host stack (compose, Caddy) and the dev database
 docs/         product, conventions, design, self-host, privacy, decisions
 ```

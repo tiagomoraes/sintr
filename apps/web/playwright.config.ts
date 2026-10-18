@@ -5,7 +5,8 @@ import { defineConfig, devices } from "@playwright/test";
  * End to end: the production build of the app, started against its own
  * fresh Postgres database (created and migrated in e2e/global-setup.ts).
  * Secrets are generated per run; workers inherit them through the
- * environment of this process.
+ * environment of this process. The assistant is the offline rehearsal
+ * model (SINTR_FAKE_AGENT): no test ever reaches a real provider.
  */
 const base = process.env.DATABASE_URL;
 if (!base) throw new Error("DATABASE_URL is not set: run the tests with `make test`");
@@ -44,6 +45,7 @@ export default defineConfig({
       SINTR_MASTER_KEY: process.env.SINTR_E2E_MASTER_KEY,
       SINTR_MASTER_KEY_ID: "k1",
       SINTR_LOG_LEVEL: "warn",
+      SINTR_FAKE_AGENT: "1",
     },
   },
 });

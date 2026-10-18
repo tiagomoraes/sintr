@@ -1,6 +1,6 @@
 # Privacy and data protection
 
-This describes what sintr does with personal data **as implemented today** (milestone F0), so it can be checked against the code. Where something is planned but not built, it says so. The product rules behind it are in [`PRODUCT.md`](PRODUCT.md) (Security and privacy, Invariants) and [`CONVENTIONS.md`](CONVENTIONS.md) (Non-negotiable rules).
+This describes what sintr does with personal data **as implemented today** (milestones F0 and F1), so it can be checked against the code. Where something is planned but not built, it says so. The product rules behind it are in [`PRODUCT.md`](PRODUCT.md) (Security and privacy, Invariants) and [`CONVENTIONS.md`](CONVENTIONS.md) (Non-negotiable rules).
 
 A diary kept in sintr is sensitive personal data: health data under LGPD art. 11. The posture is built around four ideas: the person's specific consent, encryption by the application before anything is stored, strict separation between people, and nothing sent anywhere without approval.
 
@@ -28,8 +28,11 @@ A diary kept in sintr is sensitive personal data: health data under LGPD art. 11
 | `reports` | content, PDF, recipient |
 | `consents` | recipient |
 | `conversations`, `messages` | title, message content |
+| `proposals` | the draft the assistant prepared (every field of it) |
+| `corrections` | what a changed field held before, the person's note |
+| `agent_settings` | the API key of the person's assistant provider |
 
-**Kept in the clear, on purpose,** so they can be counted and charted without decrypting anything: dates and times, the 0 to 100 intensities and the 0 to 5 check-in scales, sleep hours, statuses and kinds, ids. Also in the clear: the email address (needed to sign in), session metadata (IP address and browser, which Better Auth stores for each session), API token labels and scopes, and audit events, which hold no content.
+**Kept in the clear, on purpose,** so they can be counted and charted without decrypting anything: dates and times, the 0 to 100 intensities and the 0 to 5 check-in scales, sleep hours, statuses and kinds, ids. Also the names of the fields a correction changed (never their values), and which provider, address and model a person's assistant uses. Also in the clear: the email address (needed to sign in), session metadata (IP address and browser, which Better Auth stores for each session), API token labels and scopes, and audit events, which hold no content.
 
 **What a database dump reveals.** Account emails, dates, scales and the shape of the data; none of the words. A test writes recognisable text into every sealed column and then scans a text dump of every table for it, in clear and as hex; it finds nothing. The test was also run with sealing removed, and it fails, as it should.
 
@@ -61,15 +64,23 @@ A diary kept in sintr is sensitive personal data: health data under LGPD art. 11
 - Database errors are reduced to their SQLSTATE and constraint name before they leave the core.
 - Caddy keeps no access log. Next.js and Better Auth telemetry are disabled. Fonts are self-hosted; the app loads nothing from third parties.
 
-## Third parties
+## The assistant and its provider
 
-In F0, no personal data leaves the installation: there is no LLM call, no email, no analytics. When the embedded agent arrives (F1), self-host uses the operator's own provider key (or a local model), and the hosted offer will use zero-data-retention routes; this document will say which.
+The embedded assistant talks to a language model **the person chooses, with their own key** (bring your own key): an OpenAI-compatible endpoint (OpenAI, OpenRouter, a local Ollama or LiteLLM), Anthropic or Google.
+
+- **The key** is sealed with the person's own data key before it is stored, like ledger content. It is never sent back to the browser (the settings screen shows its last four characters at most), never logged, and used only on the server for the call to that provider. Saving or removing it is recorded in the audit log, without the key. sintr never falls back to a key from the server's environment.
+- **What the provider receives:** the messages of the current conversation (the last 40) and, when the assistant asks for it, a summary of the last seven days: dates, entry titles (or the first 120 characters of the situation), emotions with their intensities, and check-in scales. Nothing else from the diary. What the provider does with it is governed by that provider's terms; a model on the person's own machine keeps it there.
+- **Nothing the assistant drafts is a record** until the person confirms it, on screen or by telling it to save. Drafts are stored sealed and go away with their conversation.
+- **A message that signals acute risk** stops the diary before anything is sent to the provider: the reply that points to CVV 188 and SAMU 192 is written in advance, and works even without a provider.
+- No other personal data leaves the installation in F1: there is no email and no analytics. The hosted offer will use zero-data-retention routes; this document will say which.
 
 ## Retention, export and deletion
 
 - Expired sessions and verification tokens are removed every hour by the worker.
 - Deleting an account removes every row the person owns, in every table, by cascade (tested in `packages/core`). There is no button for it in the app yet.
-- Export (JSON and Markdown), deletion from the UI, configurable chat retention and the audit view arrive in F5. Until then, a self-host operator can run them directly; on the hosted offer they will exist before it opens.
+- **Conversations** are kept until the person deletes them, unless they choose in Settings to keep them 30, 90 or 365 days after the last message; the worker then removes older ones every hour, with their messages and drafts. A conversation can also be deleted from its page. Entries and check-ins saved from a conversation are records of their own and stay.
+- **Corrections** of an entry or check-in keep what the changed fields held before, dated, so nothing is rewritten silently. They are removed with the record.
+- Export (JSON and Markdown), deleting entries and the account from the UI, and the audit view arrive in F5. Until then, a self-host operator can run them directly; on the hosted offer they will exist before it opens.
 
 ## Known gaps
 

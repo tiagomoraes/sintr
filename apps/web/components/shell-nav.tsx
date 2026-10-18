@@ -5,10 +5,12 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 export const SECTIONS = [
+  { href: "/talk", label: "Talk" },
   { href: "/entries", label: "Entries" },
   { href: "/checkins", label: "Check-ins" },
   { href: "/therapy", label: "Therapy" },
   { href: "/reports", label: "Reports" },
+  { href: "/settings", label: "Settings" },
 ] as const;
 
 /**
@@ -25,7 +27,10 @@ export function ShellNav() {
         {SECTIONS.map((section) => {
           const current = pathname === section.href || pathname.startsWith(`${section.href}/`);
           return (
-            <li key={section.href} className="relative shrink-0">
+            <li
+              key={section.href}
+              className={cn("relative shrink-0", section.href === "/settings" && "min-[900px]:mt-5")}
+            >
               <Link
                 href={section.href}
                 aria-current={current ? "page" : undefined}

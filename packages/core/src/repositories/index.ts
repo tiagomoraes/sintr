@@ -3,6 +3,7 @@ import { createFieldCipher, type MasterKey } from "../crypto";
 import type { Database } from "../db/client";
 import { profiles, therapySettings, users } from "../db/schema";
 import { sanitizeError } from "../errors";
+import { agentSettingsRepository, proposalsRepository } from "./agent";
 import type { ScopeContext } from "./context";
 import { conversationsRepository } from "./conversations";
 import { loadDataKey } from "./data-keys";
@@ -29,6 +30,8 @@ export interface UserScope {
   readonly reports: ReturnType<typeof reportsRepository>;
   readonly consents: ReturnType<typeof consentsRepository>;
   readonly conversations: ReturnType<typeof conversationsRepository>;
+  readonly agentSettings: ReturnType<typeof agentSettingsRepository>;
+  readonly proposals: ReturnType<typeof proposalsRepository>;
   readonly apiTokens: ReturnType<typeof apiTokensRepository>;
   readonly auditLog: ReturnType<typeof auditLogRepository>;
   /** Run several operations atomically, with the same scope. */
@@ -73,6 +76,8 @@ function buildScope(ctx: ScopeContext): UserScope {
     reports: guard(reportsRepository(ctx)),
     consents: guard(consentsRepository(ctx)),
     conversations: guard(conversationsRepository(ctx)),
+    agentSettings: guard(agentSettingsRepository(ctx)),
+    proposals: guard(proposalsRepository(ctx)),
     apiTokens: guard(apiTokensRepository(ctx)),
     auditLog: guard(auditLogRepository(ctx)),
     async transaction(fn) {

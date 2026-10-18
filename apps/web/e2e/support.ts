@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { loadConfig } from "@sintr/core";
 import { createRuntime, type Runtime } from "@sintr/core/runtime";
-import { expect, type Page } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
 
 let shared: Runtime | undefined;
 
@@ -17,6 +17,13 @@ export function core(): Runtime {
     { service: "e2e", poolSize: 2 },
   );
   return shared;
+}
+
+/** Close the shared runtime; the next `core()` opens a fresh one. */
+export async function closeCore(): Promise<void> {
+  const runtime = shared;
+  shared = undefined;
+  await runtime?.close();
 }
 
 export const PASSWORD = "a sentence long enough to pass";
@@ -41,4 +48,52 @@ export async function currentUserId(page: Page): Promise<string> {
   const body = (await response.json()) as { user: { id: string } } | null;
   expect(body?.user.id).toBeTruthy();
   return body!.user.id;
+}
+
+/** A key that looks real, so the at-rest checks have something to look for. */
+export function newKey(): string {
+  return `sk-e2e-${randomUUID().replaceAll("-", "")}`;
+}
+
+/** Choose a provider and save a key through the settings screen. */
+export async function setUpAssistant(page: Page, key: string = newKey()): Promise<string> {
+  await page.goto("/settings");
+  await page.getByRole("button", { name: "OpenRouter" }).click();
+  await page.getByLabel("Model", { exact: true }).fill("vendor/model");
+  await page.getByLabel("API key", { exact: true }).fill(key);
+  await page.getByRole("button", { name: "Save the assistant" }).click();
+  await expect(page.getByText(`A key is saved, ending in ${key.slice(-4)}.`)).toBeVisible();
+  return key;
+}
+
+/** Send one message in the conversation and wait for the assistant's reply. */
+export async function say(page: Page, text: string, reply: string | RegExp): Promise<void> {
+  const box = page.getByLabel("Your message");
+  await box.fill(text);
+  await box.press("Enter");
+  await expect(page.getByRole("log").getByText(reply).last()).toBeVisible();
+}
+
+/**
+ * Create a person through the same auth API the sign-up form calls, but on
+ * the server side, then give the browser their session cookie. For tests
+ * about something other than signing up: the form is rate limited per
+ * address (10 every 10 minutes), and the whole suite shares one address.
+ */
+export async function signUpQuietly(page: Page, email: string = newEmail("person")): Promise<void> {
+  const { headers } = await core().auth.api.signUpEmail({
+    body: { email, password: PASSWORD, name: "", consent: true } as never,
+    returnHeaders: true,
+  });
+  const cookie = headers
+    .getSetCookie()
+    .map((line) => line.split(";")[0]!)
+    .find((pair) => pair.startsWith("sintr.session_token="));
+  expect(cookie, "a session cookie").toBeDefined();
+  const [name, ...value] = cookie!.split("=");
+  await page
+    .context()
+    .addCookies([{ name: name!, value: value.join("="), url: test.info().project.use.baseURL! }]);
+  await page.goto("/entries");
+  await expect(page.getByRole("heading", { level: 1, name: "Entries" })).toBeVisible();
 }

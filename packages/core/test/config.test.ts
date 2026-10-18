@@ -48,4 +48,12 @@ describe("configuration", () => {
     expect(() => loadConfig(rest)).toThrow(/DATABASE_URL/);
     expect(() => loadConfig({ ...valid(), SINTR_MODE: "cloud" })).toThrow(/SINTR_MODE/);
   });
+
+  it("keeps the offline test assistant off by default, and refuses it in saas mode", () => {
+    expect(loadConfig(valid()).fakeAgent).toBe(false);
+    expect(loadConfig({ ...valid(), SINTR_FAKE_AGENT: "1" }).fakeAgent).toBe(true);
+    expect(() => loadConfig({ ...valid(), SINTR_FAKE_AGENT: "1", SINTR_MODE: "saas" })).toThrow(
+      /SINTR_FAKE_AGENT/,
+    );
+  });
 });

@@ -19,7 +19,7 @@ const config: NextConfig = {
   output: process.env.SINTR_STANDALONE === "1" ? "standalone" : undefined,
   // The monorepo root, so the standalone build traces workspace packages.
   outputFileTracingRoot: resolve(process.cwd(), "../.."),
-  transpilePackages: ["@sintr/core", "@sintr/ui"],
+  transpilePackages: ["@sintr/core", "@sintr/ui", "@sintr/agent"],
   serverExternalPackages: ["@node-rs/argon2"],
   poweredByHeader: false,
   reactStrictMode: true,

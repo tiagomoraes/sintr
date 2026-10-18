@@ -38,3 +38,27 @@ export const requireScope = cache(async () => {
   if (!consent?.granted || consent.version !== HEALTH_DATA_CONSENT_VERSION) redirect("/consent");
   return { user, scope };
 });
+
+/** A JSON answer with a code the client can explain. Never content. */
+export function apiError(status: number, code: string, extra: Record<string, unknown> = {}): Response {
+  return Response.json({ code, ...extra }, { status, headers: { "Cache-Control": "no-store" } });
+}
+
+/**
+ * The gate of every data API route: a request from this origin, a real
+ * session (checked on the server), and the current consent on record.
+ * Returns the person's scope, or the error to answer with.
+ */
+export async function apiScope(request: Request) {
+  const origin = request.headers.get("origin");
+  if (request.method !== "GET" && origin !== null && origin !== runtime().config.url.origin) {
+    return apiError(403, "origin_refused");
+  }
+  const session = await runtime().auth.api.getSession({ headers: request.headers });
+  if (!session) return apiError(401, "signed_out");
+  const scope = await runtime().repositories.forUser(session.user.id);
+  const consent = await scope.consents.latest("health_data_processing");
+  if (!consent?.granted || consent.version !== HEALTH_DATA_CONSENT_VERSION)
+    return apiError(403, "consent_required");
+  return { user: session.user, scope };
+}

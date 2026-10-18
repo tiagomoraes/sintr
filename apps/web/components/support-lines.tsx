@@ -1,4 +1,5 @@
 import { cn } from "@sintr/ui";
+import { useId } from "react";
 
 const LINES = [
   {
@@ -28,12 +29,14 @@ function PhoneIcon() {
  * Where to find a person right now. sintr is not a crisis service, so this
  * is present wherever someone might write about acute risk.
  */
-export function SupportLines({ className }: { className?: string }) {
+export function SupportLines({ className, headingLevel = 2 }: { className?: string; headingLevel?: 2 | 3 }) {
+  const Heading = headingLevel === 3 ? "h3" : "h2";
+  const id = useId();
   return (
-    <section aria-labelledby="support-title" className={cn("max-w-[44rem]", className)}>
-      <h2 id="support-title" className="max-w-[24em] font-serif text-title-small font-normal">
+    <section aria-labelledby={id} className={cn("max-w-[44rem]", className)}>
+      <Heading id={id} className="max-w-[24em] font-serif text-title-small font-normal">
         If you are in danger or thinking about harming yourself, please call someone now.
-      </h2>
+      </Heading>
       <ul className="mt-5 border-t border-ink">
         {LINES.map((line) => (
           <li
