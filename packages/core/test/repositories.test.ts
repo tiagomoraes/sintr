@@ -136,8 +136,8 @@ describe("reports and consent", () => {
     });
     expect(report.status).toBe("draft");
     await expect(scope.reports.markSent(report.id, report.id)).rejects.toBeInstanceOf(InvalidStateError);
-    await scope.reports.setContent(report.id, { content: "# Report", pdf: Buffer.from("%PDF") });
-    const reviewed = await scope.reports.markReviewed(report.id);
+    await scope.reports.edit(report.id, "# Report");
+    const reviewed = await scope.reports.markReviewed(report.id, { pdf: Buffer.from("%PDF") });
     expect(reviewed.status).toBe("reviewed");
 
     await expect(
@@ -167,7 +167,8 @@ describe("reports and consent", () => {
       hasPdf: true,
     });
     expect((await scope.reports.readPdf(report.id))?.toString()).toBe("%PDF");
-    await expect(scope.reports.setContent(report.id, { content: "changed" })).rejects.toBeInstanceOf(
+    await expect(scope.reports.edit(report.id, "changed")).rejects.toBeInstanceOf(InvalidStateError);
+    await expect(scope.reports.prepareAgain(report.id, { content: "again" })).rejects.toBeInstanceOf(
       InvalidStateError,
     );
   });

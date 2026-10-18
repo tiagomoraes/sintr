@@ -21,4 +21,11 @@ export {
   therapyNotes,
 } from "./ledger";
 export { deliveryChannel, profiles, therapySettings } from "./profile";
-export { consentPurpose, consents, reportStatus, reports } from "./reports";
+export {
+  consentPurpose,
+  consents,
+  reportRevisionKind,
+  reportRevisions,
+  reportStatus,
+  reports,
+} from "./reports";

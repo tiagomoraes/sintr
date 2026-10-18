@@ -91,12 +91,11 @@ describe("encryption at rest", () => {
     const report = await scope.reports.createDraft({
       periodStart: new Date("2026-10-07T18:00:00Z"),
       periodEnd: new Date("2026-10-14T17:00:00Z"),
+      content: remember("report draft"),
     });
-    await scope.reports.setContent(report.id, {
-      content: remember("report content"),
-      pdf: Buffer.from(remember("report pdf"), "utf8"),
-    });
-    await scope.reports.markReviewed(report.id);
+    // F2: the person's edit keeps the draft's words as a revision.
+    await scope.reports.edit(report.id, remember("report content"));
+    await scope.reports.markReviewed(report.id, { pdf: Buffer.from(remember("report pdf"), "utf8") });
     const consent = await scope.consents.record({
       purpose: "report_send",
       version: "1",
@@ -151,8 +150,9 @@ describe("encryption at rest", () => {
       }
     }
     // display name, 2 therapy, 14 entry, 2 check-in, task, insight, report (3), consent, conversation,
-    // message, then F1: the API key, a proposal payload, a correction's previous values and note
-    expect(checked).toBe(31);
+    // message, then F1: the API key, a proposal payload, a correction's previous values and note,
+    // then F2: the report's previous words in its revision
+    expect(checked).toBe(32);
   });
 
   it("leaves no trace of the content in a text dump of the whole database", async () => {

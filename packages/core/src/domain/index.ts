@@ -65,6 +65,9 @@ export const TherapySettingsPatch = z
       .nullable(),
     reportLeadMinutes: z.number().int().min(0).max(10_080),
     deliveryChannel: DeliveryChannel,
+    /** A one-off date for the next session, when it moved; null clears it. */
+    nextSessionAt: z.coerce.date().nullable(),
+    reportNoticeEmail: z.boolean(),
   })
   .partial();
 export type TherapySettingsPatch = z.input<typeof TherapySettingsPatch>;
@@ -77,6 +80,8 @@ export interface TherapySettings {
   reportLeadMinutes: number;
   requireApproval: true;
   deliveryChannel: z.infer<typeof DeliveryChannel>;
+  nextSessionAt: Date | null;
+  reportNoticeEmail: boolean;
 }
 
 /* Entries (thought records) */
@@ -234,11 +239,27 @@ export interface Report {
   hasPdf: boolean;
   recipient: string | null;
   generatedAt: Date | null;
+  editedAt: Date | null;
   reviewedAt: Date | null;
   sentAt: Date | null;
   consentId: string | null;
+  notifiedAt: Date | null;
   createdAt: Date;
   updatedAt: Date;
+}
+
+export const ReportRevisionKind = z.enum(["edited", "prepared_again"]);
+export type ReportRevisionKind = z.infer<typeof ReportRevisionKind>;
+
+/** What a report said before one change (the person's edit, or a new preparation). */
+export interface ReportRevision {
+  id: string;
+  kind: ReportRevisionKind;
+  /** Names of the sections that changed. */
+  sections: string[];
+  /** The whole content before the change. */
+  previous: string;
+  createdAt: Date;
 }
 
 /* Consents */
@@ -267,6 +288,9 @@ export interface Consent {
 
 /** The current version of the consent to process health data (LGPD art. 11). */
 export const HEALTH_DATA_CONSENT_VERSION = "2026-10-18";
+
+/** The current wording of the approval to send one report to one recipient. */
+export const REPORT_SEND_CONSENT_VERSION = "2026-10-18";
 
 /* Conversations */
 
@@ -391,7 +415,11 @@ export const AuditAction = z.enum([
   "consent.recorded",
   "api_token.created",
   "api_token.revoked",
+  "report.prepared",
+  "report.edited",
+  "report.reviewed",
   "report.sent",
+  "report.send_failed",
   "data.exported",
   "data.deleted",
   "agent_key.saved",
