@@ -17,7 +17,7 @@ const EnvSchema = z.object({
   SINTR_MASTER_KEY: z.string().min(1, "is required"),
   SINTR_MASTER_KEY_ID: z.string().default("k1"),
   SINTR_LOG_LEVEL: z.enum(["debug", "info", "warn", "error"]).default("info"),
-  // Tests only, deliberately absent from .env.example: see `fakeAgent` below.
+  // Tests only (commented out in .env.example): see `fakeAgent` below.
   SINTR_FAKE_AGENT: z.enum(["0", "1"]).default("0"),
 });
 

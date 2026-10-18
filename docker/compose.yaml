@@ -51,6 +51,10 @@ services:
     <<: *image
     restart: unless-stopped
     environment: *app-env
+    # A model on the host (Ollama, LiteLLM) is http://host.docker.internal:PORT
+    # in Settings; on Linux this name has to be added explicitly.
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     depends_on:
       migrate:
         condition: service_completed_successfully
