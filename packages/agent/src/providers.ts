@@ -1,6 +1,7 @@
 /**
- * Bring your own key: the person's provider, model and key, as an AI SDK
- * language model. Three kinds cover the field:
+ * A provider, model and key as an AI SDK language model: the person's own
+ * (bring your own key) or the installation's (the house assistant). Three
+ * kinds cover the field:
  * - an OpenAI-compatible endpoint (base URL, key, model): OpenAI itself,
  *   OpenRouter, Ollama, LiteLLM, vLLM and most gateways;
  * - Anthropic and Google, by name.
@@ -34,8 +35,14 @@ export class ProviderSetupError extends Error {
 }
 
 export interface ModelOptions {
-  /** The deployment mode: saas restricts where a base URL may point. */
+  /** The deployment mode: saas restricts where a person's base URL may point. */
   mode: "selfhost" | "saas";
+  /**
+   * The installation's own address (the house assistant, from the
+   * environment), not a person's: it may point anywhere over http or https,
+   * such as a gateway on the operator's private network.
+   */
+  trusted?: boolean;
   /** For tests: a fetch that never reaches the network. */
   fetch?: typeof fetch;
 }
@@ -45,20 +52,20 @@ export function createLanguageModel(credentials: ProviderCredentials, options: M
   const baseUrl =
     credentials.baseUrl ?? (provider === "openai_compatible" ? null : DEFAULT_BASE_URLS[provider]);
   if (!baseUrl) throw new ProviderSetupError("base_url_required");
-  const checked = checkBaseUrl(baseUrl, options.mode);
+  const strict = options.mode === "saas" && !options.trusted;
+  const checked = checkBaseUrl(baseUrl, strict ? "saas" : "selfhost");
   if (!checked.ok) throw new ProviderSetupError(checked.problem);
-  // In SaaS mode a public host must not bounce the request somewhere internal.
+  // In SaaS mode a person's public host must not bounce the request somewhere internal.
   const baseFetch = options.fetch ?? globalThis.fetch;
-  const fetchOption =
-    options.mode === "saas"
-      ? { fetch: ((input, init) => baseFetch(input, { ...init, redirect: "error" })) as typeof fetch }
-      : options.fetch
-        ? { fetch: options.fetch }
-        : {};
+  const fetchOption = strict
+    ? { fetch: ((input, init) => baseFetch(input, { ...init, redirect: "error" })) as typeof fetch }
+    : options.fetch
+      ? { fetch: options.fetch }
+      : {};
   switch (provider) {
     case "openai_compatible":
       return createOpenAICompatible({
-        name: "byok",
+        name: options.trusted ? "house" : "byok",
         baseURL: checked.url,
         ...(apiKey ? { apiKey } : {}),
         includeUsage: true,
@@ -102,7 +109,8 @@ export function checkBaseUrl(
     if (url.protocol !== "https:") return { ok: false, problem: "https_required" };
     // "localhost." and "metadata.google.internal." are the same hosts.
     const host = url.hostname.replace(/\.+$/u, "");
-    if (PRIVATE_HOST.test(host) || IP_LITERAL.test(host)) {
+    // A public host name has a dot; a single label only resolves on a private network.
+    if (PRIVATE_HOST.test(host) || IP_LITERAL.test(host) || !host.includes(".")) {
       return { ok: false, problem: "private_address" };
     }
   }

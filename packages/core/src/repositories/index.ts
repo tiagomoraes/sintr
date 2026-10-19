@@ -2,7 +2,7 @@ import { eq } from "drizzle-orm";
 import { createFieldCipher, type MasterKey } from "../crypto";
 import type { Database } from "../db/client";
 import { profiles, therapySettings, users } from "../db/schema";
-import type { InvitePreview, PracticePlan } from "../domain";
+import type { InvitePreview, PlanId, PracticePlan } from "../domain";
 import { sanitizeError } from "../errors";
 import { agentSettingsRepository, proposalsRepository } from "./agent";
 import { conversationsRepository } from "./conversations";
@@ -10,6 +10,7 @@ import { loadDataKey } from "./data-keys";
 import { apiTokensRepository, auditLogRepository } from "./integration";
 import { checkinsRepository, entriesRepository, insightsRepository, therapyNotesRepository } from "./ledger";
 import type { SharingContext } from "./links";
+import { plansRepository } from "./plans";
 import { practiceRepository } from "./practice";
 import { consentsRepository, reportsRepository } from "./reports";
 import { profileRepository, therapySettingsRepository } from "./settings";
@@ -19,6 +20,7 @@ export { API_TOKEN_PREFIX, hashApiToken } from "./integration";
 export type { ListRange } from "./ledger";
 export type { AcceptInvite } from "./sharing";
 export { practiceLine } from "./links";
+export { decodeSubscription, resolvePlan, usagePeriod } from "./plans";
 
 /**
  * Data access for one user. Every repository below is bound to `userId` at
@@ -44,6 +46,8 @@ export interface UserScope {
   /** The person's links with practices and what they share through them. */
   readonly sharing: ReturnType<typeof sharingRepository>;
   readonly notices: ReturnType<typeof noticesRepository>;
+  /** The person's plan, and how much of the house assistant they used this month. */
+  readonly plans: ReturnType<typeof plansRepository>;
   /** Run several operations atomically, with the same scope. */
   transaction<T>(fn: (scope: UserScope) => Promise<T>): Promise<T>;
   /** Hard delete: the account and, by cascade, every row it owns. */
@@ -61,7 +65,11 @@ export interface Repositories {
 export interface RepositoryOptions {
   /** The plan and seats of a practice without a grant of its own. Unlimited by default. */
   practiceDefaults?: PracticePlan;
+  /** The plan of a person without a subscription or a grant. Free by default. */
+  personPlan?: PlanId;
 }
+
+type BuildContext = SharingContext & { readonly personPlan: PlanId };
 
 export const SELF_HOST_PLAN: PracticePlan = { plan: "Self-hosted", seats: null };
 
@@ -83,7 +91,7 @@ function guard<T extends object>(repository: T): T {
   return out as T;
 }
 
-function buildScope(ctx: SharingContext): UserScope {
+function buildScope(ctx: BuildContext): UserScope {
   return {
     userId: ctx.userId,
     profile: guard(profileRepository(ctx)),
@@ -102,6 +110,7 @@ function buildScope(ctx: SharingContext): UserScope {
     practice: guard(practiceRepository(ctx)),
     sharing: guard(sharingRepository(ctx)),
     notices: guard(noticesRepository(ctx)),
+    plans: guard(plansRepository(ctx)),
     async transaction(fn) {
       try {
         return await ctx.db.transaction((tx) => fn(buildScope({ ...ctx, db: tx })));
@@ -125,6 +134,7 @@ export function createRepositories(
   options: RepositoryOptions = {},
 ): Repositories {
   const practiceDefaults = options.practiceDefaults ?? SELF_HOST_PLAN;
+  const personPlan = options.personPlan ?? "free";
   return {
     async forUser(userId) {
       try {
@@ -135,6 +145,7 @@ export function createRepositories(
           cipher: createFieldCipher(dek, userId),
           kek: masterKey,
           practiceDefaults,
+          personPlan,
         });
       } catch (error) {
         throw sanitizeError(error);

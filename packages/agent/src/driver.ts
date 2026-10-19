@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import type { Logger } from "@sintr/core";
+import type { Logger, ProposalKind } from "@sintr/core";
 import {
   createUIMessageStream,
   hasToolCall,
@@ -9,6 +9,7 @@ import {
   type LanguageModel,
   type UIMessageStreamWriter,
 } from "ai";
+import type { Metered } from "./assistant";
 import { crisisLanguage, crisisMessage, screenForRisk, type CrisisLanguage } from "./crisis";
 import { smoothDashes } from "./dashes";
 import { hasContent, isInCrisis, personTexts, textOf, toModelMessages } from "./messages";
@@ -38,6 +39,11 @@ export interface CaptureTurn {
   prelude?: readonly SintrUIMessageChunk[];
   /** Persist the assistant's reply. Not called for an empty reply. */
   onResponse?(message: SintrUIMessage): Promise<void> | void;
+  /**
+   * The house assistant's monthly meter. Absent for a person's own key,
+   * which is never counted. A message that signals risk never touches it.
+   */
+  metered?: Metered;
 }
 
 type Writer = UIMessageStreamWriter<SintrUIMessage>;
@@ -47,6 +53,25 @@ function writeText(writer: Writer, text: string): void {
   writer.write({ type: "text-start", id });
   writer.write({ type: "text-delta", id, delta: text });
   writer.write({ type: "text-end", id });
+}
+
+/**
+ * The person's message as a draft entry, word for word, when the assistant
+ * cannot answer it: capture never waits for a plan. Null if it could not be
+ * stored; the message itself is kept in the conversation either way.
+ */
+async function keepWords(
+  turn: CaptureTurn,
+  text: string,
+): Promise<{ proposalId: string; draft: { situation: string; occurredAt: string } } | null> {
+  const draft = { situation: text, occurredAt: (turn.now ?? new Date()).toISOString() };
+  try {
+    const { id } = await turn.ports.createProposal({ kind: "entry", payload: draft });
+    return { proposalId: id, draft };
+  } catch (error) {
+    turn.log.warn("agent.keep_failed", { error });
+    return null;
+  }
 }
 
 /** Stop the diary: the fixed message, then the help lines on screen. */
@@ -67,6 +92,12 @@ function writeCrisis(writer: Writer, source: SintrDataParts["crisis"]["source"],
  * 3. Otherwise the model talks, and may only propose drafts. Drafts are
  *    checked against the person's words before they are stored, and none
  *    becomes a record until the person confirms it.
+ *
+ * On the house assistant, one unit of the person's monthly meter is taken
+ * right before the model runs and given back if the reply fails. When the
+ * month's messages are used, the model does not run, and nothing is lost:
+ * the person's words are kept and offered back as a draft entry, a "salva"
+ * still saves, and a paused conversation still gets the help lines.
  */
 export function runCaptureTurn(turn: CaptureTurn): ReadableStream<SintrUIMessageChunk> {
   const messages = turn.message ? [...turn.history, turn.message] : [...turn.history];
@@ -105,6 +136,7 @@ export function runCaptureTurn(turn: CaptureTurn): ReadableStream<SintrUIMessage
       // Only a new message can say yes: retrying a failed reply to "salva"
       // must not confirm the next older draft.
       let turnNote: string | undefined;
+      let saved: ProposalKind | null = null;
       if (!inCrisis && turn.message && text && isSaveCommand(text)) {
         const pending = await turn.ports.pendingProposal();
         if (pending) {
@@ -115,6 +147,7 @@ export function runCaptureTurn(turn: CaptureTurn): ReadableStream<SintrUIMessage
               id: `proposal-${pending.id}`,
               data: { proposalId: pending.id, status: "saved", recordId },
             });
+            saved = pending.kind;
             turnNote = `the person told you to save their ${pending.kind === "entry" ? "entry" : "check-in"} draft, and it is now saved. Acknowledge it in one short line and do not propose it again.`;
           } catch (error) {
             log.warn("agent.save_failed", { error });
@@ -122,84 +155,129 @@ export function runCaptureTurn(turn: CaptureTurn): ReadableStream<SintrUIMessage
         }
       }
 
-      const signal: { crisis: { language: string | undefined } | null } = { crisis: null };
-      const proposedThisTurn: string[] = [];
-      const tools = inCrisis
-        ? undefined
-        : captureTools({
-            ports: turn.ports,
-            personTexts: personTexts(messages),
-            timezone: person.timezone,
-            proposedThisTurn,
-            onCrisis: (language) => {
-              signal.crisis = { language };
-            },
+      if (turn.metered) {
+        const taken = await turn.metered.take();
+        if (!taken.ok) {
+          if (inCrisis) {
+            // The diary stays paused, and the help lines never depend on a plan.
+            writeText(writer, crisisMessage(crisisLanguage(person.language)));
+          } else {
+            writer.write({
+              type: "data-limit",
+              id: "limit",
+              data: {
+                used: taken.used,
+                limit: taken.limit,
+                next: taken.period.next,
+                kept: saved || !text || isSaveCommand(text) ? null : await keepWords(turn, text),
+                saved,
+              },
+            });
+          }
+          log.info("agent.turn_done", { durationMs: Date.now() - started, code: "limit_reached" });
+          writer.write({ type: "finish" });
+          return;
+        }
+        if (taken.limit !== null) {
+          writer.write({
+            type: "data-usage",
+            data: { used: taken.used, limit: taken.limit, next: taken.period.next },
+            transient: true,
           });
-      const states = inCrisis ? new Map() : await turn.ports.proposalStates();
+        }
+      }
 
-      const result = streamText({
-        model: turn.model,
-        instructions: inCrisis
-          ? crisisPrompt()
-          : capturePrompt({ ...person, now: turn.now ?? new Date(), ...(turnNote ? { turnNote } : {}) }),
-        messages: await toModelMessages(messages, {
-          states,
-          textOnly: inCrisis,
+      try {
+        const signal: { crisis: { language: string | undefined } | null } = { crisis: null };
+        const proposedThisTurn: string[] = [];
+        const tools = inCrisis
+          ? undefined
+          : captureTools({
+              ports: turn.ports,
+              personTexts: personTexts(messages),
+              timezone: person.timezone,
+              proposedThisTurn,
+              onCrisis: (language) => {
+                signal.crisis = { language };
+              },
+            });
+        const states = inCrisis ? new Map() : await turn.ports.proposalStates();
+
+        const result = streamText({
+          model: turn.model,
+          instructions: inCrisis
+            ? crisisPrompt()
+            : capturePrompt({ ...person, now: turn.now ?? new Date(), ...(turnNote ? { turnNote } : {}) }),
+          messages: await toModelMessages(messages, {
+            states,
+            textOnly: inCrisis,
+            ...(tools ? { tools } : {}),
+          }),
+          ...(tools ? { tools, stopWhen: [isStepCount(MAX_STEPS), hasToolCall("signal_crisis")] } : {}),
+          experimental_transform: smoothDashes(),
+          maxRetries: 1,
+          timeout: { totalMs: 180_000 },
+          ...(turn.abortSignal ? { abortSignal: turn.abortSignal } : {}),
+          telemetry: { isEnabled: false },
+          // The default writes the whole error, request included, to the console.
+          onError: ({ error }) =>
+            log.warn("agent.model_error", { code: describeProviderError(error), error }),
+        });
+
+        let failed = false;
+        const chunks = toUIMessageStream({
+          stream: result.stream,
           ...(tools ? { tools } : {}),
-        }),
-        ...(tools ? { tools, stopWhen: [isStepCount(MAX_STEPS), hasToolCall("signal_crisis")] } : {}),
-        experimental_transform: smoothDashes(),
-        maxRetries: 1,
-        timeout: { totalMs: 180_000 },
-        ...(turn.abortSignal ? { abortSignal: turn.abortSignal } : {}),
-        telemetry: { isEnabled: false },
-        // The default writes the whole error, request included, to the console.
-        onError: ({ error }) => log.warn("agent.model_error", { code: describeProviderError(error), error }),
-      });
-
-      let failed = false;
-      const chunks = toUIMessageStream({
-        stream: result.stream,
-        ...(tools ? { tools } : {}),
-        sendStart: false,
-        sendFinish: false,
-        // Also called for a refused tool input or a failing tool, which the
-        // model can recover from; only an `error` chunk fails the turn.
-        onError: (error) => describeProviderError(error),
-      }) as ReadableStream<SintrUIMessageChunk>;
-      const reader = chunks.getReader();
-      for (;;) {
-        const { done, value: chunk } = await reader.read();
-        if (done) break;
-        if (chunk.type === "error") {
-          failed = true;
-          // In crisis mode a failure must not leave the person without the numbers.
-          if (inCrisis) continue;
+          sendStart: false,
+          sendFinish: false,
+          // Also called for a refused tool input or a failing tool, which the
+          // model can recover from; only an `error` chunk fails the turn.
+          onError: (error) => describeProviderError(error),
+        }) as ReadableStream<SintrUIMessageChunk>;
+        const reader = chunks.getReader();
+        for (;;) {
+          const { done, value: chunk } = await reader.read();
+          if (done) break;
+          if (chunk.type === "error") {
+            failed = true;
+            // In crisis mode a failure must not leave the person without the numbers.
+            if (inCrisis) continue;
+          }
+          writer.write(chunk);
         }
-        writer.write(chunk);
-      }
 
-      const withdraw = async () => {
-        for (const id of proposedThisTurn) {
-          await turn.ports.discardProposal(id).catch(() => undefined);
+        const withdraw = async () => {
+          for (const id of proposedThisTurn) {
+            await turn.ports.discardProposal(id).catch(() => undefined);
+          }
+        };
+        if (failed && !inCrisis) {
+          // Drafts of a reply that is not kept would wait unseen; withdraw them.
+          keepReply = false;
+          await withdraw();
         }
-      };
-      if (failed && !inCrisis) {
-        // Drafts of a reply that is not kept would wait unseen; withdraw them.
-        keepReply = false;
-        await withdraw();
-      }
-      if (signal.crisis) {
-        // A stopped diary is always stored, so the next turn stays stopped.
-        keepReply = true;
-        await withdraw();
-        log.info("agent.crisis", { code: "assistant" });
-        writeCrisis(writer, "assistant", crisisLanguage(signal.crisis.language ?? person.language));
-      } else if (inCrisis && failed) {
+        // A reply that failed is not counted against the month.
+        if (failed) await turn.metered?.giveBack();
+        if (signal.crisis) {
+          // A stopped diary is always stored, so the next turn stays stopped.
+          keepReply = true;
+          await withdraw();
+          log.info("agent.crisis", { code: "assistant" });
+          writeCrisis(writer, "assistant", crisisLanguage(signal.crisis.language ?? person.language));
+        } else if (inCrisis && failed) {
+          writeText(writer, crisisMessage(crisisLanguage(person.language)));
+        }
+        log.info("agent.turn_done", { durationMs: Date.now() - started, code: failed ? "failed" : "ok" });
+        writer.write({ type: "finish" });
+      } catch (error) {
+        // Whatever broke before the reply, the month is not charged for it,
+        // and a paused conversation still gets the help lines.
+        await turn.metered?.giveBack();
+        if (!inCrisis) throw error;
+        log.warn("agent.turn_failed", { error });
         writeText(writer, crisisMessage(crisisLanguage(person.language)));
+        writer.write({ type: "finish" });
       }
-      log.info("agent.turn_done", { durationMs: Date.now() - started, code: failed ? "failed" : "ok" });
-      writer.write({ type: "finish" });
     },
   });
 }

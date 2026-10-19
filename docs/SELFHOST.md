@@ -25,7 +25,7 @@ On the first run this:
 3. starts Postgres, applies the database migrations (the `migrate` service runs once and exits), then the app, the worker and Caddy;
 4. waits until every service is healthy and prints the address.
 
-Open `http://localhost:3000`, create your account and give the consent it asks for. Then open Settings and choose the assistant's provider (see below).
+Open `http://localhost:3000`, create your account and give the consent it asks for. Then open Settings and choose the assistant's provider and key (see below), or give the whole installation a house assistant.
 
 ```bash
 make selfhost-down   # stop the stack; the volumes (your data) are kept
@@ -52,13 +52,15 @@ Caddy obtains and renews the certificate by itself and redirects HTTP to HTTPS. 
 
 ## The assistant
 
-sintr's assistant talks to a model you choose, with your own key. In Settings:
+sintr's assistant talks to a model you choose, with your own key. Without a house assistant (below), Talk says so and points to this door in Settings, "Your own key":
 
 - **OpenAI-compatible** covers OpenAI (`https://api.openai.com/v1`), OpenRouter (`https://openrouter.ai/api/v1`) and anything that speaks the same API. For a model on the same machine (Ollama, LiteLLM), use `http://host.docker.internal:11434/v1` (or the port it listens on): inside the stack, `localhost` is the app container itself, and the compose file maps `host.docker.internal` to the host. A local endpoint needs no key.
 - **Anthropic** and **Google** take a key and a model name.
 - **Test the connection** makes one short request with the saved settings and tells you whether the key and the model work.
 
 The key is encrypted with your data key before it is stored and is never shown again. What the provider receives is described in [`PRIVACY.md`](PRIVACY.md). Conversations are kept until you delete them, unless you choose a retention in Settings; the worker removes older ones every hour.
+
+**A house assistant for everyone on it.** On a sintr shared with a family or a practice, you can give the installation one provider, model and key in `.env` (`SINTR_HOUSE_PROVIDER`, `SINTR_HOUSE_MODEL`, `SINTR_HOUSE_KEY`, and `SINTR_HOUSE_BASE_URL` for an OpenAI-compatible endpoint), and nobody has to bring a key; a model on the same machine works too (`openai_compatible` at `http://host.docker.internal:11434/v1`). It then behaves like the hosted app: each person is on a plan that counts the assistant's messages and reports each month, Free by default (100 messages and 4 reports); for a family server that pays its own key, set `SINTR_PERSON_PLAN=unlimited`, or give one person more with `make person-plan EMAIL=... PLAN=personal`. Anyone can still use their own key instead. The house key is never stored or shown; [`OPS.md`](OPS.md) has the details. Nothing of this calls home: there is no licence check, and without `SINTR_HOUSE_*` and `SINTR_STRIPE_*` sintr works as before, offline.
 
 ## Connect your own assistant
 
@@ -74,7 +76,7 @@ The Connect screen makes a key for an assistant you already use and shows its se
 A person can give their therapist access to the reports they approve, inside sintr, from Sharing. A therapist does it the other way round: in Settings, "Are you a therapist?" opens a practice on the same account, with a dashboard where the reports their patients share arrive. Both sides use the same sintr, so on a self-host the therapist needs an account on it (sign-up must be open while they create it). Nothing leaves the machine: invites, links and reports stay in this database, and it all works offline.
 
 - **Invites** are a code (`XXXX-XXXX-XXXX`) and a link (`/join/<code>`) at `SINTR_URL`, so set it to the address people open sintr at. A practice invites a patient from its dashboard; a person invites their therapist from Sharing. Either way, nothing is shared until the person has said yes to that practice by name, and then each report goes only with their approval.
-- **Seats.** A self-hosted practice has unlimited seats, under the plan "Self-hosted". To bound them, set `SINTR_PRACTICE_SEATS` (a number, or `unlimited`) and optionally `SINTR_PRACTICE_PLAN` in `.env`, and run `make selfhost-up` again. To give one practice its own seats:
+- **Seats.** A self-hosted practice has unlimited seats, under the plan "Self-hosted". To bound them, set `SINTR_PRACTICE_SEATS` (a number, or `unlimited`) and optionally `SINTR_PRACTICE_PLAN` in `.env`, and run `make selfhost-up` again. A practice with a plan of its own also gets the house assistant's Personal plan for the professional's own diary, if there is a house assistant. To give one practice its own seats:
 
   ```bash
   make practice-plan EMAIL=therapist@example.com SEATS=10 PLAN="Practice 10"
@@ -83,6 +85,10 @@ A person can give their therapist access to the reports they approve, inside sin
 
   `make practice-plan` writes to the database in `DATABASE_URL` (the development one, unless you point it elsewhere). Inside the self-host stack the same command is in the image: `docker compose -f docker/compose.yaml --env-file .env exec -e SINTR_PLAN_EMAIL=therapist@example.com -e SINTR_PLAN_SEATS=10 worker node worker/practice-plan.mjs`. Seats are taken by linked patients and held by invites waiting for an answer; lowering them never ends a link.
 - **Email for practices.** With email set up, a therapist can ask, in Practice details, to be told when a report arrives: a link and a count, never who or what. The worker sends it within a minute.
+
+## Payments
+
+A self-host needs none: plans come from `SINTR_PERSON_PLAN` and from `make person-plan` and `make practice-plan`. Selling plans through Stripe is written and off until configured; what is missing to turn it on (a Stripe account, two prices, a key, the webhook endpoint at `/api/billing/webhook` and the customer portal) is listed in [`OPS.md`](OPS.md), "What is missing to turn payments on".
 
 ## Email
 

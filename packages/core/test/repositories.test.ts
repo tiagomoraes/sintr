@@ -334,6 +334,7 @@ describe("account deletion", () => {
     await leaving.entries.correct(record.id, { situation: "y" });
     await leaving.apiTokens.create({ name: "x", scopes: ["entries:read"] });
     await leaving.auditLog.record({ action: "data.deleted" });
+    await leaving.plans.take("assistantMessages");
 
     await leaving.deleteAccount();
 

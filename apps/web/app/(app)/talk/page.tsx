@@ -5,15 +5,15 @@ import { Conversation } from "@/components/talk/conversation";
 import { SetupNotice } from "@/components/talk/setup-notice";
 import { SupportStrip } from "@/components/talk/support-strip";
 import { formatMoment } from "@/lib/format";
-import { assistantReady } from "@/lib/server/assistant";
+import { assistantState } from "@/lib/server/assistant";
 import { requireScope, runtime } from "@/lib/server/runtime";
 
 export const metadata: Metadata = { title: "Talk" };
 
 export default async function TalkPage() {
   const { scope } = await requireScope();
-  const [ready, profile, conversations] = await Promise.all([
-    assistantReady(scope),
+  const [assistant, profile, conversations] = await Promise.all([
+    assistantState(scope),
     scope.profile.get(),
     scope.conversations.list(),
   ]);
@@ -22,7 +22,7 @@ export default async function TalkPage() {
 
   return (
     <>
-      {ready ? (
+      {assistant.kind !== "none" ? (
         <Conversation
           // A new one each time the page is opened, even from a conversation
           // whose address the browser took over after its first message.
@@ -32,6 +32,8 @@ export default async function TalkPage() {
           initialProposals={{}}
           locale={locale}
           rehearsal={runtime().config.fakeAgent}
+          source={assistant.kind}
+          meter={assistant.kind === "house" ? assistant.messages : null}
         />
       ) : (
         <div className="space-y-8">

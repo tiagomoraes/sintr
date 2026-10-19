@@ -4,6 +4,7 @@ import { ProviderSetupError, checkBaseUrl, createLanguageModel, testConnection }
 import { rehearsalModel } from "@sintr/agent/testing";
 import { ProviderKind, ValidationError, type AgentSettingsPatch } from "@sintr/core";
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 import { requireScope, runtime } from "@/lib/server/runtime";
 
 export interface AssistantFormState {
@@ -49,6 +50,11 @@ export async function saveAssistant(_state: AssistantFormState, form: FormData):
     const checked = checkBaseUrl(text(form, "baseUrl"), runtime().config.mode);
     if (checked.ok) baseUrl = checked.url;
     else problems.baseUrl = URL_PROBLEMS[checked.problem] ?? URL_PROBLEMS.invalid_url!;
+    const house = runtime().config.house?.baseUrl;
+    if (baseUrl && house && new URL(baseUrl).host === new URL(house).host) {
+      problems.baseUrl =
+        "That is the address of this sintr's own assistant, which is already included. Use your provider's address.";
+    }
   }
   // The key field is never prefilled: empty means "keep the saved one".
   const key = text(form, "apiKey");
@@ -111,6 +117,27 @@ export async function testAssistant(_state: ConnectionState): Promise<Connection
       return { tested: true, ok: false, problem: error.code, rehearsal: false };
     throw error;
   }
+}
+
+/**
+ * Back to the included assistant: the person's provider settings and key
+ * are removed, so their next message goes to the house assistant, within
+ * their plan. Only where there is a house assistant to go back to.
+ */
+export async function returnToIncludedAssistant(): Promise<void> {
+  const { scope } = await requireScope();
+  if (!runtime().config.house) return;
+  const current = await scope.agentSettings.get();
+  await scope.agentSettings.update({ provider: null, model: null, baseUrl: null, apiKey: null });
+  if (current.hasKey) {
+    await scope.auditLog.record({
+      action: "agent_key.removed",
+      targetType: "agent_settings",
+      metadata: { provider: current.provider },
+    });
+  }
+  revalidatePath("/", "layout");
+  redirect("/settings?assistant=included");
 }
 
 const RETENTION: Record<string, number | null> = { keep: null, "30": 30, "90": 90, "365": 365 };

@@ -7,7 +7,7 @@ import { SiteHeader } from "@/components/site-header";
 import { SupportLines } from "@/components/support-lines";
 import { formatMoment } from "@/lib/format";
 import { noticeText } from "@/lib/sharing";
-import { requireScope } from "@/lib/server/runtime";
+import { requireScope, runtime } from "@/lib/server/runtime";
 
 /** A calm notice, for a report of the last week only: an old draft is not chased. */
 function recent(periodEnd: Date): boolean {
@@ -50,6 +50,7 @@ export default async function ShellLayout({ children }: { children: ReactNode })
           <div className="min-[900px]:sticky min-[900px]:top-7">
             <ShellNav
               practice={practice !== null}
+              plan={runtime().config.house !== null || runtime().payments !== null}
               dots={{ sharing: unread.person > 0, practice: unread.practice > 0 }}
             />
           </div>

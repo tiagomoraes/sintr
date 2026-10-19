@@ -32,10 +32,11 @@ import { consents, reports } from "./reports";
 /**
  * Where a practice's seats come from: `config` follows the installation's
  * defaults (SINTR_PRACTICE_SEATS, unlimited on a self-host); `grant` is a
- * plan and a seat count set for this practice (the admin path). A payment
- * provider becomes a third source that sets the same two columns.
+ * plan and a seat count set for this practice (the admin path);
+ * `subscription` is the practice's plan with the payment provider, whose
+ * webhook sets the same two columns.
  */
-export const seatSource = pgEnum("seat_source", ["config", "grant"]);
+export const seatSource = pgEnum("seat_source", ["config", "grant", "subscription"]);
 
 /** One per account that opens one. The names are what the professional shows the people they invite. */
 export const practices = pgTable(

@@ -6,7 +6,7 @@ import { PageHeading } from "@/components/empty-state";
 import { Conversation } from "@/components/talk/conversation";
 import { formatMoment } from "@/lib/format";
 import type { ProposalView } from "@/lib/proposals";
-import { assistantReady, loadMessages, proposalView } from "@/lib/server/assistant";
+import { assistantState, loadMessages, proposalView } from "@/lib/server/assistant";
 import { requireScope, runtime } from "@/lib/server/runtime";
 import { deleteConversation } from "../actions";
 
@@ -17,8 +17,8 @@ export default async function ConversationPage({ params }: { params: Promise<{ i
   const { scope } = await requireScope();
   const conversation = await scope.conversations.get(id);
   if (!conversation) notFound();
-  const [ready, profile, messages, proposals] = await Promise.all([
-    assistantReady(scope),
+  const [assistant, profile, messages, proposals] = await Promise.all([
+    assistantState(scope),
     scope.profile.get(),
     loadMessages(scope, id),
     scope.proposals.list(id),
@@ -43,7 +43,9 @@ export default async function ConversationPage({ params }: { params: Promise<{ i
         initialProposals={views}
         locale={locale}
         rehearsal={runtime().config.fakeAgent}
-        ready={ready}
+        ready={assistant.kind !== "none"}
+        source={assistant.kind === "house" ? "house" : "own"}
+        meter={assistant.kind === "house" ? assistant.messages : null}
       />
       <details className="group mt-14 border-t border-rule pt-6">
         <summary className="cursor-pointer list-none text-[0.9375rem] font-medium text-ink-2 hover:text-ink [&::-webkit-details-marker]:hidden">

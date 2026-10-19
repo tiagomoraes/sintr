@@ -54,9 +54,19 @@ export default async function PracticeDetailsPage() {
             : `${practice.seats} ${practice.seats === 1 ? "seat" : "seats"}: each patient linked, or invite waiting, uses one.`}
         </p>
         <p className="mt-2 text-[0.9375rem] text-ink-3">
-          {practice.seatSource === "grant"
-            ? "Granted for your practice by whoever runs this sintr."
-            : "Set by this sintr's configuration; whoever runs it can change them."}
+          {practice.seatSource === "subscription"
+            ? "Paid through Stripe."
+            : practice.seatSource === "grant"
+              ? "Granted for your practice by whoever runs this sintr."
+              : "Set by this sintr's configuration; whoever runs it can change them."}
+          {runtime().payments ? (
+            <>
+              {" "}
+              <Link href="/plan#practice" className={linkStyles}>
+                {practice.seatSource === "subscription" ? "Change the seats" : "More seats"}
+              </Link>
+            </>
+          ) : null}
         </p>
       </section>
     </>

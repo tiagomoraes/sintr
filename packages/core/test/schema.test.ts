@@ -51,8 +51,10 @@ describe("schema invariants", () => {
         "reports",
         "sessions",
         "shared_reports",
+        "subscriptions",
         "therapy_notes",
         "therapy_settings",
+        "usage_counters",
         "user_keys",
         "users",
         "verification_tokens",
@@ -77,7 +79,8 @@ describe("schema invariants", () => {
         const first = index.config.columns[0] as { name?: string } | undefined;
         return first?.name === "user_id";
       });
-      expect(userId!.primary || leadsAnIndex, `${name} indexes user_id`).toBe(true);
+      const leadsThePrimaryKey = config.primaryKeys.some((key) => key.columns[0]?.name === "user_id");
+      expect(userId!.primary || leadsAnIndex || leadsThePrimaryKey, `${name} indexes user_id`).toBe(true);
     },
   );
 

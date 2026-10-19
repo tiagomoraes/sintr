@@ -17,7 +17,8 @@ function contentSecurityPolicy(nonce: string, https: boolean): string {
     "font-src 'self'",
     `connect-src 'self'${dev ? " ws:" : ""}`,
     "frame-ancestors 'none'",
-    "form-action 'self'",
+    // Subscribing goes to Stripe's own pages; without JavaScript that is a form's redirect.
+    "form-action 'self' https://checkout.stripe.com https://billing.stripe.com",
     "base-uri 'self'",
     "object-src 'none'",
     ...(https ? ["upgrade-insecure-requests"] : []),

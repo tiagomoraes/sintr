@@ -81,7 +81,16 @@ test.describe("bring your own key", () => {
   test("a conversation waits for a provider, but a crisis is answered without one", async ({ page }) => {
     await signUpQuietly(page, newEmail("no-provider"));
     await page.goto("/talk");
-    await expect(page.getByText("The assistant needs a provider first.")).toBeVisible();
+    await expect(page.getByText("This sintr has no assistant of its own yet.")).toBeVisible();
+    await expect(page.getByRole("link", { name: "Use your own key" })).toHaveAttribute(
+      "href",
+      "/settings?key=own#own-key",
+    );
+    // Nothing to choose without a house assistant: no plan in the navigation, and the page says why.
+    await expect(page.getByRole("link", { name: "Plan", exact: true })).toHaveCount(0);
+    await page.goto("/plan");
+    await expect(page.getByRole("heading", { name: "There is no plan to choose here." })).toBeVisible();
+    await page.goto("/talk");
     await expect(page.getByRole("link", { name: "Call CVV, 188" })).toBeVisible();
 
     const plain = await page.request.post("/api/chat", {

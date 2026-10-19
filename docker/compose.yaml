@@ -31,6 +31,18 @@ x-app-env: &app-env
   # Practices: the seats of a practice without a grant (unlimited by default here).
   SINTR_PRACTICE_SEATS: ${SINTR_PRACTICE_SEATS:-}
   SINTR_PRACTICE_PLAN: ${SINTR_PRACTICE_PLAN:-}
+  # The house assistant (optional): left empty, everyone uses their own key.
+  SINTR_HOUSE_PROVIDER: ${SINTR_HOUSE_PROVIDER:-}
+  SINTR_HOUSE_BASE_URL: ${SINTR_HOUSE_BASE_URL:-}
+  SINTR_HOUSE_MODEL: ${SINTR_HOUSE_MODEL:-}
+  SINTR_HOUSE_KEY: ${SINTR_HOUSE_KEY:-}
+  SINTR_HOUSE_NAME: ${SINTR_HOUSE_NAME:-}
+  SINTR_PERSON_PLAN: ${SINTR_PERSON_PLAN:-free}
+  # Payments (optional, Stripe): left empty, plans come from grants only.
+  SINTR_STRIPE_SECRET_KEY: ${SINTR_STRIPE_SECRET_KEY:-}
+  SINTR_STRIPE_WEBHOOK_SECRET: ${SINTR_STRIPE_WEBHOOK_SECRET:-}
+  SINTR_STRIPE_PRICE_PERSONAL: ${SINTR_STRIPE_PRICE_PERSONAL:-}
+  SINTR_STRIPE_PRICE_PRACTICE_SEAT: ${SINTR_STRIPE_PRICE_PRACTICE_SEAT:-}
 
 services:
   db:

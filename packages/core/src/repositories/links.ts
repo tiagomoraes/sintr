@@ -114,7 +114,7 @@ export function planOf(
   row: Pick<PracticeRow, "seatSource" | "plan" | "seats">,
   defaults: PracticePlan,
 ): PracticePlan {
-  return row.seatSource === "grant" ? { plan: row.plan ?? defaults.plan, seats: row.seats } : defaults;
+  return row.seatSource === "config" ? defaults : { plan: row.plan ?? defaults.plan, seats: row.seats };
 }
 
 export function inviteStatus(row: InviteRow, now: Date): InviteStatus {

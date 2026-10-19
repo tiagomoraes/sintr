@@ -1,4 +1,5 @@
 import { sql } from "drizzle-orm";
+import { createStripe, handlePaymentWebhook, type PaymentProvider, type WebhookResult } from "../billing";
 import type { Config } from "../config";
 import { createDatabase, type DatabaseHandle } from "../db/client";
 import { createEmailTransport, type EmailTransport } from "../email";
@@ -20,6 +21,10 @@ export interface BaseRuntime {
   readonly repositories: Repositories;
   /** How email leaves this installation (`available` is false when it is off). */
   readonly email: EmailTransport;
+  /** The payment provider, or null when payments are off (plans then come from grants). */
+  readonly payments: PaymentProvider | null;
+  /** One delivery of the payment provider's webhook: the raw body and its signature header. */
+  handlePaymentWebhook(payload: string, signature: string | null): Promise<WebhookResult>;
   /** Everyone with a therapy session to prepare a report for. Clear metadata only. */
   reportSchedules(now?: Date): Promise<PersonSchedule[]>;
   purgeExpiredAuthRecords(): Promise<{ sessions: number; verificationTokens: number }>;
@@ -39,6 +44,8 @@ export interface RuntimeOptions {
   poolSize?: number;
   /** Replace the configured transport (tests). */
   email?: EmailTransport;
+  /** Replace the payment provider's fetch (tests): nothing reaches the network. */
+  paymentsFetch?: typeof fetch;
 }
 
 /** @internal Shared by createBaseRuntime and createRuntime. */
@@ -49,11 +56,28 @@ export function openBaseRuntime(
   const log = createLogger({ level: config.logLevel, service: options.service });
   const database = createDatabase(config.databaseUrl, { max: options.poolSize ?? 10 });
   const emailTransport = options.email ?? createEmailTransport(config.email);
+  const billing = config.billing;
+  const payments =
+    billing.kind === "stripe"
+      ? createStripe(billing, options.paymentsFetch ? { fetch: options.paymentsFetch } : {})
+      : null;
   const base: BaseRuntime = {
     config,
     log,
-    repositories: createRepositories(database.db, config.masterKey, { practiceDefaults: config.practice }),
+    repositories: createRepositories(database.db, config.masterKey, {
+      practiceDefaults: config.practice,
+      personPlan: config.personPlan,
+    }),
     email: emailTransport,
+    payments,
+    async handlePaymentWebhook(payload, signature) {
+      if (!payments || billing.kind !== "stripe") return { status: 400, code: "payments_off" };
+      return handlePaymentWebhook(
+        { db: database.db, provider: payments, prices: billing.prices, log },
+        payload,
+        signature,
+      );
+    },
     reportSchedules: (now) => reportSchedules(database.db, now),
     purgeExpiredAuthRecords: () => purgeExpiredAuthRecords(database.db),
     purgeExpiredConversations: () => purgeExpiredConversations(database.db),

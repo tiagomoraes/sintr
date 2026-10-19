@@ -112,6 +112,22 @@ export type SintrDataParts = {
   proposal: { proposalId: string; status: ProposalStatus; recordId: string | null };
   /** Sent first on a new conversation, so the page can keep its address. */
   conversation: { conversationId: string };
+  /** The house assistant's meter after this message (not stored): for a quiet warning before the limit. */
+  usage: { used: number; limit: number; next: string };
+  /**
+   * This month's messages on the person's plan are used, so the assistant
+   * did not run. Nothing is lost: the message is kept, and offered back as
+   * a draft entry in the person's own words (`kept`), or the draft they
+   * told sintr to save was saved (`saved`).
+   */
+  limit: {
+    used: number;
+    limit: number | null;
+    /** When the count starts again (YYYY-MM-DD, the first day of the next month). */
+    next: string;
+    kept: { proposalId: string; draft: EntryDraft } | null;
+    saved: ProposalKind | null;
+  };
 };
 
 export type SintrTools = {

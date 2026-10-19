@@ -57,21 +57,152 @@ describe("configuration", () => {
     );
   });
 
-  it("gives practices unlimited seats on a self-host and none on the hosted offer, unless configured", () => {
+  it("gives practices unlimited seats on a self-host and one free seat on the hosted offer, unless configured", () => {
     expect(loadConfig(valid()).practice).toEqual({ plan: "Self-hosted", seats: null });
-    expect(loadConfig({ ...valid(), SINTR_MODE: "saas" }).practice).toEqual({ plan: "Hosted", seats: 0 });
+    expect(loadConfig({ ...valid(), SINTR_MODE: "saas" }).practice).toEqual({ plan: "Free", seats: 1 });
     expect(
       loadConfig({ ...valid(), SINTR_PRACTICE_SEATS: "12", SINTR_PRACTICE_PLAN: "Practice 12" }).practice,
     ).toEqual({ plan: "Practice 12", seats: 12 });
     expect(
       loadConfig({ ...valid(), SINTR_MODE: "saas", SINTR_PRACTICE_SEATS: "unlimited" }).practice,
     ).toEqual({
-      plan: "Hosted",
+      plan: "Free",
       seats: null,
     });
     // An empty value in .env means "not set".
     expect(loadConfig({ ...valid(), SINTR_PRACTICE_SEATS: "" }).practice.seats).toBeNull();
     expect(() => loadConfig({ ...valid(), SINTR_PRACTICE_SEATS: "ten" })).toThrow(/SINTR_PRACTICE_SEATS/);
     expect(() => loadConfig({ ...valid(), SINTR_PRACTICE_SEATS: "-1" })).toThrow(/SINTR_PRACTICE_SEATS/);
+  });
+
+  it("has no house assistant unless SINTR_HOUSE_* configures one, all or nothing", () => {
+    expect(loadConfig(valid()).house).toBeNull();
+    expect(
+      loadConfig({
+        ...valid(),
+        SINTR_HOUSE_PROVIDER: "anthropic",
+        SINTR_HOUSE_MODEL: "claude-haiku-5-5",
+        SINTR_HOUSE_KEY: "sk-ant-house-secret-value",
+      }).house,
+    ).toEqual({
+      provider: "anthropic",
+      baseUrl: null,
+      model: "claude-haiku-5-5",
+      apiKey: "sk-ant-house-secret-value",
+      name: "Anthropic",
+    });
+    // An OpenAI-compatible gateway is named after its host unless SINTR_HOUSE_NAME says otherwise.
+    const gateway = {
+      ...valid(),
+      SINTR_HOUSE_PROVIDER: "openai_compatible",
+      SINTR_HOUSE_BASE_URL: "http://litellm:4000/v1",
+      SINTR_HOUSE_MODEL: "house",
+    };
+    expect(loadConfig(gateway).house).toMatchObject({ name: "litellm", apiKey: null });
+    expect(loadConfig({ ...gateway, SINTR_HOUSE_NAME: "Anthropic, through our gateway" }).house?.name).toBe(
+      "Anthropic, through our gateway",
+    );
+  });
+
+  it("names what is missing from the house assistant, never the key", () => {
+    const secret = "sk-ant-never-echo-this";
+    const problem = (env: Record<string, string>) => {
+      try {
+        loadConfig({ ...valid(), ...env });
+      } catch (error) {
+        expect(error).toBeInstanceOf(ConfigError);
+        return (error as Error).message;
+      }
+      return "";
+    };
+    expect(problem({ SINTR_HOUSE_KEY: secret })).toMatch(/SINTR_HOUSE_PROVIDER/);
+    expect(problem({ SINTR_HOUSE_PROVIDER: "anthropic", SINTR_HOUSE_KEY: secret })).toMatch(
+      /SINTR_HOUSE_MODEL/,
+    );
+    expect(problem({ SINTR_HOUSE_PROVIDER: "google", SINTR_HOUSE_MODEL: "gemini" })).toMatch(
+      /SINTR_HOUSE_KEY/,
+    );
+    expect(problem({ SINTR_HOUSE_PROVIDER: "openai_compatible", SINTR_HOUSE_MODEL: "m" })).toMatch(
+      /SINTR_HOUSE_BASE_URL/,
+    );
+    expect(
+      problem({
+        SINTR_HOUSE_PROVIDER: "openai_compatible",
+        SINTR_HOUSE_MODEL: "m",
+        SINTR_HOUSE_BASE_URL: `https://user:${secret}@gateway.example/v1`,
+      }),
+    ).toMatch(/SINTR_HOUSE_BASE_URL/);
+    expect(problem({ SINTR_HOUSE_PROVIDER: "someone", SINTR_HOUSE_KEY: secret })).toMatch(
+      /SINTR_HOUSE_PROVIDER/,
+    );
+    const leaky: Record<string, string>[] = [
+      { SINTR_HOUSE_KEY: secret },
+      { SINTR_HOUSE_PROVIDER: "anthropic", SINTR_HOUSE_KEY: secret },
+      {
+        SINTR_HOUSE_PROVIDER: "openai_compatible",
+        SINTR_HOUSE_MODEL: "m",
+        SINTR_HOUSE_BASE_URL: `https://user:${secret}@gateway.example/v1`,
+      },
+    ];
+    for (const env of leaky) expect(problem(env)).not.toContain(secret);
+  });
+
+  it("asks a gateway on the hosted offer for a key and a name people are told", () => {
+    const gateway = {
+      ...valid(),
+      SINTR_MODE: "saas",
+      SINTR_HOUSE_PROVIDER: "openai_compatible",
+      SINTR_HOUSE_BASE_URL: "http://litellm:4000/v1",
+      SINTR_HOUSE_MODEL: "house",
+    };
+    expect(() => loadConfig(gateway)).toThrow(/SINTR_HOUSE_KEY/);
+    expect(() => loadConfig({ ...gateway, SINTR_HOUSE_KEY: "sk-gateway-key" })).toThrow(/SINTR_HOUSE_NAME/);
+    expect(
+      loadConfig({ ...gateway, SINTR_HOUSE_KEY: "sk-gateway-key", SINTR_HOUSE_NAME: "Anthropic" }).house,
+    ).toMatchObject({ name: "Anthropic", baseUrl: "http://litellm:4000/v1" });
+  });
+
+  it("puts a person on Free unless SINTR_PERSON_PLAN says otherwise", () => {
+    expect(loadConfig(valid()).personPlan).toBe("free");
+    expect(loadConfig({ ...valid(), SINTR_PERSON_PLAN: "unlimited" }).personPlan).toBe("unlimited");
+    expect(() => loadConfig({ ...valid(), SINTR_PERSON_PLAN: "gold" })).toThrow(/SINTR_PERSON_PLAN/);
+  });
+
+  it("keeps payments off unless the key, the webhook secret and a price are all given", () => {
+    expect(loadConfig(valid()).billing).toEqual({ kind: "off" });
+    const stripe = {
+      ...valid(),
+      SINTR_STRIPE_SECRET_KEY: "sk_test_abc123",
+      SINTR_STRIPE_WEBHOOK_SECRET: "whsec_def456",
+      SINTR_STRIPE_PRICE_PERSONAL: "price_personal1",
+    };
+    expect(loadConfig(stripe).billing).toEqual({
+      kind: "stripe",
+      secretKey: "sk_test_abc123",
+      webhookSecret: "whsec_def456",
+      prices: { personal: "price_personal1", practiceSeat: null },
+      apiUrl: "https://api.stripe.com",
+    });
+    const { SINTR_STRIPE_WEBHOOK_SECRET: _hook, ...noHook } = stripe;
+    expect(() => loadConfig(noHook)).toThrow(/SINTR_STRIPE_WEBHOOK_SECRET/);
+    const { SINTR_STRIPE_PRICE_PERSONAL: _price, ...noPrice } = stripe;
+    expect(() => loadConfig(noPrice)).toThrow(/SINTR_STRIPE_PRICE_PERSONAL/);
+    const { SINTR_STRIPE_SECRET_KEY: _key, ...noKey } = stripe;
+    expect(() => loadConfig(noKey)).toThrow(/SINTR_STRIPE_SECRET_KEY/);
+    expect(() => loadConfig({ ...stripe, SINTR_STRIPE_SECRET_KEY: "pk_live_public" })).toThrow(
+      /SINTR_STRIPE_SECRET_KEY/,
+    );
+    try {
+      loadConfig({ ...stripe, SINTR_STRIPE_SECRET_KEY: "pk_live_public" });
+    } catch (error) {
+      expect((error as Error).message).not.toContain("pk_live_public");
+    }
+    // A fake Stripe for the tests only.
+    expect(loadConfig({ ...stripe, SINTR_STRIPE_API_URL: "http://127.0.0.1:3199/" }).billing).toMatchObject({
+      apiUrl: "http://127.0.0.1:3199",
+    });
+    expect(() =>
+      loadConfig({ ...stripe, SINTR_STRIPE_API_URL: "http://127.0.0.1:3199", SINTR_MODE: "saas" }),
+    ).toThrow(/SINTR_STRIPE_API_URL/);
   });
 });

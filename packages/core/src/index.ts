@@ -1,3 +1,11 @@
+export {
+  BillingError,
+  PRACTICE_PLAN_LABEL,
+  type BillingConfig,
+  type PaymentProvider,
+  type PriceView,
+  type WebhookResult,
+} from "./billing";
 export { ConfigError, loadConfig, type Config } from "./config";
 export * from "./crypto";
 export * from "./domain";
@@ -19,6 +27,8 @@ export {
   createRepositories,
   hashApiToken,
   practiceLine,
+  resolvePlan,
+  usagePeriod,
   type AcceptInvite,
   type ListRange,
   type Repositories,

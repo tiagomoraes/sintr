@@ -1,25 +1,28 @@
-import { prepareReport, reportModel } from "@sintr/agent";
+import { prepareReport, reportModel, type Metered } from "@sintr/agent";
 import { notifyReportReady, planScheduledReport, type UserScope } from "@sintr/core";
 import type { BaseRuntime } from "@sintr/core/runtime/base";
 import type { LanguageModel } from "ai";
 
 /** What the report job needs from the runtime. */
 export type ReportRuntime = Pick<BaseRuntime, "reportSchedules" | "repositories" | "email" | "log"> & {
-  config: Pick<BaseRuntime["config"], "mode" | "fakeAgent" | "url">;
+  config: Pick<BaseRuntime["config"], "mode" | "fakeAgent" | "url" | "house">;
 };
+
+type ModelFor = (
+  scope: UserScope,
+) => Promise<{ model: LanguageModel | null; problem: string | null; metered?: Metered | null }>;
 
 /**
  * Prepare every report that is due at `now`: for each person with a
- * session, one `report_lead` before it, in their time zone. The draft waits
+ * session, one `report_lead` before it, in their time zone, written by their
+ * own key or the house assistant within their plan. The draft waits
  * for the person (in the app, and by email when they asked for it); nothing
  * is sent to anyone else. One person's failure does not stop the others.
  */
 export async function prepareDueReports(
   runtime: ReportRuntime,
   now: Date,
-  options: {
-    modelFor?: (scope: UserScope) => Promise<{ model: LanguageModel | null; problem: string | null }>;
-  } = {},
+  options: { modelFor?: ModelFor } = {},
 ): Promise<{ prepared: number; failed: number }> {
   const { log } = runtime;
   let prepared = 0;
@@ -34,13 +37,16 @@ export async function prepareDueReports(
         now,
       });
       if (plan.action === "wait") continue;
-      const { model, problem } = await (options.modelFor ?? ((s) => reportModel(s, runtime.config)))(scope);
+      const { model, problem, metered } = await (options.modelFor ?? ((s) => reportModel(s, runtime.config)))(
+        scope,
+      );
       const result = await prepareReport({
         scope,
         period: plan.period,
         ...(plan.action === "retarget" ? { reportId: plan.reportId, untouched: true } : {}),
         model,
         modelProblem: problem,
+        metered: metered ?? null,
         log,
       });
       if (!result) continue;

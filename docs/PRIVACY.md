@@ -1,6 +1,6 @@
 # Privacy and data protection
 
-This describes what sintr does with personal data **as implemented today** (milestones F0 to F4), so it can be checked against the code. Where something is planned but not built, it says so. The product rules behind it are in [`PRODUCT.md`](PRODUCT.md) (Security and privacy, Invariants) and [`CONVENTIONS.md`](CONVENTIONS.md) (Non-negotiable rules).
+This describes what sintr does with personal data **as implemented today** (milestones F0 to F5), so it can be checked against the code. Where something is planned but not built, it says so. The product rules behind it are in [`PRODUCT.md`](PRODUCT.md) (Security and privacy, Invariants) and [`CONVENTIONS.md`](CONVENTIONS.md) (Non-negotiable rules).
 
 A diary kept in sintr is sensitive personal data: health data under LGPD art. 11. The posture is built around four ideas: the person's specific consent, encryption by the application before anything is stored, strict separation between people, and nothing sent anywhere without approval.
 
@@ -38,7 +38,7 @@ A diary kept in sintr is sensitive personal data: health data under LGPD art. 11
 | `links` | the name the person chose to be seen as (sealed with the link's own key) |
 | `shared_reports` | the shared report's page and its PDF (sealed with the link's own key) |
 
-**Kept in the clear, on purpose,** so they can be counted and charted without decrypting anything: dates and times, the 0 to 100 intensities and the 0 to 5 check-in scales, sleep hours, statuses and kinds, ids. Also the therapy schedule (session day and time, a moved session's date, the report lead, the delivery choice), which the worker reads for everyone to know when a report is due, and the names of the sections a report revision changed (never their words). Also the names of the fields a correction changed (never their values), and which provider, address and model a person's assistant uses. Also in the clear: the email address (needed to sign in), session metadata (IP address and browser, which Better Auth stores for each session), API token labels and scopes, and audit events, which hold no content. For practices (F4): the plan, the seat count and whether the professional wants an email when a report arrives; for invites and links, their direction, status, dates, the practice's number for a person ("Patient 3") and how reports go ("ask each time" or "send what I approve"); for a shared report, its period and when it was shared and first opened; notices, which are a kind and ids. An invite code is stored only as a keyed hash (HMAC with a key derived from the master key) next to its sealed copy, so a dump alone cannot be searched for codes.
+**Kept in the clear, on purpose,** so they can be counted and charted without decrypting anything: dates and times, the 0 to 100 intensities and the 0 to 5 check-in scales, sleep hours, statuses and kinds, ids. Also the therapy schedule (session day and time, a moved session's date, the report lead, the delivery choice), which the worker reads for everyone to know when a report is due, and the names of the sections a report revision changed (never their words). Also the names of the fields a correction changed (never their values), and which provider, address and model a person's assistant uses. Also in the clear: the email address (needed to sign in), session metadata (IP address and browser, which Better Auth stores for each session), API token labels and scopes, and audit events, which hold no content. For plans (F5): a person's or a practice's plan, its status and period, the payment provider's customer and subscription ids, and how many messages and reports the house assistant answered and wrote each month (counts, never what was said). For practices (F4): the plan, the seat count and whether the professional wants an email when a report arrives; for invites and links, their direction, status, dates, the practice's number for a person ("Patient 3") and how reports go ("ask each time" or "send what I approve"); for a shared report, its period and when it was shared and first opened; notices, which are a kind and ids. An invite code is stored only as a keyed hash (HMAC with a key derived from the master key) next to its sealed copy, so a dump alone cannot be searched for codes.
 
 **What a database dump reveals.** Account emails, dates, scales and the shape of the data; none of the words. A test writes recognisable text into every sealed column and then scans a text dump of every table for it, in clear and as hex; it finds nothing. The test was also run with sealing removed, and it fails, as it should.
 
@@ -75,14 +75,36 @@ A diary kept in sintr is sensitive personal data: health data under LGPD art. 11
 
 ## The assistant and its provider
 
-The embedded assistant talks to a language model **the person chooses, with their own key** (bring your own key): an OpenAI-compatible endpoint (OpenAI, OpenRouter, a local Ollama or LiteLLM), Anthropic or Google.
+The embedded assistant talks to one of two providers, and Settings always says which.
 
-- **The key** is sealed with the person's own data key before it is stored, like ledger content. It is never sent back to the browser (the settings screen shows its last four characters at most), never logged, and used only on the server for the call to that provider. Saving or removing it is recorded in the audit log, without the key. sintr never falls back to a key from the server's environment.
-- **What the provider receives:** the messages of the current conversation (the last 40) and, when the assistant asks for it, a summary of the last seven days: dates, entry titles (or the first 120 characters of the situation), emotions with their intensities, and check-in scales. Nothing else from the diary. What the provider does with it is governed by that provider's terms; a model on the person's own machine keeps it there.
+**The house assistant** is the default wherever the installation has one: the provider, model and key its operator configured (`SINTR_HOUSE_*`). Settings names it ("It runs on a model from Anthropic, through sintr's own account").
+
+- What it means: the words of a conversation, and the digest of a report's period, go to that provider under the operator's agreement with it, not the person's. The person has no account there and no key to manage. What the provider keeps, and for how long, is governed by that agreement; the hosted offer will use zero-data-retention routes, and this document will say which before it opens.
+- The operator's key is a server secret: read from the environment, never stored in the database, never sent to a browser, never logged (tests check pages, logs and the person's stored settings for it).
+- The person's plan counts how many messages the house assistant answered and how many reports it wrote that month: numbers in the clear, no words. A message the crisis screen stops is never counted and never sent to the provider.
+
+**Your own key** (bring your own key) waits behind "Use your own key instead" in Settings, and is the way in on an installation without a house assistant: an OpenAI-compatible endpoint (OpenAI, OpenRouter, a local Ollama or LiteLLM), Anthropic or Google.
+
+- What changes: the words go to the provider the person chose, under their own agreement with it, and nothing is counted toward a plan. A model on the person's own machine keeps them there.
+- **The key** is sealed with the person's own data key before it is stored, like ledger content. It is never sent back to the browser (the settings screen shows its last four characters at most), never logged, and used only on the server for the call to that provider. Saving or removing it is recorded in the audit log, without the key. sintr never falls back to a key from the server's environment for it.
+- sintr never moves a person between the two on its own: a key of theirs that stops working is reported, never replaced by the house's, because that would send their words somewhere they did not choose. Going back to the included assistant is the person's action, and removes their key.
+
+**What the provider receives**, either way: the messages of the current conversation (the last 40) and, when the assistant asks for it, a summary of the last seven days: dates, entry titles (or the first 120 characters of the situation), emotions with their intensities, and check-in scales. Nothing else from the diary.
+
 - **Nothing the assistant drafts is a record** until the person confirms it, on screen or by telling it to save. Drafts are stored sealed and go away with their conversation.
-- **A message that signals acute risk** stops the diary before anything is sent to the provider: the reply that points to CVV 188 and SAMU 192 is written in advance, and works even without a provider.
-- **For the weekly report** (F2), the assistant receives the digest of the period: every entry of the period in full (title, situation, thoughts, emotions with intensities, body, behaviour, context, tags, notes and the working of a thought), the check-in values and notes of those days, the averages, and the person's open "things to bring up" and tasks. That is what it needs to write the report; nothing outside the period, and nothing else from the diary. What it writes is checked before it is kept (quotes against the diary, no causes, no clinical labels), and a report is never sent by it. The worker prepares reports only for people whose consent to process their health data is granted in its current wording. Without a provider, sintr prepares the parts it can alone and sends nothing to any model.
-- The hosted offer will use zero-data-retention routes; this document will say which.
+- **A message that signals acute risk** stops the diary before anything is sent to the provider: the reply that points to CVV 188 and SAMU 192 is written in advance, and works without a provider and whatever the plan.
+- **At the plan's limit** the house assistant does not run, so nothing is sent; the person's message is kept, sealed, as always, and offered back as a draft entry in their own words.
+- **For the weekly report** (F2), the assistant receives the digest of the period: every entry of the period in full (title, situation, thoughts, emotions with intensities, body, behaviour, context, tags, notes and the working of a thought), the check-in values and notes of those days, the averages, and the person's open "things to bring up" and tasks. That is what it needs to write the report; nothing outside the period, and nothing else from the diary. What it writes is checked before it is kept (quotes against the diary, no causes, no clinical labels), and a report is never sent by it. The worker prepares reports only for people whose consent to process their health data is granted in its current wording. Without an assistant, or past the plan's reports for the month, sintr prepares the parts it can alone and sends nothing to any model.
+
+## Plans and payments
+
+Plans (F5) decide how much of the house assistant a person can use each month; the diary itself is the same on every plan.
+
+- **What is stored**: in `subscriptions`, a person's plan and a practice's (the plan, its status, whether it was granted by the operator or paid, its period, the seats), and for a paid one the payment provider's customer and subscription ids; in `usage_counters`, per person and month, how many messages the house assistant answered and reports it wrote. No content, no card data. Changes of plan are in the audit log.
+- **Payments** go through Stripe, and only when the operator configured it. A person subscribes on Stripe's own page and manages the subscription on Stripe's billing page; the card never reaches sintr. What sintr sends Stripe: the account's id and email (for the receipt), the plan and the number of seats. Never a word of the diary, the therapy settings, or anything about a practice's patients. What Stripe keeps is governed by Stripe's terms.
+- **The webhook** is accepted only with Stripe's signature over its exact body, at most five minutes old; sintr then reads the subscription back from Stripe and applies its current state. It is logged as a code and the account's id, never an email.
+- **Practices**: a practice's plan covers its seats and the professional's own use of the assistant. It never covers or shows a patient's use, and a person's plan never depends on sharing with a practice.
+- Without payments configured, plans come from the installation's default (`SINTR_PERSON_PLAN`) and from grants (`make person-plan`, `make practice-plan`), and nothing reaches Stripe.
 
 ## Your own assistant (MCP)
 
@@ -133,9 +155,9 @@ A report's PDF is printed inside the app by headless Chromium from a page sintr 
 - Deleting an account removes every row the person owns, in every table, by cascade (tested in `packages/core`). There is no button for it in the app yet.
 - **Conversations** are kept until the person deletes them, unless they choose in Settings to keep them 30, 90 or 365 days after the last message; the worker then removes older ones every hour, with their messages and drafts. A conversation can also be deleted from its page. Entries and check-ins saved from a conversation are records of their own and stay.
 - **Corrections** of an entry or check-in keep what the changed fields held before, dated, so nothing is rewritten silently. They are removed with the record.
-- **Reports** are kept until the person's account is deleted, with their revisions (what each said before a change) and, once approved, their PDF. A sent report cannot change. Deleting a single report from the UI arrives with F5.
+- **Reports** are kept until the person's account is deleted, with their revisions (what each said before a change) and, once approved, their PDF. A sent report cannot change. Deleting a single report from the UI is still to come.
 - **Shared reports** (F4) live while their link is active; ending the link deletes them and destroys the key they were sealed with. A link that ended keeps its ids and dates. Invites are removed 30 days after they were accepted, cancelled or expired.
-- Export (JSON and Markdown), deleting entries and the account from the UI, and the audit view arrive in F5. Until then, a self-host operator can run them directly; on the hosted offer they will exist before it opens.
+- Export (JSON and Markdown), deleting entries and the account from the UI, and the audit view are still to come. Until then, a self-host operator can run them directly; on the hosted offer they will exist before it opens.
 
 ## Known gaps
 
@@ -148,15 +170,19 @@ Recorded here so they are not mistaken for features:
 - Entries cannot be marked as "not for the report" yet (the pack's `share: no`); the person removes a moment from a report instead.
 - The app connects to Postgres as the database owner; a least-privilege role is part of F4 hardening.
 - Session IP addresses and user agents are kept for the life of the session.
-- No MFA yet (F5).
+- No MFA yet.
 - sintr offers no OAuth for MCP yet. ChatGPT cannot send a key of its own, so for it (and for Claude without request headers) the key travels inside the address, which makes the address a secret.
 - Over MCP, the person's yes to a draft happens in their assistant's conversation, which sintr cannot see; sintr requires the assistant to declare it and checks the words, but cannot prove it.
 - MCP rate limits are counted per web process, in memory, and so are invite code lookups.
 - A database backup taken while a link was active still holds that link's key and copies; destroying the key reaches the live database, not old backups. Backups are the operator's to keep and expire.
 - Anyone holding an invite code sees who it is from (the practice's names, or the name a person chose for their invite) before signing in. That is what the code is for, but a code forwarded beyond its recipient shows it too; it still cannot be used without an account, and a person's invite cannot receive anything without the person confirming the practice.
 - A PDF a professional downloaded leaves sintr and is not deleted when a link ends.
-- Deleting an account (not in the UI yet) ends its links by cascade without telling the other side; F5 should tell them.
+- Deleting an account (not in the UI yet) ends its links by cascade without telling the other side; that should tell them.
 - A practice cannot be closed from the app yet; its links can each be ended.
-- The person sees when a shared report was first opened; the full audit view arrives in F5.
+- The person sees when a shared report was first opened; the full audit view is still to come.
+- At the plan's limit the house assistant does not run, so only the fixed crisis screen looks at a message (as without any provider); the help lines stay on every page.
+- On the house assistant, what the provider keeps is governed by the operator's agreement with it; this document does not name the hosted offer's provider and its retention yet, and will before it opens.
+- Monthly usage counts are kept while the account exists; they hold numbers only.
+- Stripe keeps the email, the payment details and the invoices of a person who subscribed, under its own terms; deleting a sintr account does not delete the Stripe customer (the operator does that in Stripe).
 
 This is a description of the software, not legal advice or a compliance claim.

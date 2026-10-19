@@ -1,6 +1,7 @@
 /**
  * The embedded agent: the capture conversation of the agent pack's SKILL.md,
- * inside the app. Provider-agnostic (bring your own key), streaming, and
+ * inside the app. Provider-agnostic (the house assistant, or the person's
+ * own key), streaming, and
  * held to the pack's rules in code, not only in the prompt:
  * - the person's words are kept verbatim, and drafts that paraphrase or
  *   invent a number are refused before they are stored;
@@ -12,6 +13,15 @@
  * Client components import from `@sintr/agent/shapes`; this entry is for
  * the server.
  */
+export {
+  metered,
+  resolveAssistant,
+  type AssistantConfig,
+  type AssistantProblem,
+  type AssistantSource,
+  type Metered,
+  type ResolvedAssistant,
+} from "./assistant";
 export { crisisLanguage, crisisMessage, screenForRisk, type CrisisLanguage, type Screening } from "./crisis";
 export { smoothDashText } from "./dashes";
 export { MAX_STEPS, runCaptureTurn, type CaptureTurn } from "./driver";

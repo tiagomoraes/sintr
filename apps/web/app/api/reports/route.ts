@@ -23,12 +23,13 @@ export async function POST(request: Request) {
   const plan = planReportNow({ schedule: settings, timeZone: profile.timezone, reports, now: new Date() });
   if (plan.action === "open") return Response.json({ id: plan.reportId, created: false });
   try {
-    const { model, problem } = await reportModel(scope, config);
+    const { model, problem, metered } = await reportModel(scope, config);
     const result = await prepareReport({
       scope,
       period: plan.period,
       model,
       modelProblem: problem,
+      metered,
       log,
       abortSignal: request.signal,
     });

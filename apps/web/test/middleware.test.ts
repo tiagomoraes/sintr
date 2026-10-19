@@ -15,7 +15,8 @@ describe("middleware", () => {
     expect(a).toMatch(/script-src 'self' 'nonce-[^']+' 'strict-dynamic'/);
     expect(a).toContain("frame-ancestors 'none'");
     expect(a).toContain("object-src 'none'");
-    expect(a).toContain("form-action 'self'");
+    // Forms post here, or redirect to Stripe's own pages when a person subscribes; nowhere else.
+    expect(a).toContain("form-action 'self' https://checkout.stripe.com https://billing.stripe.com;");
     expect(a).not.toBe(b);
   });
 
