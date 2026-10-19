@@ -164,7 +164,7 @@ test.describe("the house assistant", () => {
     await setUsage(userId, { messages: 95 });
 
     await page.goto("/talk");
-    await expect(page.getByText(/5 messages with the assistant left this month, until 1 /)).toBeVisible();
+    await expect(page.getByText(/5 messages with the assistant left this month, until 1\s/)).toBeVisible();
     await say(page, SITUATION, QUESTION);
     await expect(page.getByText(/4 messages with the assistant left this month/)).toBeVisible();
 
@@ -212,7 +212,7 @@ test.describe("plans and payments", () => {
     await page.goto("/plan");
     await expect(page.getByRole("heading", { name: "More of the assistant" })).toBeVisible();
     await expect(
-      page.getByText(/Personal: 600 messages with the assistant .* For R\$19\.90 a month\./),
+      page.getByText(/Personal: 600 messages with the assistant .* It costs R\$19\.90 a month\./),
     ).toBeVisible();
     await page.getByRole("button", { name: "Subscribe to Personal" }).click();
     await expect(page).toHaveURL(/\/checkout\/cs_test_/);

@@ -169,6 +169,8 @@ export function Conversation({
     (last?.role !== "assistant" ||
       (textOf(last).length === 0 && !last.parts.some((p) => p.type === "data-limit")));
   const limited = meter !== null && atTheLimit(meter);
+  // Once sintr has answered for the limit, the reply itself says it; the notice is for before.
+  const limitAnswered = last?.role === "assistant" && last.parts.some((p) => p.type === "data-limit");
 
   useEffect(() => {
     if (messages.length === 0) return;
@@ -200,8 +202,9 @@ export function Conversation({
             Tell me what happened.
           </h1>
           <p className="mt-4 max-w-[34em] text-lede text-ink-2">
-            In your own words, as much or as little as you want. I will listen, ask a question or two, and
-            draft an entry for you to check. Nothing is kept as an entry until you confirm it.
+            {limited
+              ? "In your own words, as much or as little as you want. Nothing is kept as an entry until you confirm it."
+              : "In your own words, as much or as little as you want. I will listen, ask a question or two, and draft an entry for you to check. Nothing is kept as an entry until you confirm it."}
           </p>
         </section>
       ) : null}
@@ -283,6 +286,9 @@ export function Conversation({
           );
         })}
         {waiting ? <Writing /> : null}
+        {ready && limited && !stopped && !limitAnswered && !busy && meter ? (
+          <LimitNotice meter={meter} />
+        ) : null}
         {error ? (
           <div className="rounded-file border border-rule px-5 py-4" role="alert">
             <p className="text-[0.9375rem] text-ink">{problemCopy(error.message, source)}</p>
@@ -342,7 +348,6 @@ export function Conversation({
             to continue this conversation.
           </p>
         )}
-        {ready && limited && !stopped && meter ? <LimitNotice meter={meter} /> : null}
         <form onSubmit={submit} className={cn("flex items-end gap-3", !ready && "hidden")}>
           <label htmlFor="talk-message" className="sr-only">
             Your message
@@ -370,7 +375,10 @@ export function Conversation({
             Enter sends. Shift and Enter for a new line.
           </p>
         </div>
-        {ready && source === "house" && meter ? <PlanLine meter={meter} /> : null}
+        {ready && source === "house" && meter && !(limited && !limitAnswered && !stopped) ? (
+          // At the limit, before anything is sent, the notice above says it all.
+          <PlanLine meter={meter} />
+        ) : null}
         {rehearsal ? (
           <p className="mt-2 text-caption text-ink-3">
             Rehearsal mode: replies come from a scripted, offline assistant (SINTR_FAKE_AGENT). Nothing is

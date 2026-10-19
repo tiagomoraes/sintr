@@ -134,7 +134,7 @@ export default async function PlanPage({
               </p>
             ) : null}
             <ManageButton subscription={subscription} />
-            <h3 className="mt-10 text-label font-medium text-ink">This month</h3>
+            <h3 className="mt-10 font-sans text-label font-medium text-ink">This month</h3>
             <dl className="mt-3 border-t border-rule">
               <MeterRow
                 label="Messages with the assistant"
@@ -196,8 +196,13 @@ export default async function PlanPage({
           </h2>
           <p className="mt-3 text-ink-2">
             Personal: {allowanceLine(PERSON_PLANS.personal.allowance).replace(/^./u, (c) => c.toLowerCase())}
-            {personalPrice ? ` For ${priceLine(personalPrice)}.` : ""}
+            {personalPrice ? ` It costs ${priceLine(personalPrice)}.` : ""}
           </p>
+          {offerPractice ? (
+            <p className="mt-2 text-[0.9375rem] text-ink-3">
+              As a therapist, the Practice plan below includes it for your own diary.
+            </p>
+          ) : null}
           {offerPersonal ? (
             <>
               <form action={subscribe.bind(null, "person" satisfies SubscriptionKind)} className="mt-6">
@@ -265,7 +270,7 @@ export default async function PlanPage({
                     inputMode="numeric"
                     min={1}
                     max={MAX_SEATS}
-                    defaultValue={Math.max(5, seats.active + seats.held)}
+                    defaultValue={Math.max(1, seats.active + seats.held)}
                     className="mt-2 w-28"
                   />
                 </div>

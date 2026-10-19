@@ -25,8 +25,8 @@ describe("plans in plain words", () => {
   });
 
   it("names the day the count starts again, and where a plan came from", () => {
-    expect(formatNext("2026-11-01")).toBe("1 November");
-    expect(formatNext("2027-01-01")).toBe("1 January");
+    expect(formatNext("2026-11-01")).toBe("1\u00a0November");
+    expect(formatNext("2027-01-01")).toBe("1\u00a0January");
     expect(sourceLine("grant")).toContain("whoever runs this sintr");
     expect(sourceLine("practice")).toContain("practice");
     expect(sourceLine("installation")).toBeNull();

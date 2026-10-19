@@ -15,11 +15,11 @@ export interface MeterView {
   next: string;
 }
 
-/** "1 November": the day the count starts again. */
+/** "1 November": the day the count starts again, never broken across two lines. */
 export function formatNext(next: string): string {
-  return new Intl.DateTimeFormat("en-GB", { timeZone: "UTC", day: "numeric", month: "long" }).format(
-    new Date(`${next}T12:00:00Z`),
-  );
+  return new Intl.DateTimeFormat("en-GB", { timeZone: "UTC", day: "numeric", month: "long" })
+    .format(new Date(`${next}T12:00:00Z`))
+    .replace(" ", "\u00a0");
 }
 
 /** "1 message", "12 messages". */
