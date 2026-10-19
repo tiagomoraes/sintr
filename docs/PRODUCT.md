@@ -93,6 +93,20 @@ The owner's decision: leaving Settings with something not saved should warn firs
 
 The reasons are in DECISIONS 113 to 115.
 
+## Giving another assistant a key (F12)
+
+The owner's decision: on "Connect another assistant" the button that made the key sat above the name and the choice of what the key may do, and those two were folded away under it, so the page read as a big button first and the real decisions as an afterthought. The whole order was backwards, and the whole flow of managing keys was to be thought about again, with Vercel, GitHub and Anthropic as references.
+
+**The decisions first, the button last.** The page asks two things, both in view: which assistant the key is for ("Claude on my phone", its name in the list), and what it may do. The three accesses keep their names and meanings, and none is chosen for the person: Save only first (it saves what they say yes to and never reads the diary back), then Read and save, then Read only, each saying what it does and when to choose it. Then Make the key, with one line beside it: sintr shows the key once, right after. The first time, three short steps above the form say what is about to happen.
+
+**Afterwards, the key says what it is.** The key is shown once, with whom it is for and what it may do in the same words as the form; the steps open on the assistant it is named after, with the key filled in, and the line turns to Connected when the assistant first calls. In the list each key carries its access beside its name, when it last talked to sintr, when it was made and its first characters, and one button to switch it off. A key whose assistant has been quiet for over two months says so, and suggests switching it off. To change what an assistant may do, the person gives it a new key and disconnects the old one; the list says so.
+
+**What was deliberately not taken.** Keys do not expire: an assistant that stops keeping the diary on a forgotten date is worse here than a key that lives until it is switched off, and the quiet line does that job instead. No description, no workspace, no editing a key's access, no confirmation before Disconnect.
+
+**Without JavaScript** a key is made, shown once and its steps read the same way.
+
+The reasons are in DECISIONS 116 to 121.
+
 ## Voice and users
 
 People in regular therapy who want their self-observations documented between sessions but do not want another app to open, or who already live inside an AI assistant. They value privacy and plain language. Typical moment of use: right after a difficult situation ("preciso falar do que aconteceu"), or right before a session ("gera o report da semana"). They already have a therapist; they are not looking for an AI therapist.
