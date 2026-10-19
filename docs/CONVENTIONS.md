@@ -44,6 +44,8 @@ See [`docs/PRODUCT.md`](PRODUCT.md). Short version: one core (`packages/core`), 
 
 Calm, private, precise. No em dashes or en dashes in user-facing copy, docs, or commit bodies. No emoji, no hype, no gamification (streaks, badges, scores as judgement). Prefer lowercase, plain language.
 
+The app's words live in its message catalog, `apps/web/messages/en/<feature>.ts`, one file per screen or feature; components read them as `t.<feature>`. A new or rewritten string goes there, not into a component, so the languages milestone adds a catalog instead of hunting through the code (DECISIONS 94).
+
 ## Tests and verification
 
 - Every feature ships with tests. `make test` must pass before a change is considered done.

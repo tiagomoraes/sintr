@@ -463,6 +463,21 @@ Black, quiet, confident; the only filled controls on the page.
 - **Light:** recolors over 2.8s and moves over 3.4s when the section's time of day changes; breathes on an 11s cycle; leaves sway on 13s and 17s. On `/tech/` it stays put.
 - All motion is opt-in behind `html.motion`; reduced motion removes animation and transition entirely.
 
+## The app's light and motion (F6)
+
+The app keeps every token above and borrows the site's light, not a new style. The values live in `packages/ui/src/styles/sintr.css`.
+
+- **Time of day.** The light's four colours are registered properties (`--light-1`, `--light-2`, `--light-3`, `--light-leaf`) set by `data-time` on the element that holds the page, with the site's palettes (dawn, early, morning, noon, late, golden, dusk, evening, night). The time is the person's own hour; changing it cross-fades over 2.8s on the slow in-out ease.
+- **The room's light.** The same window, fixed behind the page (`RoomLight`, one per page, under the content so no text loses contrast), placed by a scene: each step of the welcome, the home, a conversation, speaking, and `reading` (absolute in the first 92vh, masked from 45% down: the Light Stays in the Header Rule). A new scene moves it over 3.4s with transform and opacity only. Under 720px it is one 150vw pane that does not travel; only its strength changes. It breathes on the 11s cycle.
+- **Settling in.** A step's lines rise 18px from a 6px blur over 1.3s on the expo-out ease, 90ms apart (at most six): `Rise`, `.sintr-rise`.
+- **The pool of light** (`LightPool`): the home's presence, 216px beside the question on a desk, 120px above it on a phone, 40px beside the box once a conversation has begun. Four soft layers of the light's own colours at that hour (sky and peach a little deepened, a warm linen middle, a leaf's shadow at the edge), each blurred once and then only turned (19s, 23s, 31s) and scaled, multiplied onto the paper. Moods: resting (breathes 0.97 to 1.04 over 6s), listening (follows the voice's level up to 1.28, peach warmer, layers turning faster), transcribing (gathers to 0.88, layers turning in 2.8s), thinking (pulses between 0.95 and 1.02 at 1.5s), proposing (warms to the highlighter's peach, breathes slower), paused (still, grey, 0.84). Its mood is said in words beside it and to screen readers.
+- **Reduced motion** keeps every state and colour and removes every movement and transition, the light's included.
+
+### Named Rules
+**The Light Pool Rule.** The pool is the window light gathered, never a pastel blob: only the light's colours, no outline, no face, no gloss, no shape morphing, one per page, and it means something is happening or waiting. The wellness-app blob stays rejected.
+
+**The Thumb Rule.** On a phone the action of a screen sits where the thumb rests: Speak and Send at the bottom right of the box, a welcome step's Continue at the bottom, the menu's sheet coming in from the side.
+
 ## Do's and Don'ts
 
 ### Do:
@@ -481,5 +496,5 @@ Black, quiet, confident; the only filled controls on the page.
 - **Don't** add eyebrows, kickers, uppercase labels, or icon tiles above headings.
 - **Don't** use the mono face on the home, or anywhere outside real file contents, paths and commands on `/tech/`.
 - **Don't** use the peach highlighter on anything but a person's own quoted words.
-- **Don't** build the page from pastel blobs, a phone mockup, or a row of three feature cards, and don't turn it into a dark terminal page or a developer portal.
+- **Don't** build the page from pastel blobs, a phone mockup, or a row of three feature cards, and don't turn it into a dark terminal page or a developer portal. The app's pool of light is the window light itself (The Light Pool Rule), not a blob.
 - **Don't** use glassmorphism or backdrop blur on surfaces; blur belongs only to the light's soft edges, the leaf shadows, and the reveal transition. No purple-to-blue pairs; lavender appears only as evening light mixed with peach.

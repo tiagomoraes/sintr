@@ -52,11 +52,13 @@ Caddy obtains and renews the certificate by itself and redirects HTTP to HTTPS. 
 
 ## The assistant
 
-sintr's assistant talks to a model you choose, with your own key. Without a house assistant (below), Talk says so and points to this door in Settings, "Your own key":
+sintr's assistant talks to a model you choose, with your own key. Without a house assistant (below), the home says so and points to this door in Settings, "Your own key":
 
 - **OpenAI-compatible** covers OpenAI (`https://api.openai.com/v1`), OpenRouter (`https://openrouter.ai/api/v1`) and anything that speaks the same API. For a model on the same machine (Ollama, LiteLLM), use `http://host.docker.internal:11434/v1` (or the port it listens on): inside the stack, `localhost` is the app container itself, and the compose file maps `host.docker.internal` to the host. A local endpoint needs no key.
 - **Anthropic** and **Google** take a key and a model name.
 - **Test the connection** makes one short request with the saved settings and tells you whether the key and the model work.
+
+Speaking on the home works with OpenRouter, OpenAI, Groq and Google keys (each writes down what you say with your key; the recording is never kept); with Anthropic or a local model you write, and the home says so. It needs https, or localhost: a phone's browser opens the microphone only there.
 
 The key is encrypted with your data key before it is stored and is never shown again. What the provider receives is described in [`PRIVACY.md`](PRIVACY.md). Conversations are kept until you delete them, unless you choose a retention in Settings; the worker removes older ones every hour.
 
