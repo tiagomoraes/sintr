@@ -47,7 +47,7 @@ interface Watched {
 /** The Navigation API's `navigate` event, as far as the guard reads it (TypeScript's DOM types lack it). */
 interface NavigateEvent extends Event {
   navigationType: "push" | "replace" | "reload" | "traverse";
-  destination: { key: string };
+  destination: { key: string; url: string };
 }
 
 interface Navigation extends EventTarget {
@@ -92,6 +92,12 @@ function defaultsOf(form: HTMLFormElement): Fields {
 
 function createGuard(show: (what: string[] | null) => void, setDirty: (dirty: boolean) => void) {
   const forms = new Map<HTMLFormElement, Watched>();
+  /** Addresses a page that moves within itself still is (`useStaysOnPage`): going there is not a way out. */
+  const pages = new Set<(to: URL) => boolean>();
+  const staysOn = (href: string) => {
+    const to = new URL(href, window.location.href);
+    return [...pages].some((stays) => stays(to));
+  };
   /**
    * The person chose to leave: nothing asks again until they change
    * something, or the page or its forms start over.
@@ -190,6 +196,12 @@ function createGuard(show: (what: string[] | null) => void, setDirty: (dirty: bo
     recheck();
   }
 
+  /** A page that moves within itself: these addresses are still it. */
+  function stays(page: (to: URL) => boolean): () => void {
+    pages.add(page);
+    return () => void pages.delete(page);
+  }
+
   /** Another page: whatever was let go there is over. */
   function rearm() {
     released = false;
@@ -208,7 +220,7 @@ function createGuard(show: (what: string[] | null) => void, setDirty: (dirty: bo
         button: event.button,
         modified: event.metaKey || event.ctrlKey || event.shiftKey || event.altKey,
       };
-      if (!leavesPage(click, window.location.href)) return;
+      if (!leavesPage(click, window.location.href) || staysOn(link.href)) return;
       const what = unsaved();
       if (what.length === 0) return;
       // Before the link's own handler (Next's router) sees the click; it is played again to leave.
@@ -261,6 +273,7 @@ function createGuard(show: (what: string[] | null) => void, setDirty: (dirty: bo
     const onNavigate = (event: Event) => {
       const navigate = event as NavigateEvent;
       if (released || navigate.navigationType !== "traverse" || !navigate.cancelable) return;
+      if (staysOn(navigate.destination.url)) return;
       const what = unsaved();
       if (what.length === 0) return;
       navigate.preventDefault();
@@ -286,7 +299,7 @@ function createGuard(show: (what: string[] | null) => void, setDirty: (dirty: bo
     };
   }
 
-  return { watch, saved, recheck, mayLeave, answered, rearm, listen };
+  return { watch, saved, recheck, mayLeave, answered, rearm, listen, stays };
 }
 
 type Guard = ReturnType<typeof createGuard>;
@@ -387,6 +400,18 @@ export function UnsavedForm({ part, ...props }: ComponentProps<"form"> & { part:
   const form = useRef<HTMLFormElement>(null);
   useUnsaved(form, part, null);
   return <form ref={form} {...props} />;
+}
+
+/**
+ * A page whose state lives in its address and moves without loading again
+ * (Therapy's calendar: `?month=`, `?session=`) says which addresses are still
+ * itself. A link or a step back and forward between them keeps every form on
+ * the page as it is, so it is not a way out and is never asked about.
+ */
+export function useStaysOnPage(stays: (to: URL) => boolean): void {
+  const guard = use(GuardContext);
+  const latest = useLatest(stays);
+  useEffect(() => guard?.stays((to) => latest.current(to)), [guard, latest]);
 }
 
 const leaveFreely = () => Promise.resolve(true);

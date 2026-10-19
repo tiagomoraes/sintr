@@ -229,6 +229,11 @@ export const therapy = {
     "Todo relatório espera a sua aprovação. Nada é enviado a ninguém sem o seu sim para aquele relatório, e isso não pode ser desligado.",
   save: "Salvar",
   saved: "Salvo.",
+  unsaved: {
+    therapist: "nos dados do seu terapeuta",
+    report: "no relatório",
+    timezone: "no fuso horário",
+  },
   notes: {
     title: "Objetivos, temas e o que levar para a sessão",
     kinds: {

@@ -154,7 +154,7 @@ export default async function TherapyPage({
       </p>
       <TherapyCalendar
         view={view}
-        footer={<ZoneForm zone={zone} month={state.month} timezones={timezones} />}
+        footer={<ZoneForm key={zone} zone={zone} month={state.month} timezones={timezones} />}
       />
       <div className="mt-16 max-w-[40rem]">
         <TherapyForm

@@ -4,6 +4,7 @@ import { buttonVariants, cn } from "@sintr/ui";
 import { useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 import { useLanguage, useMessages } from "@/components/language";
+import { useStaysOnPage } from "@/components/unsaved";
 import {
   addDays,
   addMonths,
@@ -355,6 +356,8 @@ function DayDetail({ view, state, day }: { view: CalendarView; state: CalendarSt
   );
 }
 
+const onTherapy = (to: URL) => to.pathname === "/therapy";
+
 /**
  * Therapy's calendar (F11): the sessions as they fall, the next one first,
  * a month at a time, each one opened on its own to change or cancel it, or
@@ -365,6 +368,8 @@ export function TherapyCalendar({ view, footer }: { view: CalendarView; footer?:
   const T = useMessages().therapy.calendar;
   const state = useCalendarState(view.today);
   const params = useSearchParams();
+  // Its months, days and sheets are addresses of this page: moving between them leaves nothing unsaved behind.
+  useStaysOnPage(onTherapy);
   const done = params.get("done");
   const said = done && Object.hasOwn(T.done, done) ? T.done[done as keyof typeof T.done] : null;
   const coming = view.comingUp

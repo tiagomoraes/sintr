@@ -103,9 +103,11 @@ The owner's request: a person may go every fifteen days, twice a week, or on a r
 
 **Everything after it believes the calendar.** The next session announced in Therapy and Reports is the real next one; the report is prepared before it by the same lead, covering the days since the last one, so periods still meet exactly; the worker prepares on the new shape; an assistant over MCP reads the rhythm and the next sessions. Someone who had the weekly slot finds it as a weekly rhythm, with the same next session and report. Someone with nothing scheduled sees no announcement, and prepares a report by hand from Reports, as before.
 
+**Nothing unsaved is lost on the way.** Leaving Therapy with the therapist or the time zone changed and not saved asks first, as Settings does since F9; moving through the calendar (a month, a day, a session's sheet, the back gesture that closes it) never asks, because it is the same page.
+
 **What did not come back.** "Has a session moved?" stays gone: a moved session is simply a session on another day, chosen on the calendar, never a date that guesses which session it replaces.
 
-The reasons are in DECISIONS 124 to 129.
+The reasons are in DECISIONS 124 to 130.
 
 ## Giving another assistant a key (F12)
 

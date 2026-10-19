@@ -244,6 +244,45 @@ test.describe("the therapy calendar", () => {
     await expect(comingUp(page, day(17), "18:00")).toBeVisible();
   });
 
+  test("asks before leaving Therapy with a change, and never while the calendar moves", async ({ page }) => {
+    await signUpQuietly(page, newEmail("calendar-unsaved"));
+    const scope = await scopeOf(page);
+    await scope.sessions.add({ startsOn: day(3), time: "18:00", repeat: "weekly" });
+    await page.goto("/therapy");
+    // The form posts, and its Save waits for the page to be alive: no field travels in an address.
+    const form = page.getByRole("form", { name: "Your therapy" });
+    await expect(form).toHaveAttribute("method", "post");
+    await expect(form.getByRole("button", { name: "Save", exact: true })).toBeEnabled();
+    await page.getByText("Your therapist", { exact: true }).click();
+    await page.getByLabel("Name", { exact: true }).fill("Dr. Unsaved");
+
+    // The calendar's months, a session's sheet and the back gesture that closes it are this page.
+    await page.getByRole("link", { name: "Next month" }).click();
+    await expect(page).toHaveURL(/month=/);
+    await page.getByRole("link", { name: "Previous month" }).click();
+    await comingUp(page, day(3), "18:00").getByRole("link").click();
+    await expect(page.getByRole("dialog", { name: when(day(3), "18:00") })).toBeVisible();
+    await page.goBack();
+    await expect(page.getByRole("dialog")).toHaveCount(0);
+    await expect(page.getByRole("alertdialog")).toHaveCount(0);
+    await expect(page.getByLabel("Name", { exact: true })).toHaveValue("Dr. Unsaved");
+
+    // Leaving for another page asks, names what would be lost, and staying keeps it.
+    await page.getByRole("navigation").getByRole("link", { name: "Entries", exact: true }).first().click();
+    const question = page.getByRole("alertdialog");
+    await expect(question).toContainText("Your changes to your therapist's details are not saved yet");
+    await question.getByRole("button", { name: "Stay on this page" }).click();
+    await expect(page).toHaveURL(/\/therapy/);
+    await expect(page.getByLabel("Name", { exact: true })).toHaveValue("Dr. Unsaved");
+
+    // Saved, it leaves quietly.
+    await page.getByRole("button", { name: "Save", exact: true }).click();
+    await expect(page.getByText("Saved.", { exact: true })).toBeVisible();
+    await page.getByRole("navigation").getByRole("link", { name: "Entries", exact: true }).first().click();
+    await expect(page).toHaveURL(/\/entries$/);
+    expect((await scope.therapySettings.get()).therapistName).toBe("Dr. Unsaved");
+  });
+
   test.describe("on a phone", () => {
     test.use({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
 
@@ -306,7 +345,11 @@ test.describe("the therapy calendar", () => {
           plain.page.getByText("Cancelled. Only that session: the rest of the rhythm goes on."),
         ).toBeVisible();
         // The plain post is for sintr's own pages: another site's form keeps nothing.
-        for (const headers of [{ "sec-fetch-site": "cross-site" }, { origin: "https://elsewhere.example" }]) {
+        const elsewhere: Record<string, string>[] = [
+          { "sec-fetch-site": "cross-site" },
+          { origin: "https://elsewhere.example" },
+        ];
+        for (const headers of elsewhere) {
           const refused = await page.request.post("/api/therapy/sessions", {
             form: { intent: "add", day: day(6), time: "10:00", repeat: "once" },
             headers,

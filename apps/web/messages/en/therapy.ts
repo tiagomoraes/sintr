@@ -190,6 +190,12 @@ export const therapy = {
     "Every report waits for your approval. Nothing is sent to anyone without your yes for that report, and this cannot be turned off.",
   save: "Save",
   saved: "Saved.",
+  /** What is not saved yet, as the question before leaving names it inside `shell.unsaved.changes`. */
+  unsaved: {
+    therapist: "your therapist's details",
+    report: "the report",
+    timezone: "the time zone",
+  },
   /** What the person and their therapist keep in view between sessions, listed under the form. */
   notes: {
     title: "Goals, themes and things to bring up",

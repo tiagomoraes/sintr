@@ -1,11 +1,13 @@
 "use client";
 
 import { Button, Checkbox, FieldError, FieldHint, Input, Select, cn } from "@sintr/ui";
-import { useActionState, useState, type ReactNode } from "react";
+import { useActionState, useRef, useState, type ReactNode } from "react";
 import type { TherapyFormState } from "@/app/(app)/therapy/actions";
 import { LEADS, REPORT_LANGUAGE_OPTIONS } from "@/lib/therapy";
 import { submitWith } from "@/lib/use-form-action";
+import { useHydrated } from "@/lib/use-hydrated";
 import { useMessages } from "@/components/language";
+import { useUnsaved } from "@/components/unsaved";
 
 export interface TherapyDefaults {
   displayName: string;
@@ -111,12 +113,29 @@ export function TherapyForm({
 }) {
   const T = useMessages().therapy;
   const [state, action, pending] = useActionState(save, { saved: false, problems: {} });
+  const hydrated = useHydrated();
+  const form = useRef<HTMLFormElement>(null);
+  // Leaving with a change here asks first (DECISIONS 113); the calendar above moves without leaving.
+  useUnsaved(
+    form,
+    {
+      therapistName: T.unsaved.therapist,
+      therapistEmail: T.unsaved.therapist,
+      deliveryChannel: T.unsaved.therapist,
+      reportLeadMinutes: T.unsaved.report,
+      language: T.unsaved.report,
+      displayName: T.unsaved.report,
+      reportNoticeEmail: T.unsaved.report,
+    },
+    state.saved ? state : null,
+  );
   const [delivery, setDelivery] = useState(defaults.deliveryChannel);
   const p = state.problems;
   const has = (...fields: string[]) => fields.some((field) => Boolean(p[field]));
 
   return (
-    <form onSubmit={submitWith(action)} aria-label={T.title}>
+    // A post, and a Save that waits for the page to be alive: the therapist's email never travels in an address.
+    <form ref={form} method="post" action="/therapy" onSubmit={submitWith(action)} aria-label={T.title}>
       <Part
         id="therapist"
         title={T.therapist.title}
@@ -242,7 +261,7 @@ export function TherapyForm({
       </div>
       {p.form ? <FieldError>{p.form}</FieldError> : null}
       <div className="mt-10 flex flex-wrap items-center gap-x-6 gap-y-3">
-        <Button type="submit" disabled={pending}>
+        <Button type="submit" disabled={pending || !hydrated}>
           {T.save}
         </Button>
         {state.saved ? (

@@ -1,9 +1,10 @@
 "use client";
 
 import { FieldError, Select, buttonVariants, cn } from "@sintr/ui";
-import { useActionState } from "react";
+import { useActionState, useRef } from "react";
 import { saveTimeZone } from "@/app/(app)/therapy/sessions";
 import { useMessages } from "@/components/language";
+import { useUnsaved } from "@/components/unsaved";
 import { submitWith } from "@/lib/use-form-action";
 
 /**
@@ -20,8 +21,11 @@ export function ZoneForm({
   month: string;
   timezones: readonly string[];
 }) {
-  const T = useMessages().therapy.calendar;
+  const { calendar: T, unsaved: U } = useMessages().therapy;
   const [result, action, pending] = useActionState(saveTimeZone, { problem: null });
+  // A zone chosen and not saved is asked about before leaving; once saved, the page draws this form again.
+  const form = useRef<HTMLFormElement>(null);
+  useUnsaved(form, U.timezone, null);
   const place = (zone.split("/").at(-1) ?? zone).replaceAll("_", " ");
   return (
     <details className="group mt-8 border-t border-rule pt-5">
@@ -32,6 +36,7 @@ export function ZoneForm({
         </span>
       </summary>
       <form
+        ref={form}
         method="post"
         action="/api/therapy/sessions"
         onSubmit={submitWith(action)}
