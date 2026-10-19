@@ -41,7 +41,7 @@ export default async function ConnectPage() {
           keys.length ? (
             <section aria-labelledby="connected-title" className="mb-16 max-w-[40rem]">
               <h2 id="connected-title" className="font-serif text-title-small font-normal text-ink">
-                Your assistants
+                {t.connect.connected}
               </h2>
               <div className="mt-5">
                 <KeyList keys={keys} />

@@ -1,5 +1,8 @@
+"use client";
+
 import { cn } from "@sintr/ui";
 import { disconnectKey } from "@/app/(app)/connect/actions";
+import { useMessages } from "@/components/language";
 import { DisconnectButton } from "./disconnect-button";
 
 /** One connection key as the person sees it: never the key itself. */
@@ -32,12 +35,15 @@ export function UseMark({ used }: { used: boolean }) {
 
 /**
  * The keys that still work, each with when its assistant last talked to
- * sintr, and one button to switch it off.
+ * sintr, and one button to switch it off. A client component, since the
+ * setup imports its mark; the servers render it with the keys' words
+ * already written (`workingKeys`).
  */
 export function KeyList({ keys }: { keys: readonly KeyView[] }) {
+  const K = useMessages().connect.keys;
   return (
     <div>
-      <ul className="border-y border-rule" aria-label="Connected assistants">
+      <ul className="border-y border-rule" aria-label={K.label}>
         {keys.map((key) => (
           <li
             key={key.id}
@@ -49,9 +55,7 @@ export function KeyList({ keys }: { keys: readonly KeyView[] }) {
                 <UseMark used={key.used} />
                 {key.lastTalked}
               </p>
-              <p className="mt-1 text-caption text-ink-3">
-                {key.access}. Made on {key.made}. Starts with {key.prefix}.
-              </p>
+              <p className="mt-1 text-caption text-ink-3">{K.meta(key.access, key.made, key.prefix)}</p>
             </div>
             <form action={disconnectKey.bind(null, key.id)}>
               <DisconnectButton name={key.name} />
@@ -59,10 +63,7 @@ export function KeyList({ keys }: { keys: readonly KeyView[] }) {
           </li>
         ))}
       </ul>
-      <p className="mt-3 max-w-[36em] text-caption text-ink-3">
-        Disconnecting switches a key off at once. What the assistant already saved stays in your diary, and
-        you can connect it again with a new key.
-      </p>
+      <p className="mt-3 max-w-[36em] text-caption text-ink-3">{K.after}</p>
     </div>
   );
 }

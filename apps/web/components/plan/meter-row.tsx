@@ -1,17 +1,28 @@
+import { getMessages } from "@/lib/server/language";
+
 /**
  * One measure of a month: its name, how much of it is used in words, and a
  * thin track that fills as it is used. Graphite on a hairline, the same
  * ramp, whatever the amount: the words carry the state, never an alarm
  * colour, and nothing here is a score.
  */
-export function MeterRow({ label, used, limit }: { label: string; used: number; limit: number | null }) {
+export async function MeterRow({
+  label,
+  used,
+  limit,
+}: {
+  label: string;
+  used: number;
+  limit: number | null;
+}) {
+  const { meter } = (await getMessages()).plan;
   const share = limit === null || limit === 0 ? null : Math.min(1, used / limit);
   return (
     <div className="border-b border-rule py-4">
       <div className="flex flex-wrap items-baseline justify-between gap-x-6 gap-y-1">
         <dt className="text-[0.9688rem] text-ink-2">{label}</dt>
         <dd className="m-0 font-serif text-[1.1875rem] leading-snug text-ink">
-          {limit === null ? `${used} so far` : `${used} of ${limit}`}
+          {limit === null ? meter.soFar(used) : meter.of(used, limit)}
         </dd>
       </div>
       {share !== null ? (

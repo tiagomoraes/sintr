@@ -15,7 +15,10 @@ import {
   onlyReachableHere,
   sinceText,
 } from "@/lib/connect";
+import { messagesFor } from "@/messages";
 
+const en = messagesFor("en");
+const pt = messagesFor("pt-BR");
 const endpoint = { appUrl: "https://diary.example.com/", key: "sintr_abcDEF123_-xyz" };
 
 describe("the setup for each assistant", () => {
@@ -69,7 +72,7 @@ describe("the setup for each assistant", () => {
   });
 
   it("covers the five assistants, each with a check, and fills in the key or the placeholder", () => {
-    const guides = clientGuides(endpoint);
+    const guides = clientGuides(endpoint, en);
     expect(guides.map((guide) => guide.name)).toEqual([
       "Claude",
       "ChatGPT",
@@ -83,7 +86,7 @@ describe("the setup for each assistant", () => {
       expect(guide.steps.length).toBeGreaterThan(0);
     }
     const snippets = (key: string) =>
-      clientGuides({ ...endpoint, key }).flatMap((guide) =>
+      clientGuides({ ...endpoint, key }, en).flatMap((guide) =>
         [...guide.steps, ...(guide.another?.steps ?? [])].flatMap((step) =>
           step.snippet ? [step.snippet.text] : [],
         ),
@@ -95,6 +98,22 @@ describe("the setup for each assistant", () => {
     // The services that call from their own servers get the address that carries the key.
     const web = guides.filter((guide) => guide.fromTheirServers).map((guide) => guide.id);
     expect(web).toEqual(["claude", "chatgpt"]);
+  });
+
+  it("says the steps in the page's language, and the commands exactly the same", () => {
+    const english = clientGuides(endpoint, en);
+    const portuguese = clientGuides(endpoint, pt);
+    expect(portuguese.map((guide) => guide.name)).toEqual(english.map((guide) => guide.name));
+    expect(portuguese[0]!.steps[0]!.text).toBe("No Claude, abra “Customize” e depois “Connectors”.");
+    const snippets = (guides: typeof english) =>
+      guides.flatMap((guide) =>
+        [...guide.steps, ...(guide.another?.steps ?? [])].flatMap((step) =>
+          step.snippet ? [step.snippet.text] : [],
+        ),
+      );
+    expect(snippets(portuguese)).toEqual(snippets(english));
+    expect(english[0]!.steps[2]!.snippet).toMatchObject({ label: "the address", caption: "Address" });
+    expect(portuguese[0]!.steps[2]!.snippet).toMatchObject({ label: "o endereço", caption: "Endereço" });
   });
 
   it("knows when only this computer or network can reach sintr", () => {
@@ -114,15 +133,27 @@ describe("whether a key is alive", () => {
   const now = new Date("2026-10-18T15:00:00Z");
   const ago = (minutes: number) => new Date(now.getTime() - minutes * 60_000);
 
+  const utc = { language: "en", timezone: "UTC" };
+  const utcPt = { language: "pt-BR", timezone: "UTC" };
+
   it("says when the assistant last talked to sintr, in plain words", () => {
-    expect(sinceText(ago(0), now, "UTC")).toBe("just now");
-    expect(sinceText(ago(1), now, "UTC")).toBe("a minute ago");
-    expect(sinceText(ago(12), now, "UTC")).toBe("12 minutes ago");
-    expect(sinceText(ago(90), now, "UTC")).toBe("an hour ago");
-    expect(sinceText(ago(60 * 5), now, "UTC")).toBe("5 hours ago");
-    expect(sinceText(ago(60 * 30), now, "UTC")).toBe("yesterday");
-    expect(sinceText(new Date("2026-10-02T12:00:00Z"), now, "UTC")).toBe("on 2 October");
-    expect(sinceText(new Date("2025-10-02T12:00:00Z"), now, "UTC")).toBe("on 2 October 2025");
+    expect(sinceText(ago(0), now, utc, en)).toBe("just now");
+    expect(sinceText(ago(1), now, utc, en)).toBe("a minute ago");
+    expect(sinceText(ago(12), now, utc, en)).toBe("12 minutes ago");
+    expect(sinceText(ago(90), now, utc, en)).toBe("an hour ago");
+    expect(sinceText(ago(60 * 5), now, utc, en)).toBe("5 hours ago");
+    expect(sinceText(ago(60 * 30), now, utc, en)).toBe("yesterday");
+    expect(sinceText(new Date("2026-10-02T12:00:00Z"), now, utc, en)).toBe("on 2 October");
+    expect(sinceText(new Date("2025-10-02T12:00:00Z"), now, utc, en)).toBe("on 2 October 2025");
+  });
+
+  it("says it in the page's language, with its dates", () => {
+    expect(sinceText(ago(12), now, utcPt, pt)).toBe("há 12 minutos");
+    expect(sinceText(new Date("2026-10-02T12:00:00Z"), now, utcPt, pt)).toBe("em 2 de outubro");
+    expect(sinceText(new Date("2025-10-02T12:00:00Z"), now, utcPt, pt)).toBe("em 2 de outubro de 2025");
+    expect(lastTalkedText({ lastUsedAt: ago(3), lastClient: "claude-ai" }, now, utcPt, pt)).toBe(
+      "Falou com o sintr pela última vez há 3 minutos, pelo Claude.",
+    );
   });
 
   it("names the client the way a person knows it", () => {
@@ -132,8 +163,8 @@ describe("whether a key is alive", () => {
     expect(friendlyClient("gemini-cli-mcp-client")).toBe("Gemini");
     expect(friendlyClient("Hermes Agent")).toBe("Hermes");
     expect(friendlyClient("my-own-client")).toBe("my-own-client");
-    expect(lastTalkedText({ lastUsedAt: null, lastClient: null }, now, "UTC")).toBe("Not used yet.");
-    expect(lastTalkedText({ lastUsedAt: ago(3), lastClient: "claude-ai" }, now, "UTC")).toBe(
+    expect(lastTalkedText({ lastUsedAt: null, lastClient: null }, now, utc, en)).toBe("Not used yet.");
+    expect(lastTalkedText({ lastUsedAt: ago(3), lastClient: "claude-ai" }, now, utc, en)).toBe(
       "Last talked to sintr 3 minutes ago, from Claude.",
     );
   });

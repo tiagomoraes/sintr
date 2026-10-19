@@ -9,6 +9,7 @@ import {
   type UserScope,
 } from "@sintr/core";
 import { revalidatePath } from "next/cache";
+import { getMessages } from "@/lib/server/language";
 import { requireScope } from "@/lib/server/runtime";
 
 export interface MakeKeyState {
@@ -17,15 +18,16 @@ export interface MakeKeyState {
   problem: string | null;
 }
 
-const DEFAULT_NAME = "My assistant";
-
-/** "My assistant", then "My assistant 2", so keys made without a name stay tellable apart. */
-async function defaultName(scope: UserScope): Promise<string> {
+/**
+ * "My assistant", then "My assistant 2", so keys made without a name stay
+ * tellable apart. Written in the page's language, then kept as the key's name.
+ */
+async function defaultName(scope: UserScope, base: string): Promise<string> {
   const taken = new Set(
     (await scope.apiTokens.list()).filter((key) => !key.revokedAt).map((key) => key.name),
   );
   for (let n = 1; ; n += 1) {
-    const name = n === 1 ? DEFAULT_NAME : `${DEFAULT_NAME} ${n}`;
+    const name = n === 1 ? base : `${base} ${n}`;
     if (!taken.has(name)) return name;
   }
 }
@@ -38,10 +40,13 @@ async function defaultName(scope: UserScope): Promise<string> {
  */
 export async function makeKey(_state: MakeKeyState, form: FormData): Promise<MakeKeyState> {
   const { scope } = await requireScope();
+  const t = await getMessages();
   const rawName = form.get("name");
-  const name = (typeof rawName === "string" ? rawName.trim() : "").slice(0, 80) || (await defaultName(scope));
+  const name =
+    (typeof rawName === "string" ? rawName.trim() : "").slice(0, 80) ||
+    (await defaultName(scope, t.connect.defaultName));
   const access = ApiTokenAccess.safeParse(form.get("access") ?? "read_write");
-  if (!access.success) return { key: null, problem: "Choose what your assistant may do." };
+  if (!access.success) return { key: null, problem: t.connect.problems.access };
   try {
     const made = await scope.transaction(async (tx) => {
       const created = await tx.apiTokens.create({
@@ -61,10 +66,7 @@ export async function makeKey(_state: MakeKeyState, form: FormData): Promise<Mak
     return { key: { id: made.apiToken.id, token: made.token, name: made.apiToken.name }, problem: null };
   } catch (error) {
     if (error instanceof InvalidStateError) {
-      return {
-        key: null,
-        problem: `You already have ${MAX_ACTIVE_API_TOKENS} keys. Disconnect one you no longer use, then make a new one.`,
-      };
+      return { key: null, problem: t.connect.problems.tooMany(MAX_ACTIVE_API_TOKENS) };
     }
     throw error;
   }

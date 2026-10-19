@@ -2,6 +2,7 @@
 
 import { linkStyles } from "@sintr/ui";
 import { useState } from "react";
+import { useMessages } from "@/components/language";
 import { clientGuides, type ClientGuide, type ClientId, type Step } from "@/lib/connect";
 import { Snippet } from "./copy-button";
 
@@ -25,7 +26,9 @@ function Steps({ steps, start = 1 }: { steps: readonly Step[]; start?: number })
                 </a>
               </p>
             ) : null}
-            {step.snippet ? <Snippet text={step.snippet.text} label={step.snippet.label} /> : null}
+            {step.snippet ? (
+              <Snippet text={step.snippet.text} label={step.snippet.label} caption={step.snippet.caption} />
+            ) : null}
           </div>
         </li>
       ))}
@@ -42,21 +45,20 @@ function Guide({
   reachableHere: boolean;
   appUrl: string;
 }) {
+  const S = useMessages().connect.setup;
   const blocked = guide.fromTheirServers && reachableHere;
   return (
     <div>
       <p className="max-w-[36em] text-ink-2">{guide.what}</p>
       {blocked ? (
         <p className="mt-4 max-w-[36em] rounded-file border border-rule bg-wash px-5 py-4 text-[0.9375rem] text-ink-2">
-          {guide.name} reaches sintr from its own servers, and this sintr is at {appUrl}, which only this
-          computer or network can reach. It needs a public https address first (the self-host guide explains
-          how).
-          {guide.another ? " The way below, from a file, works from this computer now." : ""}
+          {S.blocked(guide.name, appUrl)}
+          {guide.another ? ` ${S.fromFile}` : ""}
         </p>
       ) : null}
       <Steps steps={guide.steps} />
       <p className="mt-6 max-w-[36em] text-[0.9375rem] text-ink-2">
-        <span className="font-medium text-ink">To check it worked: </span>
+        <span className="font-medium text-ink">{S.check}</span>
         {guide.check}
       </p>
       {guide.notes.length ? (
@@ -95,13 +97,14 @@ export function ClientGuides({
   keyText: string;
   reachableHere: boolean;
 }) {
-  const guides = clientGuides({ appUrl, key: keyText });
+  const t = useMessages();
+  const guides = clientGuides({ appUrl, key: keyText }, t);
   const [chosen, setChosen] = useState<ClientId>("claude");
   const guide = guides.find((g) => g.id === chosen) ?? guides[0]!;
   return (
     <div>
       <fieldset className="min-w-0 border-0 p-0">
-        <legend className="p-0 text-label font-medium text-ink">Your assistant</legend>
+        <legend className="p-0 text-label font-medium text-ink">{t.connect.setup.choose}</legend>
         <div className="mt-3 inline-flex max-w-full flex-wrap gap-1 rounded-[26px] border border-rule bg-paper p-1">
           {guides.map((option) => (
             <label key={option.id} className="relative">
