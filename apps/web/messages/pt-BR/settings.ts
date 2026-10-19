@@ -126,6 +126,12 @@ export const settings = {
     save: "Salvar",
     saved: "Salvo.",
   },
+  unsaved: {
+    timezone: "no fuso horário",
+    retention: "no prazo para guardar as conversas",
+    assistant: "no assistente",
+    language: "no idioma",
+  },
   problems: {
     provider: "Escolha um provedor.",
     model: "Escreva o nome do modelo como o seu provedor escreve.",

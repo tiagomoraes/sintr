@@ -1,4 +1,5 @@
 import { Button, FieldHint, Select } from "@sintr/ui";
+import { UnsavedForm } from "@/components/unsaved";
 import { languageName } from "@/lib/format";
 import { currentLanguage } from "@/lib/server/language";
 import { LANGUAGES, messagesFor } from "@/messages";
@@ -6,17 +7,18 @@ import { LANGUAGES, messagesFor } from "@/messages";
 /**
  * The language sintr speaks to the person, said as a sentence with who
  * decided it, and the choice to change it or give it back (DECISIONS 98).
- * A plain form: it works without JavaScript.
+ * A plain form: it works without JavaScript; with it, a choice made and
+ * not saved is asked about before the person leaves (DECISIONS 113).
  */
 export async function LanguageSection() {
   const language = await currentLanguage();
-  const t = messagesFor(language.code).language;
+  const { language: t, settings } = messagesFor(language.code);
   const name = languageName(language.code, language.code);
   return (
     <>
       <p className="mt-3 text-ink-2">{t.summary[language.source](name)}</p>
       <p className="mt-3 text-[0.9375rem] text-ink-3">{t.body}</p>
-      <form method="post" action="/api/language" className="mt-8">
+      <UnsavedForm part={settings.unsaved.language} method="post" action="/api/language" className="mt-8">
         <input type="hidden" name="next" value="/settings" />
         <label htmlFor="language" className="block text-label font-medium text-ink">
           {t.label}
@@ -38,7 +40,7 @@ export async function LanguageSection() {
         <Button type="submit" variant="outline" className="mt-6">
           {t.save}
         </Button>
-      </form>
+      </UnsavedForm>
     </>
   );
 }

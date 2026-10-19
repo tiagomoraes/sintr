@@ -124,7 +124,8 @@ export async function AssistantSection({
         {voiceLine}
         {memoryLine}
         {state.house ? (
-          <form action={back} className="mt-5 flex flex-wrap items-center gap-x-5 gap-y-2">
+          // It comes back to Settings at another address, so what is unsaved elsewhere on the page is asked about.
+          <form action={back} data-leaves className="mt-5 flex flex-wrap items-center gap-x-5 gap-y-2">
             <Button type="submit" variant="outline" size="sm">
               {S.back}
             </Button>

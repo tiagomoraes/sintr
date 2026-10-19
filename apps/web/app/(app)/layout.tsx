@@ -9,6 +9,7 @@ import { PhoneMenu, ShellNav } from "@/components/shell-nav";
 import { SignOutButton } from "@/components/sign-out-button";
 import { SiteHeader } from "@/components/site-header";
 import { SupportLines } from "@/components/support-lines";
+import { UnsavedGuard } from "@/components/unsaved";
 import { formatMoment } from "@/lib/format";
 import { noticeText } from "@/lib/sharing";
 import { assistantState } from "@/lib/server/assistant";
@@ -33,7 +34,9 @@ const NOTICE_LINK =
  * depends on the page (the footer, the width, which notice repeats the
  * page) is chosen on the client from the current path. The assistant lives
  * here too, so its conversation and its pool of light go with the person
- * from page to page.
+ * from page to page. The guard against leaving with something unsaved
+ * lives here too, so it asks before the navigation's links as well as the
+ * page's own.
  */
 export default async function ShellLayout({ children }: { children: ReactNode }) {
   const { user, scope } = await requireScope();
@@ -68,81 +71,83 @@ export default async function ShellLayout({ children }: { children: ReactNode })
   };
   return (
     <ShellLight time={timeOfDay(hourIn(profile.timezone))}>
-      <AssistantProvider setup={setup}>
-        <SiteHeader home="/home" sticky>
-          <span className="hidden text-caption text-ink-3 min-[900px]:inline">{user.email}</span>
-          <span className="hidden min-[900px]:inline-flex">
-            <SignOutButton />
-          </span>
-          <span className="inline-flex min-[900px]:hidden">
-            <AssistantSpot place="header" />
-          </span>
-          <PhoneMenu
-            {...nav}
-            footer={
-              <div className="flex flex-wrap items-center justify-between gap-3 border-t border-rule pt-5">
-                <span className="min-w-0 truncate text-caption text-ink-3">{user.email}</span>
-                <SignOutButton />
-              </div>
-            }
-          />
-        </SiteHeader>
-        <div className="wrap grid grid-cols-12 gap-x-6 gap-y-8 pb-24 pt-2 min-[900px]:pt-12">
-          <aside className="hidden min-[900px]:col-span-3 min-[900px]:block">
-            <div className="min-[900px]:sticky min-[900px]:top-7">
-              <ShellNav {...nav} />
-              <div className="mt-12 empty:hidden">
-                <AssistantSpot place="rail" />
-              </div>
-            </div>
-          </aside>
-          <ShellMain>
-            {sharingNotice ? (
-              <ExceptOn paths={["/sharing"]}>
-                <p className={NOTICE}>
-                  <span aria-hidden="true" className="size-[7px] rounded-full bg-ink" />
-                  {noticeText(sharingNotice, t)}
-                  <Link href="/sharing" className={NOTICE_LINK}>
-                    {t.shell.notice.openSharing}
-                  </Link>
-                </p>
-              </ExceptOn>
-            ) : null}
-            {notice ? (
-              <ExceptOn paths={["/reports", "/practice"]}>
-                <p className={NOTICE}>
-                  <span
-                    aria-hidden="true"
-                    className="size-[7px] rounded-full bg-draft shadow-[0_0_0_3px_#fbe6da]"
-                  />
-                  {notice.sessionAt
-                    ? t.shell.notice.reportReady(
-                        formatMoment(notice.sessionAt, {
-                          language: language.code,
-                          timezone: profile.timezone,
-                        }),
-                      )
-                    : t.shell.notice.weeklyReady}
-                  <Link href={`/reports/${notice.id}`} className={NOTICE_LINK}>
-                    {t.shell.notice.readIt}
-                  </Link>
-                </p>
-              </ExceptOn>
-            ) : null}
-            {children}
-          </ShellMain>
-        </div>
-        <footer className="border-t border-rule">
-          <div className="wrap py-14">
-            <ShellFooter
-              person={<SupportLines />}
-              practice={<p className="max-w-[44em] text-[0.9375rem] text-ink-3">{t.shell.practiceNote}</p>}
+      <UnsavedGuard>
+        <AssistantProvider setup={setup}>
+          <SiteHeader home="/home" sticky>
+            <span className="hidden text-caption text-ink-3 min-[900px]:inline">{user.email}</span>
+            <span className="hidden min-[900px]:inline-flex">
+              <SignOutButton />
+            </span>
+            <span className="inline-flex min-[900px]:hidden">
+              <AssistantSpot place="header" />
+            </span>
+            <PhoneMenu
+              {...nav}
+              footer={
+                <div className="flex flex-wrap items-center justify-between gap-3 border-t border-rule pt-5">
+                  <span className="min-w-0 truncate text-caption text-ink-3">{user.email}</span>
+                  <SignOutButton />
+                </div>
+              }
             />
-            <LanguageOffers className="mt-10" />
+          </SiteHeader>
+          <div className="wrap grid grid-cols-12 gap-x-6 gap-y-8 pb-24 pt-2 min-[900px]:pt-12">
+            <aside className="hidden min-[900px]:col-span-3 min-[900px]:block">
+              <div className="min-[900px]:sticky min-[900px]:top-7">
+                <ShellNav {...nav} />
+                <div className="mt-12 empty:hidden">
+                  <AssistantSpot place="rail" />
+                </div>
+              </div>
+            </aside>
+            <ShellMain>
+              {sharingNotice ? (
+                <ExceptOn paths={["/sharing"]}>
+                  <p className={NOTICE}>
+                    <span aria-hidden="true" className="size-[7px] rounded-full bg-ink" />
+                    {noticeText(sharingNotice, t)}
+                    <Link href="/sharing" className={NOTICE_LINK}>
+                      {t.shell.notice.openSharing}
+                    </Link>
+                  </p>
+                </ExceptOn>
+              ) : null}
+              {notice ? (
+                <ExceptOn paths={["/reports", "/practice"]}>
+                  <p className={NOTICE}>
+                    <span
+                      aria-hidden="true"
+                      className="size-[7px] rounded-full bg-draft shadow-[0_0_0_3px_#fbe6da]"
+                    />
+                    {notice.sessionAt
+                      ? t.shell.notice.reportReady(
+                          formatMoment(notice.sessionAt, {
+                            language: language.code,
+                            timezone: profile.timezone,
+                          }),
+                        )
+                      : t.shell.notice.weeklyReady}
+                    <Link href={`/reports/${notice.id}`} className={NOTICE_LINK}>
+                      {t.shell.notice.readIt}
+                    </Link>
+                  </p>
+                </ExceptOn>
+              ) : null}
+              {children}
+            </ShellMain>
           </div>
-        </footer>
-        <AssistantCorner />
-      </AssistantProvider>
+          <footer className="border-t border-rule">
+            <div className="wrap py-14">
+              <ShellFooter
+                person={<SupportLines />}
+                practice={<p className="max-w-[44em] text-[0.9375rem] text-ink-3">{t.shell.practiceNote}</p>}
+              />
+              <LanguageOffers className="mt-10" />
+            </div>
+          </footer>
+          <AssistantCorner />
+        </AssistantProvider>
+      </UnsavedGuard>
     </ShellLight>
   );
 }

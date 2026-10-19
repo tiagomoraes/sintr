@@ -44,6 +44,11 @@ export function weekday(day: number, language: string): string {
   );
 }
 
+/** "the time zone and the assistant", "no fuso horário e no assistente": a list as the page's language joins it. */
+export function formatList(items: readonly string[], language: string): string {
+  return new Intl.ListFormat(intlOf(language), { type: "conjunction" }).format(items);
+}
+
 /** A language's name as the page's language says it in a sentence: "Portuguese", "português". */
 export function languageName(code: string, language: string): string {
   const base = code.split(/[-_]/u)[0] ?? code;
