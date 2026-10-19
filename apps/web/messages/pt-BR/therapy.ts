@@ -49,10 +49,6 @@ export const therapy = {
     time: "Horário",
     zone: "Seu fuso horário",
     zoneHint: "O dia e o horário das suas sessões seguem esse fuso.",
-    moved: "Uma sessão mudou de data?",
-    movedHint:
-      "Informe a nova data e o horário. Ela ocupa o lugar da sessão regular mais próxima, só dessa vez, e o relatório é preparado para ela.",
-    movedBack: "A sessão voltou ao dia de sempre",
   },
   therapist: {
     title: "Seu terapeuta",
@@ -125,7 +121,6 @@ export const therapy = {
     sessionTime: "Escreva o horário em horas e minutos, como 18:00.",
     dayAndTime: "Informe o dia e o horário das sessões, ou nenhum dos dois.",
     lead: "Escolha quando preparar o relatório.",
-    moved: "Informe a data e o horário dessa sessão.",
     therapistEmail: "Confira o endereço: um e-mail só, como nome@exemplo.com.",
     delivery: "Escolha o que acontece com o relatório.",
     sendNeedsEmail: "Para enviar o relatório, o sintr precisa do e-mail do seu terapeuta.",

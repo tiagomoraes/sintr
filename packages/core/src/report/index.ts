@@ -79,7 +79,6 @@ export {
   planReportNow,
   planScheduledReport,
   preparationTime,
-  scheduledSessions,
   sessionPeriod,
   upcomingSession,
   weekPeriod,

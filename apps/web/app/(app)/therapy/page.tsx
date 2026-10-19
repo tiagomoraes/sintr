@@ -5,7 +5,6 @@ import { TherapyForm } from "@/components/therapy/therapy-form";
 import { formatMoment, languageName } from "@/lib/format";
 import { requireScope, runtime } from "@/lib/server/runtime";
 import { isLead } from "@/lib/therapy";
-import { toLocalInput } from "@/lib/time";
 import { currentLanguage, getMessages } from "@/lib/server/language";
 import { saveTherapy } from "./actions";
 
@@ -29,8 +28,6 @@ export default async function TherapyPage() {
   const session = upcomingSession(settings, profile.timezone, new Date());
   const prepared = session ? preparationTime(settings, session) : null;
   const timezones = TIMEZONES.includes(profile.timezone) ? TIMEZONES : [profile.timezone, ...TIMEZONES];
-  const upcomingMoved =
-    settings.nextSessionAt && settings.nextSessionAt > new Date() ? settings.nextSessionAt : null;
   const next =
     session && prepared
       ? t.therapy.next(formatMoment(prepared, locale), formatMoment(session, locale))
@@ -83,7 +80,6 @@ export default async function TherapyPage() {
             sessionDay: settings.sessionDay,
             sessionTime: settings.sessionTime ?? "",
             reportLeadMinutes: settings.reportLeadMinutes,
-            nextSessionAt: upcomingMoved ? toLocalInput(upcomingMoved, profile.timezone) : "",
             deliveryChannel: settings.deliveryChannel,
             reportNoticeEmail: settings.reportNoticeEmail,
           }}

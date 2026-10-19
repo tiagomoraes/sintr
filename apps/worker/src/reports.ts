@@ -27,7 +27,7 @@ export async function prepareDueReports(
   const { log } = runtime;
   let prepared = 0;
   let failed = 0;
-  for (const person of await runtime.reportSchedules(now)) {
+  for (const person of await runtime.reportSchedules()) {
     try {
       const scope = await runtime.repositories.forUser(person.userId);
       const plan = planScheduledReport({

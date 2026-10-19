@@ -5,7 +5,6 @@ import {
   planReportNow,
   planScheduledReport,
   preparationTime,
-  scheduledSessions,
   upcomingSession,
   weekPeriod,
   type KnownReport,
@@ -24,7 +23,6 @@ const TZ = "America/Recife"; // UTC-3 all year, the pack's fixture zone
 const MONDAY_18: SessionSchedule = {
   sessionDay: 1,
   sessionTime: "18:00",
-  nextSessionAt: null,
   reportLeadMinutes: 60,
 };
 
@@ -61,30 +59,6 @@ describe("the session a report is for", () => {
     expect(upcomingSession(ny, "America/New_York", new Date("2026-10-20T12:00:00Z"))).toEqual(
       new Date("2026-10-26T22:00:00Z"),
     );
-  });
-
-  it("takes a one-off date in place of the weekly session nearest to it (a rescheduled session)", () => {
-    const moved = { ...MONDAY_18, nextSessionAt: at(2026, 10, 22, 19, 30) };
-    expect(upcomingSession(moved, TZ, at(2026, 10, 18, 9))).toEqual(at(2026, 10, 22, 19, 30));
-    expect(scheduledSessions(moved, TZ, at(2026, 10, 12), at(2026, 11, 3))).toEqual([
-      at(2026, 10, 12, 18),
-      at(2026, 10, 22, 19, 30),
-      at(2026, 10, 26, 18),
-      at(2026, 11, 2, 18),
-    ]);
-    // After the one-off date the weekly schedule resumes.
-    expect(upcomingSession(moved, TZ, at(2026, 10, 22, 20))).toEqual(at(2026, 10, 26, 18));
-  });
-
-  it("is a one-off date alone when there is no weekly schedule", () => {
-    const once = {
-      sessionDay: null,
-      sessionTime: null,
-      nextSessionAt: at(2026, 10, 21, 10),
-      reportLeadMinutes: 60,
-    };
-    expect(upcomingSession(once, TZ, at(2026, 10, 19))).toEqual(at(2026, 10, 21, 10));
-    expect(upcomingSession(once, TZ, at(2026, 10, 21, 11))).toBeNull();
   });
 
   it("does not exist without a day and a time", () => {
@@ -149,7 +123,7 @@ describe("the period a report covers", () => {
       end: at(2026, 10, 15, 14),
       session: null,
     });
-    const none = { sessionDay: null, sessionTime: null, nextSessionAt: null, reportLeadMinutes: 60 };
+    const none = { sessionDay: null, sessionTime: null, reportLeadMinutes: 60 };
     expect(planReportNow({ schedule: none, timeZone: TZ, reports: [], now: at(2026, 10, 15, 14) })).toEqual({
       action: "create",
       period: week,
@@ -249,22 +223,6 @@ describe("the scheduler's decision", () => {
     });
   });
 
-  it("follows a one-off date set before the preparation: nothing is prepared for the weekly time", () => {
-    const moved = { ...MONDAY_18, nextSessionAt: at(2026, 10, 22, 19, 30) };
-    expect(
-      planScheduledReport({ schedule: moved, timeZone: TZ, reports: [], now: at(2026, 10, 19, 17) }),
-    ).toEqual({
-      action: "wait",
-      until: at(2026, 10, 22, 18, 30),
-    });
-    expect(
-      planScheduledReport({ schedule: moved, timeZone: TZ, reports: [], now: at(2026, 10, 22, 18, 30) }),
-    ).toMatchObject({
-      action: "create",
-      period: { end: at(2026, 10, 22, 18, 30), session: at(2026, 10, 22, 19, 30) },
-    });
-  });
-
   it("starts a new report after a session that happened, even if its draft was never approved", () => {
     const old = report({
       periodStart: at(2026, 10, 12, 17),
@@ -279,7 +237,7 @@ describe("the scheduler's decision", () => {
 });
 
 describe("prepare it now", () => {
-  const none = { sessionDay: null, sessionTime: null, nextSessionAt: null, reportLeadMinutes: 60 };
+  const none = { sessionDay: null, sessionTime: null, reportLeadMinutes: 60 };
 
   it("opens this week's report, and preparing it again takes it up to now, never past Sunday", () => {
     const week = report({ id: "w1", periodStart: at(2026, 10, 12), periodEnd: at(2026, 10, 14, 9) });

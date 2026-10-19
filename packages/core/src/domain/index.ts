@@ -81,8 +81,6 @@ export const TherapySettingsPatch = z
       .nullable(),
     reportLeadMinutes: z.number().int().min(0).max(10_080),
     deliveryChannel: DeliveryChannel,
-    /** A one-off date for the next session, when it moved; null clears it. */
-    nextSessionAt: z.coerce.date().nullable(),
     reportNoticeEmail: z.boolean(),
   })
   .partial();
@@ -96,7 +94,6 @@ export interface TherapySettings {
   reportLeadMinutes: number;
   requireApproval: true;
   deliveryChannel: z.infer<typeof DeliveryChannel>;
-  nextSessionAt: Date | null;
   reportNoticeEmail: boolean;
 }
 

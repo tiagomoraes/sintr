@@ -60,8 +60,9 @@ export const therapySettings = pgTable(
     requireApproval: boolean("require_approval").notNull().default(true),
     deliveryChannel: deliveryChannel("delivery_channel").notNull().default("download"),
     /**
-     * A one-off date for the next session, when it moved: it replaces the
-     * weekly session closest to it, and the weekly schedule resumes after it.
+     * Unused since F8 (DECISIONS 111): it held a one-off date for a session
+     * that moved, which Therapy no longer asks. Migrations are additive, so
+     * the column stays; 0008 emptied it and nothing reads or writes it.
      */
     nextSessionAt: timestamp("next_session_at", { withTimezone: true }),
     /** Email the person (at a verified address) when a report is ready. Opt-in. */

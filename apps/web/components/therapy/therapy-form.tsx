@@ -18,7 +18,6 @@ export interface TherapyDefaults {
   sessionTime: string;
   reportLeadMinutes: number;
   /** The one-off session as a datetime-local value in the person's zone, or "". */
-  nextSessionAt: string;
   deliveryChannel: "email" | "download";
   reportNoticeEmail: boolean;
 }
@@ -131,7 +130,7 @@ export function TherapyForm({
         id="sessions"
         title={T.sessions.title}
         summary={summaries.sessions}
-        open={has("sessionDay", "sessionTime", "timezone", "nextSessionAt")}
+        open={has("sessionDay", "sessionTime", "timezone")}
       >
         <fieldset className="min-w-0 border-0 p-0">
           <legend className="p-0 text-label font-medium text-ink">{T.sessions.day}</legend>
@@ -190,26 +189,6 @@ export function TherapyForm({
             ))}
           </Select>
         </Field>
-        <Field
-          id="therapy-moved"
-          label={T.sessions.moved}
-          hint={T.sessions.movedHint}
-          problem={p.nextSessionAt}
-        >
-          <Input
-            id="therapy-moved"
-            name="nextSessionAt"
-            type="datetime-local"
-            defaultValue={defaults.nextSessionAt}
-            className="mt-2 max-w-72"
-          />
-        </Field>
-        {defaults.nextSessionAt ? (
-          <label className="flex items-start gap-3 text-[0.9375rem] text-ink-2">
-            <Checkbox name="clearNextSession" />
-            {T.sessions.movedBack}
-          </label>
-        ) : null}
       </Part>
 
       <Part

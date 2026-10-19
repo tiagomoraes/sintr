@@ -11,7 +11,6 @@ export const DEMO_TZ = "America/Sao_Paulo";
 export const DEMO_SCHEDULE = {
   sessionDay: 1,
   sessionTime: "18:00",
-  nextSessionAt: null,
   reportLeadMinutes: 60,
 };
 

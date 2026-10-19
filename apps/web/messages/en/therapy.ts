@@ -21,10 +21,6 @@ export const therapy = {
     time: "Time",
     zone: "Your time zone",
     zoneHint: "The day and time of your sessions are read in it.",
-    moved: "Has a session moved?",
-    movedHint:
-      "Give its new date and time. It takes the place of the regular session nearest to it, just once, and the report is prepared for it instead.",
-    movedBack: "The session is back to its usual day",
   },
   therapist: {
     title: "Your therapist",
@@ -96,7 +92,6 @@ export const therapy = {
     sessionTime: "Write the time as hours and minutes, such as 18:00.",
     dayAndTime: "Give both the day and the time of your sessions, or neither.",
     lead: "Choose when to prepare the report.",
-    moved: "Give the date and the time of that session.",
     therapistEmail: "Check the address: one email, such as name@example.com.",
     delivery: "Choose what happens to the report.",
     sendNeedsEmail: "To send the report, sintr needs your therapist's email.",
