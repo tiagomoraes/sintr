@@ -16,14 +16,14 @@ import {
 } from "react";
 import { SupportLines } from "@/components/support-lines";
 import { useRoomScene } from "@/components/shell-light";
-import { MAX_MESSAGE_LENGTH, needsSetup, problemCopy } from "@/lib/chat";
-import { atTheLimit, limitReplyText, type MeterView } from "@/lib/plan";
+import { MAX_MESSAGE_LENGTH, needsSetup, problemText } from "@/lib/chat";
+import { atTheLimit, formatNext, limitReplyText, type MeterView } from "@/lib/plan";
 import type { ProposalView } from "@/lib/proposals";
 import { useHydrated } from "@/lib/use-hydrated";
 import { poolMood } from "@/lib/voice/state";
 import { canRecord, useVoice, type Heard } from "@/lib/voice/use-voice";
 import type { VoiceView } from "@/lib/voice/view";
-import { useMessages } from "@/components/language";
+import { useLanguage, useMessages } from "@/components/language";
 import { CrisisPanel } from "./crisis-panel";
 import { LimitNotice, PlanLine } from "./plan-notes";
 import { ProposalCard } from "./proposal-card";
@@ -349,7 +349,7 @@ export function Conversation({
                   const kept = part.data.kept;
                   return (
                     <div key={key} className="flex flex-col gap-3">
-                      <Bubble from="assistant">{limitReplyText(part.data)}</Bubble>
+                      <Bubble from="assistant">{limitReplyText(part.data, t)}</Bubble>
                       {kept ? (
                         <div className="py-2">
                           <ProposalCard
@@ -400,7 +400,7 @@ export function Conversation({
         ) : null}
         {error ? (
           <div className="rounded-file border border-rule bg-paper px-5 py-4" role="alert">
-            <p className="text-[0.9375rem] text-ink">{problemCopy(error.message, source)}</p>
+            <p className="text-[0.9375rem] text-ink">{problemText(error.message, t, source)}</p>
             <div className="mt-3 flex flex-wrap items-center gap-x-6 gap-y-2">
               {needsSetup(error.message) ? null : (
                 <Button
@@ -555,8 +555,9 @@ export function Conversation({
 /** One quiet line about speaking: why it is not offered, that the month's time is used, or, while speaking, who hears it. */
 function VoiceAvailability({ voice, speaking }: { voice: VoiceView; speaking: boolean }) {
   const t = useMessages();
+  const { intl } = useLanguage();
   if (voice.kind === "limit")
-    return <p className="mt-2 text-caption text-ink-3">{t.voice.limit(voice.next)}</p>;
+    return <p className="mt-2 text-caption text-ink-3">{t.voice.limit(formatNext(voice.next, intl))}</p>;
   if (voice.kind === "unavailable") {
     const line = t.voice.unavailable[voice.reason](voice.provider);
     return line ? <p className="mt-2 text-caption text-ink-3">{line}</p> : null;
