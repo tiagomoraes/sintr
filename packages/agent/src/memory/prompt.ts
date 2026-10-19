@@ -18,7 +18,7 @@ How to write each one
 - One short plain sentence, at most 200 characters, in the language the page is written in. Third person without their name, as a note: "Works night shifts at the hospital." or "Trabalha em plantões noturnos no hospital."
 - Never assume their gender: no "he", "she", "ele", "ela"; a note without a subject reads fine.
 - One event is a moment, never a habit or a trait: "Has a manager, Marcos." ("Tem um chefe, Marcos."), not "Has a manager who always questions deadlines." ("Tem um chefe que cobra prazos.")
-- Every memory rests on the person's own words: in quote, copy the exact span of the page it comes from, word for word, without changing a letter.
+- Every memory rests on the person's own words: in quote, copy the exact span of one line they wrote (what happened, a thought, a note...), word for word, without changing a letter. The feelings lines only list the feelings they named with their numbers: a feeling's name may be the quote, the line is not.
 - Nothing they did not write: no interpretation, no cause, no diagnosis or clinical label, no advice, no judgement, no feelings they did not name, no guess about what it means.
 - Never paraphrase a thought into something else; if a thought matters, the quote carries it.
 - Do not repeat what is already known (listed below), and do not keep the same thing twice.

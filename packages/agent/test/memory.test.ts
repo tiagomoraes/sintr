@@ -385,7 +385,7 @@ describe("reading the diary", () => {
     ]);
     expect(model.calls).toHaveLength(2);
     const told = JSON.stringify(toolResultsOf(model.calls[1]!));
-    expect(told).toContain("is not in the page word for word");
+    expect(told).toContain("is not words the person wrote on one line of the page");
     expect(told).toContain("states a cause");
     expect(told).toContain("clinical label");
     expect(JSON.stringify(model.calls[0]!.prompt)).toContain(

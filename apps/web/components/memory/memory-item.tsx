@@ -101,7 +101,7 @@ export function MemoryItem({
 }) {
   const M = useMessages().memory;
   return (
-    <li className="border-b border-rule py-6">
+    <li className="border-b border-rule py-6 last:border-b-0">
       <p className="max-w-[36em] font-serif text-[1.1875rem] leading-[1.45] text-ink">{text}</p>
       {quote ? (
         <p className="mt-2 max-w-[36em] font-serif text-[1rem] leading-[1.5] text-ink-2">

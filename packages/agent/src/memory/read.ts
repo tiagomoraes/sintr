@@ -132,35 +132,44 @@ export function mayRead(page: Page): boolean {
 
 const QUOTE_MARKS = /^[\s"'“”‘’«»„]+|[\s"'“”‘’«»„]+$/gu;
 
+/** Why a memory was refused, as a code the logs may carry. */
+type Refusal = "page" | "empty" | "quote" | "label" | "cause" | "risk";
+
 /** One proposed memory, checked: the person's span and the smoothed sentence, or why not. */
 function check(
   memory: RememberInput["memories"][number],
   pages: ReadonlyMap<string, Page>,
-): { ok: true; page: string; memory: ReadMemory } | { ok: false; reason: string } {
+): { ok: true; page: string; memory: ReadMemory } | { ok: false; code: Refusal; reason: string } {
   const page = pages.get(memory.page);
-  if (!page) return { ok: false, reason: `"${memory.page}" is not one of the pages given.` };
+  if (!page) return { ok: false, code: "page", reason: `"${memory.page}" is not one of the pages given.` };
   const text = smoothDashText(memory.text).replace(/\s+/gu, " ").trim();
-  if (!text) return { ok: false, reason: `${memory.page}: the sentence is empty.` };
+  if (!text) return { ok: false, code: "empty", reason: `${memory.page}: the sentence is empty.` };
   // Models often wrap a quote in quotation marks of their own; the person's words are inside them.
   const quote = findVerbatim(page.texts, memory.quote.replace(QUOTE_MARKS, ""));
   if (!quote) {
     return {
       ok: false,
-      reason: `${memory.page}: "${memory.quote}" is not in the page word for word. Copy the person's words exactly.`,
+      code: "quote",
+      reason: `${memory.page}: "${memory.quote}" is not words the person wrote on one line of the page. Copy a span of one line they wrote, exactly (a feelings line does not count).`,
     };
   }
   const { causes, labels } = interpretationsIn(text);
   if (labels.length > 0) {
     return {
       ok: false,
+      code: "label",
       reason: `${memory.page}: "${labels[0]}" is a clinical label. Describe, in their words.`,
     };
   }
   if (causes.length > 0) {
-    return { ok: false, reason: `${memory.page}: "${causes[0]}" states a cause. Say what happened instead.` };
+    return {
+      ok: false,
+      code: "cause",
+      reason: `${memory.page}: "${causes[0]}" states a cause. Say what happened instead.`,
+    };
   }
   if (screenForRisk(text).risk || screenForRisk(quote).risk) {
-    return { ok: false, reason: `${memory.page}: this is not something to keep in the memory.` };
+    return { ok: false, code: "risk", reason: `${memory.page}: this is not something to keep in the memory.` };
   }
   return {
     ok: true,
@@ -201,6 +210,8 @@ export async function readPages(input: {
           const result = check(memory, byRef);
           if (!result.ok) {
             reasons.push(result.reason);
+            // The code only: the reason quotes the person's words.
+            log.info("memory.refused", { code: result.code, attempt: attempts });
             continue;
           }
           const list = found.get(result.page)!;
