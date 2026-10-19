@@ -6,7 +6,7 @@ The connection uses MCP, the Model Context Protocol, an open standard for giving
 
 ## In short
 
-1. In sintr, open **Connect** and choose **Make a key**. The key is shown once; copy it.
+1. In sintr, open **Connect**, say which assistant the key is for and what it may do, then choose **Make the key**. The key is shown once; copy it.
 2. Choose your assistant on the same screen and follow its steps. Your address and key are already filled in.
 3. Ask your assistant something, for example "what did I write down in sintr this week?". The Connect screen then says **Connected** and when it last talked to sintr.
 
@@ -14,9 +14,11 @@ Each key belongs to one person and can be switched off at any time with **Discon
 
 ## The key
 
-- **What it may do.** By default a key may read and save. Under "Name it, or choose what it may do" you can make one that may only **save** (it records entries and check-ins and never reads your diary back) or only **read**. A key only sees the tools it may use.
+- **What it may do.** You choose it when you make the key; nothing is chosen for you. **Save only** records entries and check-ins and never reads your diary back; **Read and save** also reads your recent days, your entries and your therapy notes; **Read only** reads and saves nothing. A key only sees the tools it may use. To change it, make a new key and disconnect the old one.
+- **Its name.** "Which assistant is it for?" is the key's name in your list ("Claude on my phone"), so keys can be told apart; when it names one of the assistants, its steps open first.
 - **Shown once.** sintr stores only a SHA-256 hash of the key. It is shown when you make it and never again; if you lose it, make a new one and disconnect the old one.
-- **Alive or not.** Each key shows when its assistant last talked to sintr and which client it was ("Last talked to sintr 4 minutes ago, from Claude"). A key that was never used says so.
+- **Alive or not.** Each key shows when its assistant last talked to sintr and which client it was ("Last talked to sintr 4 minutes ago, from Claude"). A key that was never used says so, and one that has been quiet for over two months suggests switching it off.
+- **No expiry.** A key works until you disconnect it. That is on purpose: an assistant that stopped keeping your diary on a date nobody remembers would be the worse failure, so the list points out quiet keys instead.
 - **Recorded.** Making and disconnecting a key, and every entry or check-in an assistant saves, are written to the audit log with the key's id (never the key, never the words).
 - **At most twenty** keys work at once per person.
 

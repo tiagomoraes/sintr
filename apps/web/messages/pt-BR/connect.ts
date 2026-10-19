@@ -17,7 +17,7 @@ export const connect = {
     label: "Como funciona",
     make: {
       title: "Crie uma chave",
-      text: "Uma chave particular que deixa um assistente acessar o seu diário. Você pode desligá-la quando quiser.",
+      text: "Diga para qual assistente ela é e o que ele pode fazer. É uma chave particular, e você pode desligá-la quando quiser.",
     },
     give: {
       title: "Passe para o seu assistente",
@@ -34,31 +34,34 @@ export const connect = {
     first: "Conectar um assistente",
   },
   make: {
-    button: "Criar uma chave",
-    making: "Criando sua chave",
-    more: "Dar um nome, ou escolher o que o assistente pode fazer",
-    name: "Nome",
-    optional: "(opcional)",
-    placeholder: "Por exemplo, Claude no meu notebook",
-    hint: "Para você distinguir suas chaves depois.",
-    access: "O que o assistente pode fazer",
+    name: "Para qual assistente é esta chave?",
+    placeholder: "Por exemplo, Claude no meu celular",
+    hint: "Este é o nome dela na sua lista, para você distinguir suas chaves depois.",
+    access: "O que o assistente pode fazer?",
+    accessHint: "Para mudar isso depois, crie uma nova chave e desligue esta.",
+    button: "Criar a chave",
+    making: "Criando a chave",
+    once: "O sintr mostra a chave uma vez só, logo depois que você a cria.",
   },
   access: {
-    read_write: {
-      label: "Ler e salvar",
-      hint: "Ele pode rever os seus últimos dias e salvar novos registros e check-ins.",
-    },
     write: {
       label: "Só salvar",
-      hint: "Ele pode salvar novos registros e check-ins, e nunca lê o seu diário.",
+      does: "Ele salva os registros e check-ins quando você disser sim, e nunca lê o seu diário.",
+      when: "Escolha se você só quer ajuda para anotar as coisas.",
+    },
+    read_write: {
+      label: "Ler e salvar",
+      does: "Ele salva quando você disser sim, e também pode ler os seus últimos dias, os seus registros e as anotações da sua terapia.",
+      when: "Escolha se você quer que ele lembre do que você escreveu antes.",
     },
     read: {
       label: "Só ler",
-      hint: "Ele pode ler os seus últimos dias e as anotações da sua terapia, e não salva nada.",
+      does: "Ele pode ler os seus últimos dias, os seus registros e as anotações da sua terapia, e não salva nada.",
+      when: "Escolha para conversar sobre o que você escreveu e continuar escrevendo aqui por conta própria.",
     },
   },
-  defaultName: "Meu assistente",
   problems: {
+    name: "Escreva para qual assistente é a chave, para encontrá-la na sua lista depois.",
     access: "Escolha o que o seu assistente pode fazer.",
     tooMany: (max: number) =>
       `Você já tem ${max} chaves. Desconecte uma que não usa mais e depois crie uma nova.`,
@@ -71,7 +74,10 @@ export const connect = {
     connected: (last: string) => `Conectado. ${last}`,
     waiting:
       "Esperando o seu assistente. Quando terminar os passos abaixo, pergunte algo a ele; esta linha muda quando ele chegar ao sintr.",
+    waitingStill:
+      "Esperando o seu assistente. Quando terminar os passos abaixo, pergunte algo a ele e abra esta página de novo para ver se conectou.",
     hide: "Já guardei, esconder a chave",
+    done: "Pronto",
   },
   setup: {
     title: "Passe para o seu assistente",
@@ -153,10 +159,10 @@ export const connect = {
   },
   keys: {
     label: "Assistentes conectados",
-    meta: (access: string, made: string, prefix: string) =>
-      `${access}. Criada em ${made}. Começa com ${prefix}.`,
+    meta: (made: string, prefix: string) => `Criada em ${made}. Começa com ${prefix}.`,
+    quiet: "Sem uso há mais de dois meses. Se você não usa mais, desconecte.",
     after:
-      "Desconectar desliga a chave na hora. O que o assistente já salvou continua no seu diário, e você pode conectá-lo de novo com uma nova chave.",
+      "Desconectar desliga a chave na hora, e o que o assistente já salvou continua no seu diário. Para mudar o que um assistente pode fazer, dê a ele uma nova chave e desconecte a antiga.",
     disconnect: "Desconectar",
     disconnecting: "Desconectando",
     disconnectName: (name: string) => `Desconectar ${name}`,

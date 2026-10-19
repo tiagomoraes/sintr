@@ -1,14 +1,18 @@
 import { describe, expect, it } from "vitest";
 import {
+  ACCESS_ORDER,
   KEY_PLACEHOLDER,
+  QUIET_AFTER_DAYS,
   antigravityConfig,
   claudeCodeCommand,
   claudeDesktopConfig,
   clientGuides,
+  clientNamed,
   friendlyClient,
   geminiCommand,
   hermesCommand,
   hermesConfig,
+  isQuiet,
   keyedUrl,
   lastTalkedText,
   mcpUrl,
@@ -167,5 +171,47 @@ describe("whether a key is alive", () => {
     expect(lastTalkedText({ lastUsedAt: ago(3), lastClient: "claude-ai" }, now, utc, en)).toBe(
       "Last talked to sintr 3 minutes ago, from Claude.",
     );
+  });
+});
+
+describe("making a key", () => {
+  it("offers the three accesses, the one that reads nothing first, each said with what it does and when to choose it", () => {
+    expect(ACCESS_ORDER).toEqual(["write", "read_write", "read"]);
+    for (const t of [en, pt]) {
+      for (const access of ACCESS_ORDER) {
+        const words = t.connect.access[access];
+        expect(words.label).not.toBe("");
+        expect(words.does).toMatch(/\.$/u);
+        expect(words.when).toMatch(/\.$/u);
+      }
+    }
+    expect(en.connect.access.write.does).toBe(
+      "It saves the entries and check-ins you say yes to, and never reads your diary back.",
+    );
+  });
+
+  it("opens the steps of the assistant a key is named after", () => {
+    expect(clientNamed("Claude on my phone")).toBe("claude");
+    expect(clientNamed("claude code at work")).toBe("claude-code");
+    expect(clientNamed("Claude-Code")).toBe("claude-code");
+    expect(clientNamed("ChatGPT no trabalho")).toBe("chatgpt");
+    expect(clientNamed("Chat GPT")).toBe("chatgpt");
+    expect(clientNamed("Gemini CLI")).toBe("gemini");
+    expect(clientNamed("Antigravity")).toBe("gemini");
+    expect(clientNamed("hermes")).toBe("hermes");
+    expect(clientNamed("My assistant")).toBeNull();
+  });
+});
+
+describe("a key gone quiet", () => {
+  const now = new Date("2026-10-18T15:00:00Z");
+  const daysAgo = (days: number) => new Date(now.getTime() - days * 86_400_000);
+
+  it("is one its assistant has not called for over two months, or one never used for as long since it was made", () => {
+    expect(QUIET_AFTER_DAYS).toBe(60);
+    expect(isQuiet({ lastUsedAt: daysAgo(59), createdAt: daysAgo(400) }, now)).toBe(false);
+    expect(isQuiet({ lastUsedAt: daysAgo(61), createdAt: daysAgo(400) }, now)).toBe(true);
+    expect(isQuiet({ lastUsedAt: null, createdAt: daysAgo(3) }, now)).toBe(false);
+    expect(isQuiet({ lastUsedAt: null, createdAt: daysAgo(61) }, now)).toBe(true);
   });
 });

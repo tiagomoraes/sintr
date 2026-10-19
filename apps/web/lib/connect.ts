@@ -296,5 +296,33 @@ export function lastTalkedText(
   return t.connect.keys.lastTalked(sinceText(key.lastUsedAt, now, locale, t), friendlyClient(key.lastClient));
 }
 
-/** The accesses a key can be made with, in the order the form offers them; their words are `connect.access`. */
-export const ACCESS_ORDER = ["read_write", "write", "read"] as const satisfies readonly ApiTokenAccess[];
+/**
+ * The accesses a key can be made with, in the order the form offers them:
+ * the one that reads nothing first, then the one that also reads, then the
+ * one that saves nothing. None is chosen for the person. Their words are
+ * `connect.access`.
+ */
+export const ACCESS_ORDER = ["write", "read_write", "read"] as const satisfies readonly ApiTokenAccess[];
+
+/**
+ * The assistant a key's name speaks of ("Claude on my phone", "ChatGPT at
+ * work"), so its steps open first once the key is made; null when it names
+ * none of them.
+ */
+export function clientNamed(name: string): ClientId | null {
+  if (/claude[\s_-]?code/iu.test(name)) return "claude-code";
+  if (/claude/iu.test(name)) return "claude";
+  if (/chat\s?gpt|openai/iu.test(name)) return "chatgpt";
+  if (/gemini|antigravity/iu.test(name)) return "gemini";
+  if (/hermes/iu.test(name)) return "hermes";
+  return null;
+}
+
+/** Days without a word from its assistant (or since it was made) after which the list points a key out. */
+export const QUIET_AFTER_DAYS = 60;
+
+/** A key that has not talked to sintr for a long while, counted from when it was made if it never did. */
+export function isQuiet(key: { lastUsedAt: Date | null; createdAt: Date }, now: Date): boolean {
+  const since = key.lastUsedAt ?? key.createdAt;
+  return now.getTime() - since.getTime() > QUIET_AFTER_DAYS * 86_400_000;
+}

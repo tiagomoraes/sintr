@@ -291,3 +291,21 @@
     transform: translateY(48px);
   }
 }
+/*
+ * The steps for each assistant on Connect (F12): every assistant's steps are
+ * on the page, and the native radio checked above them decides which one
+ * shows, so choosing an assistant works without JavaScript too. A browser
+ * without `:has` hides none of them, rather than all.
+ */
+@supports selector(:has(*)) {
+  .sintr-guides [data-guide] {
+    display: none;
+  }
+  .sintr-guides:has(input[value="claude"]:checked) [data-guide="claude"],
+  .sintr-guides:has(input[value="chatgpt"]:checked) [data-guide="chatgpt"],
+  .sintr-guides:has(input[value="gemini"]:checked) [data-guide="gemini"],
+  .sintr-guides:has(input[value="claude-code"]:checked) [data-guide="claude-code"],
+  .sintr-guides:has(input[value="hermes"]:checked) [data-guide="hermes"] {
+    display: block;
+  }
+}
