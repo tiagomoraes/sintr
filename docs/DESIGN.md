@@ -489,6 +489,20 @@ The app keeps every token above and borrows the site's light, not a new style. T
 
 **The Thumb Rule.** On a phone the action of a screen sits where the thumb rests: Speak and Send at the bottom right of the box, a welcome step's Continue at the bottom, the menu's sheet coming in from the side.
 
+## The calendar (F11)
+
+Therapy's sessions as they fall, in the house's own terms (DECISIONS 118). Google Calendar's moves, none of its look: no colour, no cell borders, no event blocks.
+
+- **The rhythm in a sentence.** The section opens on a label ("Your sessions") over a Title Small serif sentence per rhythm ("Every week on Tuesday at 18:00."), the small ink "Add a session" pill on its right (under it on a phone).
+- **Coming up.** The next five sessions on hairline rows: the day in the serif (1.0625rem), the time on the right at 500 and tabular, a caption under it in Ink Three with the rhythm or what happened ("Moved from Tuesday 27 October at 18:00", "Cancelled"). The next session leads with a 7px ink dot and its caption in ink ("Next session. Every week"); a cancelled one is struck through in Ink Three. Beside the grid in a 16rem column from 1180px; above it, under the sentence, on anything narrower.
+- **The month.** Its name in the serif (Title Small), the 40px hairline circles with the disclosure's chevron for the months before and after, a quiet "Today" when away from it. The grid is a table of seven columns separated only by a hairline above each week; weekday names in caption Ink Three. The day number is 0.8125rem in Ink Two (Soft Ink outside the month), today in a 26px ink disc with paper digits, the chosen day on Wash. On a wide screen (cells 92px tall) each session is a pill under the number, 0.8125rem at 500: a Strong Hairline edge with ink digits, the next one filled ink, past ones Hairline and Ink Three, a cancelled one with no edge, struck through. On a phone (cells 56px) the day is the target and its sessions are its times at 0.6875rem, the next one in a small ink pill.
+- **The day.** A chosen day opens under the grid on a hairline: its name in the serif, its sessions as rows led by their time, and an outline pill to add one on it. On a phone it comes into view.
+- **The session's sheet.** A native modal dialog over the 18% ink veil: in the middle of a wide screen, 30rem, paper, the panel radius, a hairline and the Lift shadow, rising 14px over 0.6s on the expo-out ease; on a phone a sheet from the bottom with the bubble radius on top, a 36px grip, at most 88% of the screen, its actions stacked full width where the thumb is. Its title is the session in the serif ("Wednesday 28 October at 19:00") with its rhythm in a caption under it, then plain sentences (where it moved from, when its report is prepared), then Change (ink), Cancel this session (outline) and, for a moved or cancelled one, Put it back (outline). Its forms keep the house's fields: the date and time fields side by side, the repeats as a column of radio sentences (labels following the chosen day), the chosen weekdays as the welcome's day pills, and "Which sessions" as two radio sentences with a quiet line under each.
+- **Reduced motion** keeps the sheet and drops its rise; the scroll to a chosen day jumps instead of gliding.
+
+### Named Rules
+**The Explicit Session Rule.** Whatever changes a session says which sessions it changes, before and after: "Only this one" or "This one and the ones after it" in the form, and a sentence once kept. A moved session shows on its new day only and says where it came from; it never shows twice.
+
 ## Do's and Don'ts
 
 ### Do:
