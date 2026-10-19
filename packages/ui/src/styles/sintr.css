@@ -690,4 +690,37 @@
       rotate: 1turn;
     }
   }
+
+  /*
+   * The pool on its way between two places (F8): one square over the page,
+   * moved and scaled about its centre by the app (the Web Animations API,
+   * transform only), multiplied onto what it passes over, taking no pointer.
+   * Hidden whenever it is not travelling.
+   */
+  .sintr-flight {
+    position: fixed;
+    top: 0;
+    left: 0;
+    z-index: 50;
+    pointer-events: none;
+    mix-blend-mode: multiply;
+  }
+  .sintr-flight__part {
+    position: absolute;
+    inset: 0;
+  }
+  .sintr-flight__grow {
+    transform-origin: 50% 50%;
+  }
+
+  /*
+   * Idle: after a while without a touch, a key or a scroll (and never while
+   * the assistant listens, writes down or thinks), the app sets
+   * `data-idle` on the root and the light stops where it is, so no frame is
+   * drawn for it. The next touch carries it on from the same place.
+   */
+  :root[data-idle] .sintr-pool *,
+  :root[data-idle] .sintr-room * {
+    animation-play-state: paused !important;
+  }
 }

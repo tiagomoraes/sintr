@@ -82,4 +82,9 @@ export const welcome = {
     go: "Ir para o meu diário",
   },
   problem: "Não foi possível salvar agora. Tente de novo daqui a pouco.",
+  again: {
+    heading: "Aqui estão as boas-vindas de novo.",
+    body: "O que você me contou antes já vem preenchido. Mude o que quiser e pule o resto: pular mantém a sua resposta como está, e nada do que você escreveu é apagado.",
+    later: "Agora não, voltar para Ajustes",
+  },
 } satisfies Messages["welcome"];

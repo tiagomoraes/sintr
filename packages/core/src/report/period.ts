@@ -9,8 +9,9 @@
  * - The first report covers the 7 days before. After a long pause a period
  *   reaches back at most four weeks.
  * - Without a session, a calendar week (Monday to Sunday) is the period.
- * - A session that moved (a new weekly day or time, or a one-off date)
- *   moves the preparation with it.
+ * - A session that moved (a new weekly day or time) moves the preparation
+ *   with it. A single session on another day is not a setting: the person
+ *   prepares that week's report on the day, from Reports (DECISIONS 111).
  */
 import type { ReportStatus } from "../domain";
 import { addDays, dayStart, isoWeek, localDay, localParts, weekdayOf, zonedTime } from "./time";
@@ -26,8 +27,6 @@ export interface SessionSchedule {
   sessionDay: number | null;
   /** `HH:MM`, in the person's time zone. */
   sessionTime: string | null;
-  /** A one-off date for the next session, when it moved. */
-  nextSessionAt: Date | null;
   reportLeadMinutes: number;
 }
 
@@ -80,40 +79,9 @@ export function weeklySessions(schedule: SessionSchedule, timeZone: string, from
   return out;
 }
 
-/**
- * Every session in [from, to): the weekly ones, except the one a one-off
- * date replaces (the weekly session nearest to it, within half a week),
- * plus that one-off date.
- */
-export function scheduledSessions(schedule: SessionSchedule, timeZone: string, from: Date, to: Date): Date[] {
-  const override = schedule.nextSessionAt;
-  if (!override) return weeklySessions(schedule, timeZone, from, to);
-  // Look around the override as well, so the session it replaces is known
-  // even when it falls outside [from, to).
-  const around = weeklySessions(
-    schedule,
-    timeZone,
-    new Date(Math.min(from.getTime(), override.getTime()) - 4 * DAY),
-    new Date(Math.max(to.getTime(), override.getTime()) + 4 * DAY),
-  );
-  let replaced: Date | null = null;
-  for (const at of around) {
-    const distance = Math.abs(at.getTime() - override.getTime());
-    if (
-      distance <= 3.5 * DAY &&
-      (!replaced || distance < Math.abs(replaced.getTime() - override.getTime()))
-    ) {
-      replaced = at;
-    }
-  }
-  const sessions = around.filter((at) => at.getTime() !== replaced?.getTime());
-  sessions.push(override);
-  return sessions.filter((at) => at >= from && at < to).sort((a, b) => a.getTime() - b.getTime());
-}
-
 /** The first session that has not started yet, or null without a schedule. */
 export function upcomingSession(schedule: SessionSchedule, timeZone: string, now: Date): Date | null {
-  const later = scheduledSessions(
+  const later = weeklySessions(
     schedule,
     timeZone,
     new Date(now.getTime() + 1),
@@ -124,7 +92,7 @@ export function upcomingSession(schedule: SessionSchedule, timeZone: string, now
 
 /** Is `at` one of the sessions the schedule holds now? */
 export function inSchedule(schedule: SessionSchedule, timeZone: string, at: Date): boolean {
-  return scheduledSessions(
+  return weeklySessions(
     schedule,
     timeZone,
     new Date(at.getTime() - MINUTE),

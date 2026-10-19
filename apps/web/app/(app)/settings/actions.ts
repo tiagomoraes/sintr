@@ -81,7 +81,8 @@ export async function saveAssistant(_state: AssistantFormState, form: FormData):
       metadata: { provider: provider.data },
     });
   }
-  revalidatePath("/settings");
+  // The whole frame, not only this page: the assistant in its corner follows who answers, and how.
+  revalidatePath("/", "layout");
   return { saved: true, problems: {} };
 }
 

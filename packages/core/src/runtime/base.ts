@@ -26,7 +26,7 @@ export interface BaseRuntime {
   /** One delivery of the payment provider's webhook: the raw body and its signature header. */
   handlePaymentWebhook(payload: string, signature: string | null): Promise<WebhookResult>;
   /** Everyone with a therapy session to prepare a report for. Clear metadata only. */
-  reportSchedules(now?: Date): Promise<PersonSchedule[]>;
+  reportSchedules(): Promise<PersonSchedule[]>;
   purgeExpiredAuthRecords(): Promise<{ sessions: number; verificationTokens: number }>;
   /** Conversations past their owner's retention setting (agent_settings). */
   purgeExpiredConversations(): Promise<{ conversations: number }>;
@@ -80,7 +80,7 @@ export function openBaseRuntime(
         signature,
       );
     },
-    reportSchedules: (now) => reportSchedules(database.db, now),
+    reportSchedules: () => reportSchedules(database.db),
     purgeExpiredAuthRecords: () => purgeExpiredAuthRecords(database.db),
     purgeExpiredConversations: () => purgeExpiredConversations(database.db),
     purgeStaleInvites: (now) => purgeStaleInvites(database.db, now),

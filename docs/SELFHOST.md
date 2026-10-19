@@ -125,7 +125,7 @@ What email means for privacy: a report you send leaves sintr's encryption. Your 
 
 ## The weekly report
 
-Set your sessions in Therapy: the day and time, your time zone, and when to prepare the report (an hour before, by default). The worker checks every minute and prepares each report at that moment, covering exactly the days since the previous report ended. If a session moves for one week, give its date under "Has a session moved?"; if your sessions move for good, change the day. The preparation follows either way. You can also prepare a report by hand from Reports at any time.
+Set your sessions in Therapy: the day and time, your time zone, and when to prepare the report (an hour before, by default). The worker checks every minute and prepares each report at that moment, covering exactly the days since the previous report ended. If your sessions move for good, change the day and the preparation follows. If a single session falls on another day, prepare that week's report from Reports when you need it: you can prepare one by hand at any time.
 
 The report is written by your assistant (the provider in Settings), which receives the period's entries and check-ins to do it. Without an assistant, sintr prepares what it can on its own (your moments, notes and topics, in your words) and leaves the prose to you. You read it, change what you want, approve it, and only then can you send it.
 

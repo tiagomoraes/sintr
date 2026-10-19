@@ -1,6 +1,6 @@
 "use client";
 
-import { Button, FieldError, Input, Rise, RoomLight, Wordmark, cn, type RoomScene } from "@sintr/ui";
+import { Button, FieldError, Input, Rise, RoomLight, Select, Wordmark, cn, type RoomScene } from "@sintr/ui";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import {
@@ -119,17 +119,23 @@ function Actions({ children }: { children: ReactNode }) {
  * answer is saved as the person goes on; every question can be skipped,
  * and the light moves to a new place on the wall with each one. The steps
  * live in the address, so the phone's back gesture goes back a question.
+ *
+ * Run again from Settings (`again`), it opens on a sentence that says so,
+ * every answer already given is filled in, and every question has a Skip
+ * that keeps the answer as it is: nothing is erased by passing through.
  */
 export function WelcomeFlow({
   next,
   invite: arrivedWith,
   timezones,
   saved,
+  again = false,
 }: {
   next: string | null;
   invite: WelcomeInvite | null;
   timezones: string[];
   saved: { name: string; therapist: string; day: string; time: string; timezone: string };
+  again?: boolean;
 }) {
   const t = useMessages();
   const W = t.welcome;
@@ -211,12 +217,30 @@ export function WelcomeFlow({
     });
   }
 
+  /** Not now: back to where the person came from, Settings when it was run again. */
+  function later() {
+    startTransition(async () => {
+      await finishWelcome(again ? "/settings" : next, invite !== null);
+    });
+  }
+
+  /** Skipping a question run again keeps its answer as it is, and the summary says what is kept. */
+  function keep(current: Step, restore: () => void) {
+    restore();
+    go(after(current));
+  }
+
   const index = asked.indexOf(step);
   let content: ReactNode;
   switch (step) {
     case "start":
       content = (
-        <StepFrame index={null} of={asked.length} heading={W.start.heading} body={W.start.body}>
+        <StepFrame
+          index={null}
+          of={asked.length}
+          heading={again ? W.again.heading : W.start.heading}
+          body={again ? W.again.body : W.start.body}
+        >
           <Rise as="p" index={3} className="mt-5 max-w-[34em] text-[0.9688rem] text-ink-3">
             {W.start.promise}
           </Rise>
@@ -228,8 +252,8 @@ export function WelcomeFlow({
             >
               {W.start.begin}
             </Button>
-            <Button type="button" variant="quiet" size="inline" disabled={pending} onClick={finish}>
-              {W.start.later}
+            <Button type="button" variant="quiet" size="inline" disabled={pending} onClick={later}>
+              {again ? W.again.later : W.start.later}
             </Button>
           </Actions>
         </StepFrame>
@@ -264,7 +288,12 @@ export function WelcomeFlow({
               <Button type="submit" disabled={pending}>
                 {W.next}
               </Button>
-              <Button type="button" variant="quiet" size="inline" onClick={() => go(after("name"))}>
+              <Button
+                type="button"
+                variant="quiet"
+                size="inline"
+                onClick={() => (again ? keep("name", () => setName(saved.name)) : go(after("name")))}
+              >
                 {W.skip}
               </Button>
             </Actions>
@@ -356,17 +385,28 @@ export function WelcomeFlow({
               <Button type="submit" disabled={pending}>
                 {W.next}
               </Button>
-              <Button
-                type="button"
-                variant="quiet"
-                size="inline"
-                onClick={() => {
-                  setTherapist("");
-                  go(after("therapist"));
-                }}
-              >
-                {W.therapist.none}
-              </Button>
+              {again ? (
+                <Button
+                  type="button"
+                  variant="quiet"
+                  size="inline"
+                  onClick={() => keep("therapist", () => setTherapist(saved.therapist))}
+                >
+                  {W.skip}
+                </Button>
+              ) : (
+                <Button
+                  type="button"
+                  variant="quiet"
+                  size="inline"
+                  onClick={() => {
+                    setTherapist("");
+                    go(after("therapist"));
+                  }}
+                >
+                  {W.therapist.none}
+                </Button>
+              )}
             </Actions>
           </form>
         </StepFrame>
@@ -435,18 +475,18 @@ export function WelcomeFlow({
                     <label htmlFor="welcome-zone" className="sr-only">
                       {W.session.zoneLabel}
                     </label>
-                    <select
+                    <Select
                       id="welcome-zone"
                       value={zone}
                       onChange={(event) => setChosenZone(event.target.value)}
-                      className="block h-12 w-full max-w-md rounded-command border border-rule-strong bg-paper px-4 font-sans text-body text-ink hover:border-ink-soft focus-visible:border-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
+                      className="max-w-md"
                     >
                       {timezones.map((option) => (
                         <option key={option} value={option}>
                           {option.replaceAll("_", " ")}
                         </option>
                       ))}
-                    </select>
+                    </Select>
                   </div>
                 ) : null}
               </div>
@@ -468,6 +508,21 @@ export function WelcomeFlow({
               >
                 {W.session.varies}
               </Button>
+              {again ? (
+                <Button
+                  type="button"
+                  variant="quiet"
+                  size="inline"
+                  onClick={() =>
+                    keep("session", () => {
+                      setDay(saved.day);
+                      setTime(saved.time);
+                    })
+                  }
+                >
+                  {W.skip}
+                </Button>
+              ) : null}
             </Actions>
           </form>
         </StepFrame>

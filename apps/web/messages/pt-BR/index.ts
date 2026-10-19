@@ -1,4 +1,5 @@
 import type { Catalog } from "../types";
+import { assistant } from "./assistant";
 import { auth } from "./auth";
 import { checkin } from "./checkin";
 import { common } from "./common";
@@ -20,6 +21,7 @@ import { welcome } from "./welcome";
 
 /** Português do Brasil: every screen of the English catalog, in the house voice, "você". */
 export const catalog = {
+  assistant,
   auth,
   checkin,
   common,

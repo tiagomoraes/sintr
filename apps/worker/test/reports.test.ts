@@ -194,7 +194,7 @@ describe("preparing reports on schedule", () => {
     const frank = await person("frank", true);
     await frank.therapySettings.update({ sessionDay: 1, sessionTime: "21:00" });
     await frank.consents.record({ purpose: "health_data_processing", version: "2000-01-01", granted: true });
-    const scheduled = (await runtime.reportSchedules(new Date("2026-11-02T20:00:00Z"))).map((p) => p.userId);
+    const scheduled = (await runtime.reportSchedules()).map((p) => p.userId);
     expect(scheduled).not.toContain(erin.userId);
     expect(scheduled).not.toContain(frank.userId);
     expect(scheduled).toContain(alice.userId);

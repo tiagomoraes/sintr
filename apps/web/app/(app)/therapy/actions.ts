@@ -5,7 +5,6 @@ import { revalidatePath } from "next/cache";
 import { getMessages } from "@/lib/server/language";
 import { requireScope } from "@/lib/server/runtime";
 import { isLead } from "@/lib/therapy";
-import { fromLocalInput } from "@/lib/time";
 
 export interface TherapyFormState {
   saved: boolean;
@@ -53,13 +52,6 @@ export async function saveTherapy(_state: TherapyFormState, form: FormData): Pro
   const lead = Number(text(form, "reportLeadMinutes"));
   if (!isLead(lead)) problems.reportLeadMinutes = said.lead;
 
-  const movedValue = text(form, "nextSessionAt");
-  let nextSessionAt: Date | null = null;
-  if (movedValue && form.get("clearNextSession") !== "on") {
-    nextSessionAt = isTimeZone(timezone) ? fromLocalInput(movedValue, timezone) : null;
-    if (!nextSessionAt) problems.nextSessionAt = said.moved;
-  }
-
   const therapistName = text(form, "therapistName");
   const therapistEmail = text(form, "therapistEmail");
   if (therapistEmail && !isEmailAddress(therapistEmail)) {
@@ -80,7 +72,6 @@ export async function saveTherapy(_state: TherapyFormState, form: FormData): Pro
     sessionDay,
     sessionTime,
     reportLeadMinutes: lead,
-    nextSessionAt,
     deliveryChannel: delivery as "email" | "download",
     reportNoticeEmail: form.get("reportNoticeEmail") === "on",
   };

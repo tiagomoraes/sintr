@@ -1,3 +1,4 @@
+import { assistant } from "./assistant";
 import { auth } from "./auth";
 import { checkin } from "./checkin";
 import { common } from "./common";
@@ -23,6 +24,7 @@ import { welcome } from "./welcome";
  * that carries a value is a function of it.
  */
 export const catalog = {
+  assistant,
   auth,
   checkin,
   common,

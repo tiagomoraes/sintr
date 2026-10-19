@@ -33,7 +33,8 @@ export function SupportLines({ className, headingLevel = 2 }: { className?: stri
   const Heading = headingLevel === 3 ? "h3" : "h2";
   const id = useId();
   return (
-    <section aria-labelledby={id} className={cn("max-w-[44rem]", className)}>
+    // Laid out by its own width, so it reads the same in the footer and in the conversation beside a page.
+    <section aria-labelledby={id} className={cn("@container max-w-[44rem]", className)}>
       <Heading id={id} className="max-w-[24em] font-serif text-title-small font-normal">
         {crisis.heading}
       </Heading>
@@ -43,9 +44,9 @@ export function SupportLines({ className, headingLevel = 2 }: { className?: stri
           return (
             <li
               key={line.number}
-              className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-5 gap-y-1 border-b border-rule py-3.5 sm:grid-cols-[8rem_minmax(0,1fr)_auto]"
+              className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-5 gap-y-1 border-b border-rule py-3.5 @md:grid-cols-[8rem_minmax(0,1fr)_auto]"
             >
-              <span className="hidden text-caption text-ink-3 sm:block">{line.where}</span>
+              <span className="hidden text-caption text-ink-3 @md:block">{line.where}</span>
               <span className="font-medium leading-[1.4] text-ink">
                 {line.who}
                 <span className="block text-[0.875rem] font-normal text-ink-3">{line.how}</span>

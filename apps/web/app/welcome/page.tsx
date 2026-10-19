@@ -27,6 +27,7 @@ function inviteCode(path: string): string | null {
  * The welcome after signing up: a few questions, one a screen, each able
  * to wait. A practice's invite the person arrived with is part of it; a
  * professional answering a patient's invite goes straight to that invite.
+ * From Settings (`?again=1`) it runs again over the answers already given.
  */
 export default async function WelcomePage({
   searchParams,
@@ -34,7 +35,8 @@ export default async function WelcomePage({
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const { user, scope } = await requireScope();
-  const raw = (await searchParams).next;
+  const query = await searchParams;
+  const raw = query.next;
   const next = typeof raw === "string" ? safeNext(raw) : null;
   const code = next?.startsWith("/join/") ? inviteCode(next) : null;
   const [profile, therapy] = await Promise.all([scope.profile.get(), scope.therapySettings.get()]);
@@ -62,6 +64,7 @@ export default async function WelcomePage({
   return (
     <WelcomeFlow
       next={next}
+      again={query.again === "1" && invite === null}
       invite={invite}
       timezones={TIMEZONES.includes(profile.timezone) ? TIMEZONES : [profile.timezone, ...TIMEZONES]}
       saved={{

@@ -222,4 +222,27 @@ describe("migrations", () => {
     // English was everyone's default, so it says nothing of a choice: their reports follow their language.
     expect(byId.get(english)).toBeNull();
   });
+
+  it("empty the one-off session date Therapy no longer asks, and keep its column (0008)", async () => {
+    const root = fileURLToPath(new URL("..", import.meta.url));
+    const statement = readFileSync(join(root, "drizzle/0008_no_moved_session.sql"), "utf8")
+      .split("--> statement-breakpoint")
+      .map((part) => part.trim())
+      .find((part) => part.includes('UPDATE "therapy_settings"'));
+    expect(statement, "the statement that empties it").toBeDefined();
+    const moved = await createUser(db.db, "moved-session");
+    await db.db.insert(schema.therapySettings).values({
+      userId: moved,
+      sessionDay: 1,
+      sessionTime: "18:00",
+      nextSessionAt: new Date("2026-10-22T22:30:00Z"),
+    });
+    await db.db.execute(sql.raw(statement!));
+    const [row] = await db.db
+      .select({ day: schema.therapySettings.sessionDay, once: schema.therapySettings.nextSessionAt })
+      .from(schema.therapySettings)
+      .where(inArray(schema.therapySettings.userId, [moved]));
+    // The weekly schedule is the person's and stays; the one-off date is gone.
+    expect(row).toEqual({ day: 1, once: null });
+  });
 });

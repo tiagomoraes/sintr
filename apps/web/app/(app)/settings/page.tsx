@@ -44,6 +44,12 @@ export default async function SettingsPage({
   return (
     <>
       <PageHeading title={S.title} lede={S.lede} />
+      <p className="-mt-4 mb-14 max-w-[40rem] text-[0.9688rem] text-ink-3">
+        {S.welcomeAgain.body}{" "}
+        <Link href="/welcome?again=1" className={linkStyles}>
+          {S.welcomeAgain.link}
+        </Link>
+      </p>
       <section aria-labelledby="assistant-title" className="max-w-[40rem]">
         <h2 id="assistant-title" className="font-serif text-title-small font-normal text-ink">
           {S.assistant.title}

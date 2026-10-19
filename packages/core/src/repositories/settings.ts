@@ -86,7 +86,6 @@ export function therapySettingsRepository({ db, userId, cipher }: ScopeContext) 
       reportLeadMinutes: row.reportLeadMinutes,
       requireApproval: true,
       deliveryChannel: row.deliveryChannel,
-      nextSessionAt: row.nextSessionAt,
       reportNoticeEmail: row.reportNoticeEmail,
     };
   };
@@ -103,7 +102,6 @@ export function therapySettingsRepository({ db, userId, cipher }: ScopeContext) 
         reportLeadMinutes: 60,
         requireApproval: true,
         deliveryChannel: "download",
-        nextSessionAt: null,
         reportNoticeEmail: false,
       };
     },

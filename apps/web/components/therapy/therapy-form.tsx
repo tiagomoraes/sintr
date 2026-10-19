@@ -1,6 +1,6 @@
 "use client";
 
-import { Button, Checkbox, FieldError, FieldHint, Input, cn } from "@sintr/ui";
+import { Button, Checkbox, FieldError, FieldHint, Input, Select, cn } from "@sintr/ui";
 import { useActionState, useState, type ReactNode } from "react";
 import type { TherapyFormState } from "@/app/(app)/therapy/actions";
 import { LEADS, REPORT_LANGUAGE_OPTIONS } from "@/lib/therapy";
@@ -18,7 +18,6 @@ export interface TherapyDefaults {
   sessionTime: string;
   reportLeadMinutes: number;
   /** The one-off session as a datetime-local value in the person's zone, or "". */
-  nextSessionAt: string;
   deliveryChannel: "email" | "download";
   reportNoticeEmail: boolean;
 }
@@ -30,8 +29,7 @@ export interface TherapySummaries {
   report: string;
 }
 
-const select =
-  "mt-2 block h-12 w-full max-w-md rounded-command border border-rule-strong bg-paper px-4 font-sans text-body text-ink hover:border-ink-soft focus-visible:border-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink";
+const select = "mt-2 max-w-md";
 const segmentedOption =
   "pointer-events-none flex min-h-10 items-center rounded-pill px-4 text-[0.9375rem] font-medium text-ink-2 transition-colors duration-300 peer-hover:bg-wash peer-checked:bg-ink peer-checked:text-paper peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-ink";
 
@@ -132,7 +130,7 @@ export function TherapyForm({
         id="sessions"
         title={T.sessions.title}
         summary={summaries.sessions}
-        open={has("sessionDay", "sessionTime", "timezone", "nextSessionAt")}
+        open={has("sessionDay", "sessionTime", "timezone")}
       >
         <fieldset className="min-w-0 border-0 p-0">
           <legend className="p-0 text-label font-medium text-ink">{T.sessions.day}</legend>
@@ -177,7 +175,7 @@ export function TherapyForm({
           />
         </Field>
         <Field id="therapy-timezone" label={T.sessions.zone} hint={T.sessions.zoneHint} problem={p.timezone}>
-          <select
+          <Select
             id="therapy-timezone"
             name="timezone"
             value={zone}
@@ -189,28 +187,8 @@ export function TherapyForm({
                 {name.replaceAll("_", " ")}
               </option>
             ))}
-          </select>
+          </Select>
         </Field>
-        <Field
-          id="therapy-moved"
-          label={T.sessions.moved}
-          hint={T.sessions.movedHint}
-          problem={p.nextSessionAt}
-        >
-          <Input
-            id="therapy-moved"
-            name="nextSessionAt"
-            type="datetime-local"
-            defaultValue={defaults.nextSessionAt}
-            className="mt-2 max-w-72"
-          />
-        </Field>
-        {defaults.nextSessionAt ? (
-          <label className="flex items-start gap-3 text-[0.9375rem] text-ink-2">
-            <Checkbox name="clearNextSession" />
-            {T.sessions.movedBack}
-          </label>
-        ) : null}
       </Part>
 
       <Part
@@ -282,7 +260,7 @@ export function TherapyForm({
         open={has("reportLeadMinutes", "language", "displayName")}
       >
         <Field id="therapy-lead" label={T.report.lead} hint={T.report.leadHint} problem={p.reportLeadMinutes}>
-          <select
+          <Select
             id="therapy-lead"
             name="reportLeadMinutes"
             defaultValue={String(defaults.reportLeadMinutes)}
@@ -293,7 +271,7 @@ export function TherapyForm({
                 {T.report.leads[minutes]}
               </option>
             ))}
-          </select>
+          </Select>
         </Field>
         <Field
           id="therapy-language"
@@ -301,14 +279,14 @@ export function TherapyForm({
           hint={T.report.languageHint}
           problem={p.language}
         >
-          <select id="therapy-language" name="language" defaultValue={defaults.language} className={select}>
+          <Select id="therapy-language" name="language" defaultValue={defaults.language} className={select}>
             <option value="">{T.report.languageFollow(readIn)}</option>
             {REPORT_LANGUAGE_OPTIONS.map((option) => (
               <option key={option.value} value={option.value}>
                 {option.label}
               </option>
             ))}
-          </select>
+          </Select>
         </Field>
         <Field id="therapy-name" label={T.report.name} hint={T.report.nameHint} problem={p.displayName}>
           <Input id="therapy-name" name="displayName" defaultValue={defaults.displayName} className="mt-2" />

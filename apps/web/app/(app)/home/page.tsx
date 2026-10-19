@@ -1,14 +1,9 @@
-import { randomUUID } from "node:crypto";
 import { linkStyles } from "@sintr/ui";
 import type { Metadata } from "next";
 import Link from "next/link";
-import { Conversation } from "@/components/talk/conversation";
-import { SetupNotice } from "@/components/talk/setup-notice";
-import { SupportStrip } from "@/components/talk/support-strip";
+import { AssistantRoom } from "@/components/assistant/room";
 import { formatMoment } from "@/lib/format";
-import { assistantState } from "@/lib/server/assistant";
-import { requireScope, runtime } from "@/lib/server/runtime";
-import { voiceView } from "@/lib/server/voice";
+import { requireScope } from "@/lib/server/runtime";
 import { hourIn, partOfDay } from "@/lib/time-of-day";
 import { currentLanguage, getMessages } from "@/lib/server/language";
 import type { Messages } from "@/messages";
@@ -41,61 +36,39 @@ function Doors({ t }: { t: Messages }) {
 }
 
 /**
- * The home is the input: "Tell me what happened.", by voice or in writing,
- * and the assistant drafts. A person who has not finished the welcome is
- * offered the way back to it, once, quietly.
+ * The home is the assistant's room: the pool of light in the middle, "Tell
+ * me what happened.", by voice or in writing, and the assistant drafts. The
+ * conversation itself lives in the shell (it follows the person to every
+ * page); this page gives it its room, the doors, and the earlier
+ * conversations below. A person who has not finished the welcome is offered
+ * the way back to it, once, quietly.
  */
 export default async function HomePage() {
   const t = await getMessages();
   const { scope } = await requireScope();
-  const [assistant, profile, conversations, voice] = await Promise.all([
-    assistantState(scope),
-    scope.profile.get(),
-    scope.conversations.list(),
-    voiceView(scope),
-  ]);
+  const [profile, conversations] = await Promise.all([scope.profile.get(), scope.conversations.list()]);
   const earlier = conversations.filter((c) => c.lastMessageAt !== null).slice(0, 8);
   const locale = { language: (await currentLanguage()).code, timezone: profile.timezone };
   const greeting = t.home.greeting(partOfDay(hourIn(profile.timezone)), profile.preferredName);
 
   return (
     <>
-      {profile.onboardedAt === null ? (
-        <p className="mb-8 text-[0.9375rem] text-ink-3">
-          {t.home.unfinished}{" "}
-          <Link href="/welcome" className={linkStyles}>
-            {t.home.unfinishedLink}
-          </Link>
-        </p>
-      ) : null}
-      {assistant.kind !== "none" ? (
-        <Conversation
-          // A new one each time the page is opened, even from a conversation
-          // whose address the browser took over after its first message.
-          key={randomUUID()}
-          conversationId={null}
-          initialMessages={[]}
-          initialProposals={{}}
-          locale={locale}
-          rehearsal={runtime().config.fakeAgent}
-          source={assistant.kind}
-          meter={assistant.kind === "house" ? assistant.messages : null}
-          voice={voice}
-          greeting={greeting}
-          doors={<Doors t={t} />}
-        />
-      ) : (
-        <div className="space-y-8">
-          <div>
-            <p className="font-serif text-[1.1875rem] italic text-ink-3">{greeting}</p>
-            <h1 className="mt-1 text-title">{t.home.title}</h1>
-          </div>
-          <SetupNotice />
-          <SupportStrip />
-        </div>
-      )}
+      <AssistantRoom
+        greeting={greeting}
+        doors={<Doors t={t} />}
+        unfinished={
+          profile.onboardedAt === null ? (
+            <p className="mb-8 text-center text-[0.9375rem] text-ink-3">
+              {t.home.unfinished}{" "}
+              <Link href="/welcome" className={linkStyles}>
+                {t.home.unfinishedLink}
+              </Link>
+            </p>
+          ) : null
+        }
+      />
       {earlier.length > 0 ? (
-        <section aria-labelledby="earlier-title" className="mt-16">
+        <section aria-labelledby="earlier-title" className="mx-auto mt-20 max-w-[40rem]">
           <h2 id="earlier-title" className="font-serif text-title-small font-normal text-ink">
             {t.home.earlier}
           </h2>
