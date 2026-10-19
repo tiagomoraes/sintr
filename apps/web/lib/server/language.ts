@@ -28,7 +28,7 @@ export const currentLanguage = cache(async (): Promise<PageLanguage> => {
   const [scope, requestHeaders] = await Promise.all([sessionScope(), headers()]);
   const profile = scope ? await scope.profile.get() : null;
   const resolved = resolveLanguage({
-    chosen: profile?.locale ?? chosenInBrowser(requestHeaders.get("cookie")),
+    chosen: profile?.locale ?? chosenInCookie(requestHeaders.get("cookie")),
     installation: runtime().config.language,
     accept: requestHeaders.get("accept-language"),
   });

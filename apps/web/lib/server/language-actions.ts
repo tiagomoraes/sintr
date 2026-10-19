@@ -4,8 +4,8 @@ import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { safeNext } from "@/lib/redirect";
-import { matchLanguage } from "@/messages";
-import { LANGUAGE_COOKIE, runtime, sessionScope } from "./runtime";
+import { LANGUAGE_COOKIE, matchLanguage } from "@/messages";
+import { runtime, sessionScope } from "./runtime";
 
 const YEAR = 365 * 24 * 60 * 60;
 

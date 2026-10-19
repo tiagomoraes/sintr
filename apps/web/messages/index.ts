@@ -22,6 +22,9 @@ export type LanguageSource = "person" | "installation" | "browser" | "default";
 
 export const DEFAULT_LANGUAGE = "en";
 
+/** The cookie that keeps a language chosen in a browser, before signing in or beside the profile. */
+export const LANGUAGE_COOKIE = "sintr_language";
+
 const catalogs: Readonly<Record<string, Catalog>> = CATALOGS;
 
 /** The languages offered, in the order `languages.json` gives them. */
@@ -93,4 +96,18 @@ export function resolveLanguage(input: {
     if (browser) return { code: browser, source: "browser" };
   }
   return { code: DEFAULT_LANGUAGE, source: "default" };
+}
+
+/** A language chosen in this browser, from a request's Cookie header; null when none it speaks. */
+export function chosenInCookie(header: string | null | undefined): string | null {
+  for (const part of (header ?? "").split(";")) {
+    const [name, ...value] = part.trim().split("=");
+    if (name !== LANGUAGE_COOKIE) continue;
+    try {
+      return matchLanguage(decodeURIComponent(value.join("=")));
+    } catch {
+      return null;
+    }
+  }
+  return null;
 }

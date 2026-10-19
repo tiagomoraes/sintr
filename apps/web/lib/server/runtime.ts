@@ -5,18 +5,9 @@ import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { cache } from "react";
 import { safeNext } from "@/lib/redirect";
-import { LANGUAGES, matchLanguage, resolveLanguage } from "@/messages";
+import { LANGUAGES, chosenInCookie, matchLanguage, resolveLanguage } from "@/messages";
 
 const holder = globalThis as typeof globalThis & { __sintrRuntime?: Runtime };
-
-/** The cookie that keeps a language chosen in this browser, before signing in or alongside the profile. */
-export const LANGUAGE_COOKIE = "sintr_language";
-
-/** A language chosen in this browser, from a request's cookies. */
-export function chosenInBrowser(cookieHeader: string | null): string | null {
-  const value = new RegExp(`(?:^|;\\s*)${LANGUAGE_COOKIE}=([^;]+)`, "u").exec(cookieHeader ?? "")?.[1];
-  return value ? matchLanguage(decodeURIComponent(value)) : null;
-}
 
 /** Created on first use, so `next build` never needs the runtime secrets. */
 export function runtime(): Runtime {
@@ -33,7 +24,7 @@ export function runtime(): Runtime {
       // The emails about an account are written as its pages are read (DECISIONS 98).
       languageFor: async (requestHeaders, userId) => {
         const profile = userId ? await (await runtime().repositories.forUser(userId)).profile.get() : null;
-        const browser = chosenInBrowser(requestHeaders.get("cookie"));
+        const browser = chosenInCookie(requestHeaders.get("cookie"));
         const resolved = resolveLanguage({
           chosen: profile?.locale ?? browser,
           installation: config.language,

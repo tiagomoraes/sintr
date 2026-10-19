@@ -2,9 +2,11 @@ import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
+import { formatDay, formatMoment, intlOf, languageName, weekday } from "@/lib/format";
 import {
   LANGUAGES,
   acceptedTags,
+  chosenInCookie,
   matchLanguage,
   messagesFor,
   resolveLanguage,
@@ -85,8 +87,8 @@ function sentences(value: unknown, path: string): { path: string; text: string }
 }
 
 const RULES = [
-  { name: "an em dash", pattern: /—/u },
-  { name: "an en dash", pattern: /–/u },
+  { name: "an em dash", pattern: /\u2014/u },
+  { name: "an en dash", pattern: /\u2013/u },
   { name: "an emoji", pattern: /[\u{1F000}-\u{1FAFF}\u{2600}-\u{27BF}\u{2B00}-\u{2BFF}]|\u{FE0F}|\u{200D}/u },
 ];
 
@@ -193,5 +195,33 @@ describe("who decides the language", () => {
     expect(matchLanguage("PT-br")).toBe("pt-BR");
     expect(matchLanguage("en-US")).toBe("en");
     expect(matchLanguage("es")).toBeNull();
+  });
+});
+
+describe("a language chosen in the browser", () => {
+  it("is read from its cookie, and only when sintr speaks it", () => {
+    expect(chosenInCookie("a=1; sintr_language=pt-BR; b=2")).toBe("pt-BR");
+    expect(chosenInCookie("sintr_language=pt-br")).toBe("pt-BR");
+    expect(chosenInCookie("sintr_language=fr")).toBeNull();
+    expect(chosenInCookie("other_sintr_language=pt-BR")).toBeNull();
+    expect(chosenInCookie("sintr_language=%E0%A4%A")).toBeNull();
+    expect(chosenInCookie(null)).toBeNull();
+  });
+});
+
+describe("dates and names in the page's language", () => {
+  const at = new Date("2026-10-20T21:40:00Z");
+  const sp = { timezone: "America/Sao_Paulo" };
+
+  it("write English as before, and Portuguese as Portuguese does", () => {
+    expect(intlOf("en")).toBe("en-GB");
+    expect(intlOf("pt-BR")).toBe("pt-BR");
+    expect(formatMoment(at, { language: "en", ...sp })).toBe("Tuesday 20 October at 18:40");
+    expect(formatMoment(at, { language: "pt-BR", ...sp })).toBe("terça-feira, 20 de outubro às 18:40");
+    expect(formatDay(at, { language: "pt-BR", ...sp })).toBe("20 de outubro de 2026");
+    expect(weekday(2, "en")).toBe("Tuesday");
+    expect(weekday(2, "pt-BR")).toBe("terça-feira");
+    expect(languageName("pt-BR", "en")).toBe("Portuguese");
+    expect(languageName("en", "pt-BR")).toBe("inglês");
   });
 });

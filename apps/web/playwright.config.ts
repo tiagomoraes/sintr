@@ -70,6 +70,8 @@ const shared = {
   SINTR_MASTER_KEY: process.env.SINTR_E2E_MASTER_KEY,
   SINTR_MASTER_KEY_ID: "k1",
   SINTR_LOG_LEVEL: "warn",
+  // Each test's browser decides the language (DECISIONS 98), whatever the local .env says.
+  SINTR_LANGUAGE: "",
   SINTR_FAKE_AGENT: "1",
   SINTR_EMAIL_OUTBOX: process.env.SINTR_E2E_OUTBOX,
   ...(process.env.SINTR_CHROMIUM_PATH ? { SINTR_CHROMIUM_PATH: process.env.SINTR_CHROMIUM_PATH } : {}),
