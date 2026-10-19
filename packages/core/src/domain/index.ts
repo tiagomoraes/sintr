@@ -322,8 +322,11 @@ export type PracticeInput = z.input<typeof PracticeInput>;
 export const PracticePatch = PracticeInput.partial().extend({ notifyEmail: z.boolean().optional() });
 export type PracticePatch = z.input<typeof PracticePatch>;
 
-/** Where a practice's seats come from: the installation's defaults, or a grant for this practice. */
-export type SeatSource = "config" | "grant";
+/**
+ * Where a practice's seats come from: the installation's defaults, a grant
+ * for this practice, or its subscription with the payment provider.
+ */
+export type SeatSource = "config" | "grant" | "subscription";
 
 /** A plan and its seat count; `seats: null` is unlimited. */
 export interface PracticePlan {
@@ -571,6 +574,120 @@ export interface ProviderCredentials {
   apiKey: string | null;
 }
 
+/**
+ * The house assistant: the installation's own provider, model and key, from
+ * the environment. Everyone without a key of their own talks to it, within
+ * their plan. The key never leaves the server and is never logged.
+ */
+export interface HouseAssistant extends ProviderCredentials {
+  /** Who people are told receives their conversations, such as "Anthropic". */
+  name: string;
+}
+
+/* Plans: how much of the house assistant a person may use each month */
+
+export const PlanId = z.enum(["free", "personal", "unlimited"]);
+export type PlanId = z.infer<typeof PlanId>;
+
+/** What the house assistant may be used for in one month. null is no limit. */
+export interface Allowance {
+  /** Messages the assistant answered. */
+  assistantMessages: number | null;
+  /** Reports the assistant wrote. */
+  reports: number | null;
+  /** Spoken minutes. A placeholder: audio arrives in the next milestone, and nothing counts it yet. */
+  audioMinutes: number | null;
+}
+export type Meter = keyof Allowance;
+export const METERS = ["assistantMessages", "reports", "audioMinutes"] as const satisfies readonly Meter[];
+
+/**
+ * The person plans, and their numbers (DECISIONS records why these). The
+ * diary itself is the same on every plan: entries, check-ins and reports
+ * never depend on the assistant.
+ */
+export const PERSON_PLANS: Record<PlanId, { label: string; allowance: Allowance }> = {
+  free: { label: "Free", allowance: { assistantMessages: 100, reports: 4, audioMinutes: 15 } },
+  personal: { label: "Personal", allowance: { assistantMessages: 600, reports: 12, audioMinutes: 120 } },
+  unlimited: {
+    label: "Unlimited",
+    allowance: { assistantMessages: null, reports: null, audioMinutes: null },
+  },
+};
+
+export type SubscriptionKind = "person" | "practice";
+export const SubscriptionStatus = z.enum([
+  "active",
+  "trialing",
+  "past_due",
+  "unpaid",
+  "paused",
+  "incomplete",
+  "incomplete_expired",
+  "canceled",
+]);
+export type SubscriptionStatus = z.infer<typeof SubscriptionStatus>;
+/** A grant made by whoever runs the installation, or a subscription with the payment provider. */
+export type SubscriptionSource = "grant" | "stripe";
+
+/** A status that keeps the plan: paid, in a trial, or a payment the provider is still retrying. */
+export function isEntitling(status: SubscriptionStatus): boolean {
+  return status === "active" || status === "trialing" || status === "past_due";
+}
+
+export interface Subscription {
+  id: string;
+  kind: SubscriptionKind;
+  /** For a person, "personal" or "unlimited"; for a practice, "practice". */
+  plan: string;
+  status: SubscriptionStatus;
+  source: SubscriptionSource;
+  /** A practice's seats; null otherwise. */
+  seats: number | null;
+  currentPeriodStart: Date | null;
+  currentPeriodEnd: Date | null;
+  cancelAtPeriodEnd: boolean;
+  /** The payment provider knows this account as a customer, so its billing page can open. */
+  hasCustomer: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+/** Where a person's plan comes from. */
+export type PlanSource = "installation" | "grant" | "subscription" | "practice";
+
+export interface PersonPlan {
+  id: PlanId;
+  label: string;
+  source: PlanSource;
+  allowance: Allowance;
+}
+
+/** One month of the meter, in the person's own calendar. */
+export interface UsagePeriod {
+  /** Its first day, YYYY-MM-DD. */
+  start: string;
+  /** The first day of the next month, when the count starts again. */
+  next: string;
+}
+
+export interface Entitlements {
+  plan: PersonPlan;
+  /** The person's own subscription, if any, whatever its status. */
+  subscription: Subscription | null;
+  period: UsagePeriod;
+  used: Record<Meter, number>;
+}
+
+/** The result of taking one unit of a meter: refused when the month's allowance is used. */
+export interface Taken {
+  ok: boolean;
+  /** Units used this month, this one included when it was taken. */
+  used: number;
+  limit: number | null;
+  period: UsagePeriod;
+}
+
 /* Proposals: what the assistant drafted, waiting for the person */
 
 export const ProposalKind = z.enum(["entry", "checkin"]);
@@ -691,6 +808,7 @@ export const AuditAction = z.enum([
   "share.created",
   "share.read",
   "share.downloaded",
+  "plan.changed",
 ]);
 export type AuditAction = z.infer<typeof AuditAction>;
 

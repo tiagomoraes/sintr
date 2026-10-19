@@ -36,6 +36,13 @@
       "when": 1792367046261,
       "tag": "0004_therapist",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1792377713754,
+      "tag": "0005_plans",
+      "breakpoints": true
     }
   ]
 }

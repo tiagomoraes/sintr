@@ -149,6 +149,17 @@ describe("tenant isolation", () => {
     expect((await b.therapySettings.get()).therapistName).toBeNull();
   });
 
+  it("keeps each person's plan and use of the assistant their own", async () => {
+    await a.plans.take("assistantMessages");
+    await a.plans.take("assistantMessages");
+    const before = (await b.plans.current()).used.assistantMessages;
+    await b.plans.giveBack("assistantMessages", (await a.plans.current()).period);
+    expect((await a.plans.current()).used.assistantMessages).toBeGreaterThanOrEqual(2);
+    expect((await b.plans.current()).used.assistantMessages).toBe(before);
+    expect(await b.plans.subscription("person")).toBeNull();
+    expect(await b.plans.customer()).toBeNull();
+  });
+
   it("does not let B change or delete A's rows", async () => {
     expect(await b.entries.update(owned.entry, { situation: "overwritten" })).toBeNull();
     expect(await b.checkins.update(owned.checkin, { mood: 5 })).toBeNull();

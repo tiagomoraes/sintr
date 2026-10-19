@@ -1,4 +1,5 @@
 import type { z } from "zod";
+import { BillingError } from "./billing/stripe";
 import { DecryptionError } from "./crypto";
 
 /**
@@ -52,6 +53,7 @@ const KNOWN = [
   InvalidStateError,
   DataAccessError,
   DecryptionError,
+  BillingError,
 ];
 
 function findPostgresError(error: unknown): { code?: unknown; constraint_name?: unknown } | null {

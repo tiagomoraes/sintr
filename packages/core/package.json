@@ -17,7 +17,8 @@
     "test": "vitest run",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "tsx src/db/migrate-cli.ts",
-    "practice:plan": "tsx src/practice/plan-cli.ts"
+    "practice:plan": "tsx src/practice/plan-cli.ts",
+    "person:plan": "tsx src/billing/person-plan-cli.ts"
   },
   "dependencies": {
     "@node-rs/argon2": "2.2.2",

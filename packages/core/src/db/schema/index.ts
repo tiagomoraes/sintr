@@ -33,6 +33,14 @@ export {
   shareMode,
   sharedReports,
 } from "./practice";
+export {
+  subscriptionKind,
+  subscriptionSource,
+  subscriptionStatus,
+  subscriptions,
+  usageCounters,
+  type SubscriptionRow,
+} from "./plans";
 export { deliveryChannel, profiles, therapySettings } from "./profile";
 export {
   consentPurpose,

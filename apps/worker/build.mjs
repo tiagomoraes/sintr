@@ -1,4 +1,4 @@
-// Bundle the worker, the migration runner and the seats admin path into
+// Bundle the worker, the migration runner and the two plan admin paths into
 // self-contained files for the Docker image: no node_modules are needed at runtime.
 import { build } from "esbuild";
 
@@ -7,6 +7,7 @@ await build({
     worker: "src/main.ts",
     migrate: "src/migrate.ts",
     "practice-plan": "../../packages/core/src/practice/plan-cli.ts",
+    "person-plan": "../../packages/core/src/billing/person-plan-cli.ts",
   },
   outdir: "dist",
   outExtension: { ".js": ".mjs" },

@@ -19,7 +19,7 @@ COMPOSE := docker compose -f docker/compose.yaml $(if $(SINTR_DOCKER_SUBNET),-f 
 # CI passes --with-deps to also install the browser's system libraries.
 PLAYWRIGHT_INSTALL_FLAGS ?=
 
-.PHONY: help setup dev test lint typecheck build migrate db-generate report-assets mcp-bridge practice-plan selfhost-up selfhost-down db-up db-down
+.PHONY: help setup dev test lint typecheck build migrate db-generate report-assets mcp-bridge practice-plan person-plan selfhost-up selfhost-down db-up db-down
 
 help: ## List the targets
 	@grep -hE '^[a-z-]+:.*## ' Makefile | awk -F ':.*## ' '{printf "  make %-14s %s\n", $$1, $$2}'
@@ -54,6 +54,10 @@ mcp-bridge: ## Build the stdio bridge for local MCP clients (packages/mcp/dist/s
 practice-plan: ## Grant a practice its seats: EMAIL=... SEATS=10, unlimited or default, PLAN="..." (optional)
 	@SINTR_PLAN_EMAIL="$(EMAIL)" SINTR_PLAN_SEATS="$(SEATS)" SINTR_PLAN_NAME="$(PLAN)" \
 		$(PNPM) --silent --filter @sintr/core practice:plan
+
+person-plan: ## Give a person their plan: EMAIL=... PLAN=personal, unlimited or default
+	@SINTR_PLAN_EMAIL="$(EMAIL)" SINTR_PLAN_NAME="$(PLAN)" \
+		$(PNPM) --silent --filter @sintr/core person:plan
 
 dev: migrate mcp-bridge ## Run the web app and the worker against the development database
 	$(PNPM) --parallel --filter @sintr/web --filter @sintr/worker dev
