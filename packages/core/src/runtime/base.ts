@@ -5,6 +5,7 @@ import { createDatabase, type DatabaseHandle } from "../db/client";
 import { createEmailTransport, type EmailTransport } from "../email";
 import { createLogger, type Logger } from "../log";
 import { purgeExpiredAuthRecords, purgeExpiredConversations, purgeStaleInvites } from "../maintenance";
+import { memoryWork } from "../memory/work";
 import { sendPracticeNotices } from "../practice/notices";
 import { reportSchedules, type PersonSchedule } from "../report/schedules";
 import { createRepositories, type Repositories } from "../repositories";
@@ -27,6 +28,8 @@ export interface BaseRuntime {
   handlePaymentWebhook(payload: string, signature: string | null): Promise<WebhookResult>;
   /** Everyone with a therapy session to prepare a report for. Clear metadata only. */
   reportSchedules(): Promise<PersonSchedule[]>;
+  /** Everyone whose memory is on and has a page to read or a memory to place. Ids only. */
+  memoryWork(): Promise<string[]>;
   purgeExpiredAuthRecords(): Promise<{ sessions: number; verificationTokens: number }>;
   /** Conversations past their owner's retention setting (agent_settings). */
   purgeExpiredConversations(): Promise<{ conversations: number }>;
@@ -81,6 +84,7 @@ export function openBaseRuntime(
       );
     },
     reportSchedules: () => reportSchedules(database.db),
+    memoryWork: () => memoryWork(database.db),
     purgeExpiredAuthRecords: () => purgeExpiredAuthRecords(database.db),
     purgeExpiredConversations: () => purgeExpiredConversations(database.db),
     purgeStaleInvites: (now) => purgeStaleInvites(database.db, now),

@@ -85,6 +85,12 @@ export const settings = {
     ready: (who: string) =>
       `Quando você fala em vez de digitar, o que você disse é passado para texto por ${who}, e a gravação é descartada logo depois: o sintr nunca a guarda. Você lê as palavras antes de elas serem enviadas.`,
   },
+  memory: {
+    on: "Ele lembra o seu nome e o que você contou ao seu diário, enquanto a memória dele está ligada.",
+    off: "Ele não lembra de você de uma conversa para a outra, a não ser que você ligue a memória dele.",
+    paused: "A memória dele está pausada até você concordar de novo.",
+    link: "Memória",
+  },
   others: {
     title: "Seus outros assistentes",
     body: "ChatGPT, Claude, Gemini ou Hermes podem guardar registros aqui para você, cada um com a sua própria chave.",

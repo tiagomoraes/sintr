@@ -4,6 +4,7 @@ import { InvalidStateError, NotFoundError, ShareMode, ValidationError, isTimeZon
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { tooManyLookups } from "@/lib/server/join";
+import { keepNameInMemory } from "@/lib/server/memory";
 import { requireScope } from "@/lib/server/runtime";
 import { safeNext } from "@/lib/redirect";
 import { getMessages } from "@/lib/server/language";
@@ -31,13 +32,14 @@ export async function beginWelcome(timezone: string): Promise<StepResult> {
   return OK;
 }
 
-/** How the person wants to be called: kept sealed, for greetings only. */
+/** How the person wants to be called: kept sealed, for greetings, and for their assistant while its memory is on. */
 export async function saveName(name: string): Promise<StepResult> {
   const t = await getMessages();
   const { scope } = await requireScope();
   const value = name.trim();
   if (value.length > 80) return fail(t.welcome.name.tooLong);
   await scope.profile.update({ preferredName: value || null });
+  await keepNameInMemory(scope);
   return OK;
 }
 

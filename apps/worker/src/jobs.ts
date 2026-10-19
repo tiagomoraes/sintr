@@ -1,4 +1,5 @@
 import type { BaseRuntime } from "@sintr/core/runtime/base";
+import { readDiaries } from "./memory";
 import { prepareDueReports } from "./reports";
 import type { Job } from "./scheduler";
 
@@ -9,7 +10,9 @@ const HOUR = 60 * MINUTE;
  * The worker's jobs. Housekeeping spans every person by nature, so it reads
  * no content: it deletes by date and counts what it removed. The report job
  * opens one person's scope at a time, and only to prepare their own draft.
- * The practice notice reads ids, flags and the professional's address.
+ * The practice notice reads ids, flags and the professional's address. The
+ * memory job opens one person's scope at a time, and only when their memory
+ * is on.
  */
 export const JOBS: readonly Job<BaseRuntime>[] = [
   {
@@ -36,6 +39,12 @@ export const JOBS: readonly Job<BaseRuntime>[] = [
     name: "prepare-reports",
     intervalMs: MINUTE,
     run: (runtime, now) => prepareDueReports(runtime, now),
+  },
+  {
+    // The memory: a few new pages of each diary whose memory is on, within the house's daily bound.
+    name: "read-diaries",
+    intervalMs: MINUTE,
+    run: (runtime, now) => readDiaries(runtime, now),
   },
   {
     // Professionals who asked for it hear by email that a report arrived:

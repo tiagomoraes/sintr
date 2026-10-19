@@ -64,6 +64,13 @@
       "when": 1792421387651,
       "tag": "0008_no_moved_session",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1792437148124,
+      "tag": "0009_memory",
+      "breakpoints": true
     }
   ]
 }

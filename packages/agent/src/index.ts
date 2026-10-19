@@ -35,6 +35,7 @@ export {
   textOf,
 } from "./messages";
 export { scopePorts, type CapturePorts } from "./ports";
+export * from "./memory";
 export { capturePrompt, crisisPrompt } from "./prompt";
 export {
   DEFAULT_BASE_URLS,

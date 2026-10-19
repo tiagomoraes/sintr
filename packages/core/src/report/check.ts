@@ -211,6 +211,19 @@ const CAUSAL =
 const LABELS =
   /(?<![\p{L}\p{N}])(catastrofiz\p{L}*|catastrophiz\p{L}*|rumina[cç][aã]o|rumiaci[oó]n|rumination|evita[cç][aã]o|evitaci[oó]n|avoidance|transtorno\p{L}*|trastorno\p{L}*|disorder\p{L}*|depress[aã]o|depresi[oó]n|depression|depressiv\p{L}*|depresiv\p{L}*|depressive|burnout|tdah|adhd|bipolar|borderline|trauma\p{L}*|diagn[oó]stic\p{L}*|diagnos\p{L}*)(?![\p{L}\p{N}])/giu;
 
+/**
+ * The causes and clinical labels in a text, outside its quotes: what a
+ * sentence about the person must not add. The memory (F10) is held to the
+ * same rule as a report's prose.
+ */
+export function interpretationsIn(text: string): { causes: string[]; labels: string[] } {
+  const plain = withoutQuotes(text);
+  const found = (pattern: RegExp) => [
+    ...new Set([...plain.matchAll(pattern)].map((m) => m[0].toLocaleLowerCase())),
+  ];
+  return { causes: found(CAUSAL), labels: found(LABELS) };
+}
+
 const SUMMARY_WORDS = 140;
 const MAX_TOPICS = 6;
 const MAX_MOMENTS = 6;

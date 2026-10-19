@@ -95,6 +95,13 @@ export const settings = {
     ready: (who: string) =>
       `When you speak instead of typing, ${who} writes down what you said, and the recording is dropped once it has: sintr never keeps it. You read the words before they are sent.`,
   },
+  /** The memory, said in Settings next to who answers. */
+  memory: {
+    on: "It remembers your name and what you told your diary, while its memory is on.",
+    off: "It does not remember you from one conversation to the next, unless you turn on its memory.",
+    paused: "Its memory is paused until you agree again.",
+    link: "Memory",
+  },
   others: {
     title: "Your other assistants",
     body: "ChatGPT, Claude, Gemini or Hermes can keep entries here for you, each with its own key.",

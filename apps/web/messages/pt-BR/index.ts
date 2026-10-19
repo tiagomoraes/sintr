@@ -8,6 +8,7 @@ import { crisis } from "./crisis";
 import { entry } from "./entry";
 import { home } from "./home";
 import { language } from "./language";
+import { memory } from "./memory";
 import { plan } from "./plan";
 import { practice } from "./practice";
 import { reports } from "./reports";
@@ -30,6 +31,7 @@ export const catalog = {
   entry,
   home,
   language,
+  memory,
   plan,
   practice,
   reports,

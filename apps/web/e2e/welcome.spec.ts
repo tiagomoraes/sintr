@@ -47,11 +47,13 @@ test.describe("the welcome", () => {
     await expect(page.getByRole("link", { name: "Call CVV, 188" })).toBeVisible();
     await page.getByRole("button", { name: "Begin" }).click();
 
-    // How to call the person: for greetings only.
+    // How to call the person: for greetings, and for the assistant while its memory is on.
     await expect(page.getByRole("heading", { level: 1, name: "What should I call you?" })).toBeVisible();
     await expect(page.getByText("Step 1 of 3")).toBeVisible();
     await expect(
-      page.getByText("It is never sent to the assistant and never printed on a report."),
+      page.getByText(
+        "To greet you here, and for your assistant to call you by it if you turn on its memory. It is never printed on a report.",
+      ),
     ).toBeVisible();
     await page.getByLabel("Your name, or what you like to be called").fill("Bia");
     await page.getByRole("button", { name: "Continue" }).click();

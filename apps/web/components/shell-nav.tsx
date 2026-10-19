@@ -13,6 +13,7 @@ export const SECTIONS: readonly { href: string; key: Section }[] = [
   { href: "/home", key: "home" },
   { href: "/entries", key: "entries" },
   { href: "/checkins", key: "checkins" },
+  { href: "/memory", key: "memory" },
   { href: "/therapy", key: "therapy" },
   { href: "/reports", key: "reports" },
   { href: "/sharing", key: "sharing" },

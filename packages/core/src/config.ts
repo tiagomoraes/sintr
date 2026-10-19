@@ -1,7 +1,14 @@
 import { z } from "zod";
 import type { BillingConfig } from "./billing/stripe";
 import { parseMasterKey, type MasterKey } from "./crypto/keys";
-import { PlanId, ProviderKind, type HouseAssistant, type HouseVoice, type PracticePlan } from "./domain";
+import {
+  PlanId,
+  ProviderKind,
+  type HouseAssistant,
+  type HouseMemory,
+  type HouseVoice,
+  type PracticePlan,
+} from "./domain";
 import type { EmailConfig } from "./email/transport";
 import type { LogLevel } from "./log";
 
@@ -82,6 +89,14 @@ const EnvSchema = z.object({
     .string()
     .regex(/^[a-z]{2,3}$/, "must be a language code such as pt or en")
     .optional(),
+  // How the house places a memory by meaning: its provider's own embeddings by
+  // default, or an OpenAI-compatible endpoint of its own; "off" for no memory.
+  SINTR_HOUSE_EMBED_MODEL: z.string().min(1).max(200).optional(),
+  SINTR_HOUSE_EMBED_BASE_URL: z
+    .url({ protocol: /^https?$/ })
+    .max(500)
+    .optional(),
+  SINTR_HOUSE_EMBED_KEY: z.string().min(1).max(2_000).optional(),
   // The plan of a person without a subscription or a grant of their own.
   SINTR_PERSON_PLAN: PlanId.default("free"),
   // Payments (optional): Stripe. Without them, plans come from grants only.
@@ -238,6 +253,9 @@ function houseFrom(e: Env): HouseAssistant | null {
     e.SINTR_HOUSE_STT_BASE_URL,
     e.SINTR_HOUSE_STT_KEY,
     e.SINTR_HOUSE_STT_LANGUAGE,
+    e.SINTR_HOUSE_EMBED_MODEL,
+    e.SINTR_HOUSE_EMBED_BASE_URL,
+    e.SINTR_HOUSE_EMBED_KEY,
   ];
   const provider = e.SINTR_HOUSE_PROVIDER;
   if (!provider) {
@@ -285,6 +303,36 @@ function houseFrom(e: Env): HouseAssistant | null {
     name:
       e.SINTR_HOUSE_NAME ?? (provider === "openai_compatible" ? baseUrl!.hostname : HOUSE_NAMES[provider]),
     voice: houseVoiceFrom(e),
+    memory: houseMemoryFrom(e),
+  };
+}
+
+/** The house's embeddings from SINTR_HOUSE_EMBED_*: its provider's by default, an endpoint of its own, or off. */
+function houseMemoryFrom(e: Env): HouseMemory {
+  const off = e.SINTR_HOUSE_EMBED_MODEL?.toLowerCase() === "off";
+  if (e.SINTR_HOUSE_EMBED_KEY && !e.SINTR_HOUSE_EMBED_BASE_URL) {
+    throw new ConfigError(
+      "invalid configuration: SINTR_HOUSE_EMBED_BASE_URL: is required with SINTR_HOUSE_EMBED_KEY",
+    );
+  }
+  let endpoint: HouseMemory["endpoint"] = null;
+  if (e.SINTR_HOUSE_EMBED_BASE_URL) {
+    const url = new URL(e.SINTR_HOUSE_EMBED_BASE_URL);
+    if (url.username || url.password) {
+      throw new ConfigError(
+        "invalid configuration: SINTR_HOUSE_EMBED_BASE_URL: must not hold credentials; the key goes in SINTR_HOUSE_EMBED_KEY",
+      );
+    }
+    // Like the house's own gateway: on the hosted offer an endpoint answers only with a key.
+    if (e.SINTR_MODE === "saas" && !e.SINTR_HOUSE_EMBED_KEY) {
+      throw new ConfigError("invalid configuration: SINTR_HOUSE_EMBED_KEY: is required in saas mode");
+    }
+    endpoint = { baseUrl: e.SINTR_HOUSE_EMBED_BASE_URL, apiKey: e.SINTR_HOUSE_EMBED_KEY ?? null };
+  }
+  return {
+    off,
+    endpoint: off ? null : endpoint,
+    model: off ? null : (e.SINTR_HOUSE_EMBED_MODEL ?? null),
   };
 }
 

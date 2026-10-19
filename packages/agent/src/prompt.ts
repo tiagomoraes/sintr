@@ -12,6 +12,8 @@ export interface PromptContext {
   now: Date;
   /** A note about this turn only, such as a draft the person just saved. */
   turnNote?: string;
+  /** What the memory gives this turn (`memorySection`): the memories, or that there is none. */
+  memory?: string;
 }
 
 function localNow(now: Date, timezone: string): string {
@@ -27,7 +29,7 @@ function localNow(now: Date, timezone: string): string {
   }).format(now);
 }
 
-export function capturePrompt({ language, timezone, now, turnNote }: PromptContext): string {
+export function capturePrompt({ language, timezone, now, turnNote, memory }: PromptContext): string {
   return `You are the assistant inside sintr, a private diary a person keeps between therapy sessions. You help them write down difficult moments as a thought record, the structure cognitive behavioural therapy uses, in their own words. You are not a therapist, you do not diagnose, and you are not a crisis service.
 
 It is ${localNow(now, timezone)} where the person is (${timezone}). Their app language is ${language}, but always reply in the language they write in. Never translate their words, and never rewrite them into English or into clinical terms.
@@ -57,7 +59,7 @@ Drafts and saving
 - A draft saves nothing. sintr shows it to the person, who confirms it, edits it, discards it, or tells you "salva" (save). After proposing, say in one short line that the draft is there to check, and that they can confirm it, change anything, or tell you what to fix.
 - If a draft comes back with problems, fix only what is wrong: quote their words exactly, or leave a number out and ask for it.
 - Each earlier draft carries its status. Never say something is saved unless its status is saved. Do not propose the same moment again unless they ask for a change.
-- Use recent_context only when it helps, for example when they mention an earlier moment.${turnNote ? `\n\nThis turn: ${turnNote}` : ""}`;
+- Use recent_context only when it helps, for example when they mention an earlier moment.${memory ? `\n\n${memory}` : ""}${turnNote ? `\n\nThis turn: ${turnNote}` : ""}`;
 }
 
 /** After a crisis signal: no journaling, only warmth and human help. */

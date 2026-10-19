@@ -168,6 +168,23 @@ describe("encryption at rest", () => {
       },
       pdf: Buffer.from(remember("shared copy pdf"), "utf8"),
     });
+
+    // F10: a memory of the entry and the words it rests on, and the name as a memory.
+    const [remembered] = await scope.entries.list();
+    if (!remembered) throw new Error("the entry above");
+    await scope.memories.keep(
+      { kind: "entry", id: remembered.id, updatedAt: remembered.updatedAt },
+      [
+        {
+          kind: "moment",
+          text: remember("memory text"),
+          quote: remember("memory quote"),
+          embedding: Array.from({ length: 16 }, (_, i) => (i === 3 ? 1 : 0.01)),
+        },
+      ],
+      { occurredAt: remembered.occurredAt, space: { model: "test-embedding", dimensions: 16 } },
+    );
+    await scope.memories.setName(remember("memory name"));
   });
 
   afterAll(() => handle.close());
@@ -197,8 +214,9 @@ describe("encryption at rest", () => {
     // then F2: the report's previous words in its revision, then F4: the practice (3), two invites
     // (each a code, plus the note or the name), the link's name, two more consents (the link and the
     // share name the practice), the second report (content and PDF) and its shared copy (page and PDF),
-    // then F6: the name the person goes by
-    expect(checked).toBe(32 + 3 + 4 + 1 + 2 + 2 + 2 + 1);
+    // then F6: the name the person goes by, then F10: a memory's sentence and quote, and the name
+    // kept as a memory
+    expect(checked).toBe(32 + 3 + 4 + 1 + 2 + 2 + 2 + 1 + 3);
   });
 
   it("leaves no trace of the content in a text dump of the whole database", async () => {
@@ -216,6 +234,20 @@ describe("encryption at rest", () => {
       expect(dump.includes(plaintext), `${label} in clear`).toBe(false);
       expect(dump.includes(hex(plaintext)), `${label} as hex`).toBe(false);
     }
+  });
+
+  it("keeps a memory's vector only turned by the person's rotation, never as the provider gave it", async () => {
+    const rows = await handle.db.execute<{ embedding: string }>(
+      sql`select embedding::text as embedding from memories where user_id = ${userId} and embedding is not null`,
+    );
+    expect(rows.length).toBe(1);
+    const stored = JSON.parse(rows[0]!.embedding) as number[];
+    const given = Array.from({ length: 16 }, (_, i) => (i === 3 ? 1 : 0.01));
+    const length = Math.hypot(...given);
+    const cosine = stored.reduce((sum, value, i) => sum + value * (given[i]! / length), 0);
+    // Almost all of the given vector lies on one axis; turned, it lies there no more than chance allows.
+    expect(Math.abs(cosine)).toBeLessThan(0.9);
+    expect(stored[3]).not.toBeCloseTo(given[3]! / length, 2);
   });
 
   it("keeps the corrected-away words only sealed, in the correction", async () => {

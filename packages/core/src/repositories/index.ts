@@ -10,6 +10,7 @@ import { loadDataKey } from "./data-keys";
 import { apiTokensRepository, auditLogRepository } from "./integration";
 import { checkinsRepository, entriesRepository, insightsRepository, therapyNotesRepository } from "./ledger";
 import type { SharingContext } from "./links";
+import { memoriesRepository } from "./memories";
 import { plansRepository } from "./plans";
 import { practiceRepository } from "./practice";
 import { consentsRepository, reportsRepository } from "./reports";
@@ -20,6 +21,7 @@ export { API_TOKEN_PREFIX, hashApiToken } from "./integration";
 export type { ListRange } from "./ledger";
 export type { AcceptInvite } from "./sharing";
 export { practiceLine } from "./links";
+export { MEMORIES_PER_SOURCE, spaceId, type NearMemory, type ReadSource } from "./memories";
 export { decodeSubscription, resolvePlan, usagePeriod } from "./plans";
 
 /**
@@ -48,6 +50,8 @@ export interface UserScope {
   readonly notices: ReturnType<typeof noticesRepository>;
   /** The person's plan, and how much of the house assistant they used this month. */
   readonly plans: ReturnType<typeof plansRepository>;
+  /** What sintr remembers of the person, for their own assistant (F10). */
+  readonly memories: ReturnType<typeof memoriesRepository>;
   /** Run several operations atomically, with the same scope. */
   transaction<T>(fn: (scope: UserScope) => Promise<T>): Promise<T>;
   /** Hard delete: the account and, by cascade, every row it owns. */
@@ -111,6 +115,7 @@ function buildScope(ctx: BuildContext): UserScope {
     sharing: guard(sharingRepository(ctx)),
     notices: guard(noticesRepository(ctx)),
     plans: guard(plansRepository(ctx)),
+    memories: guard(memoriesRepository(ctx)),
     async transaction(fn) {
       try {
         return await ctx.db.transaction((tx) => fn(buildScope({ ...ctx, db: tx })));

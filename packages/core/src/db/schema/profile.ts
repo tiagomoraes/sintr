@@ -19,7 +19,7 @@ export const profiles = pgTable("profiles", {
     .references(() => users.id, { onDelete: "cascade" }),
   /** sealed: the name printed on the person's reports, chosen in Therapy */
   displayName: bytea("display_name"),
-  /** sealed: how the person wants to be called in the app; never sent to a model, never on a report */
+  /** sealed: how the person wants to be called; given to their assistant only while their memory is on (DECISIONS 116), never on a report */
   preferredName: bytea("preferred_name"),
   /** Until F7 the report's language, chosen in Therapy. No longer read: see `report_language`. */
   language: text("language").notNull().default("en"),

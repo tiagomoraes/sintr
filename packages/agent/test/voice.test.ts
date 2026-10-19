@@ -29,6 +29,7 @@ const OPENROUTER_HOUSE: HouseAssistant = {
   apiKey: "sk-or-house-0123456789",
   name: "OpenRouter",
   voice: { off: false, endpoint: null, model: null, language: null },
+  memory: { off: false, endpoint: null, model: null },
 };
 const ANTHROPIC_HOUSE: HouseAssistant = {
   provider: "anthropic",
@@ -37,6 +38,7 @@ const ANTHROPIC_HOUSE: HouseAssistant = {
   apiKey: "sk-ant-house-0123456789",
   name: "Anthropic",
   voice: { off: false, endpoint: null, model: null, language: null },
+  memory: { off: false, endpoint: null, model: null },
 };
 const own = (
   provider: ProviderCredentials["provider"],

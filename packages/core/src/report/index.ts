@@ -9,6 +9,7 @@ export {
   buildCorpus,
   checkReport,
   entryTexts,
+  interpretationsIn,
   isVerbatim,
   isVerified,
   mapOutsideQuotes,

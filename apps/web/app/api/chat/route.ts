@@ -13,6 +13,7 @@ import { consumeStream, createUIMessageStreamResponse, type LanguageModel } from
 import { z } from "zod";
 import { MAX_MESSAGE_LENGTH } from "@/lib/chat";
 import { assistantFor, loadMessages, titleFrom } from "@/lib/server/assistant";
+import { memoryForTurn } from "@/lib/server/memory";
 import { currentLanguage } from "@/lib/server/language";
 import { apiError, apiScope, runtime } from "@/lib/server/runtime";
 
@@ -86,6 +87,8 @@ export async function POST(request: Request) {
     prelude,
     // The house assistant's monthly meter; a person's own key is never counted.
     ...(metered ? { metered } : {}),
+    // What sintr remembers, while the person's memory is on; asked only after the crisis screen.
+    ...(assistant.ok ? { memory: memoryForTurn(scope, profile.timezone) } : {}),
     onResponse: async (response) => {
       await scope.conversations.append(conversation.id, serializeMessage(response));
     },

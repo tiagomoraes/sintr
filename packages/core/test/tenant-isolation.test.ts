@@ -23,6 +23,7 @@ interface Owned {
   token: string;
   rawToken: string;
   proposal: string;
+  memory: string;
 }
 
 describe("tenant isolation", () => {
@@ -90,6 +91,16 @@ describe("tenant isolation", () => {
     ).id;
     await a.entries.correct(owned.entry, { behavior: "alice's correction" }, { note: "alice's note" });
     await a.checkins.correct(owned.checkin, { sleepHours: 7 });
+    // F10: A's memory, from A's entry, placed by meaning, and A's name in it.
+    const entry = (await a.entries.get(owned.entry))!;
+    owned.memory = (
+      await a.memories.keep(
+        { kind: "entry", id: owned.entry, updatedAt: entry.updatedAt },
+        [{ kind: "moment", text: "alice's memory", quote: "alice's situation", embedding: [1, 0, 0, 0] }],
+        { occurredAt: entry.occurredAt, space: { model: "test", dimensions: 4 } },
+      )
+    )[0]!.id;
+    await a.memories.setName("Alice");
   });
 
   afterAll(() => handle.close());
@@ -118,6 +129,38 @@ describe("tenant isolation", () => {
     expect((await a.conversations.get(owned.conversation))?.title).toBe("alice's chat");
     const { proposal } = await a.proposals.confirm(owned.proposal);
     await expect(a.proposals.confirm(proposal.id)).rejects.toBeInstanceOf(InvalidStateError);
+  });
+
+  it("keeps A's memory out of B's reach: nothing to list, find, open, correct or forget", async () => {
+    const space = { model: "test", dimensions: 4 };
+    expect(await b.memories.list()).toEqual([]);
+    expect(await b.memories.count()).toBe(0);
+    expect(await b.memories.get(owned.memory)).toBeNull();
+    expect(await b.memories.of({ kind: "entry", id: owned.entry })).toEqual([]);
+    expect(await b.memories.lately({ about: 8, moments: 8, since: new Date(0) })).toEqual([]);
+    // The very vector A's memory was placed from finds nothing in B's memory.
+    expect(await b.memories.nearest(space, [1, 0, 0, 0], { limit: 10, maxDistance: 2 })).toEqual([]);
+    expect(await b.memories.unread(10)).toEqual([]);
+    expect(await b.memories.progress()).toEqual({ read: 0, unread: 0 });
+    expect(await b.memories.correct(owned.memory, "overwritten", null)).toBeNull();
+    expect(await b.memories.forget(owned.memory)).toBe(false);
+    expect(await b.memories.forgetAll()).toEqual({ memories: 0 });
+    // B cannot keep a memory from A's entry, or mark A's entry read.
+    const entry = (await a.entries.get(owned.entry))!;
+    await expect(
+      b.memories.keep(
+        { kind: "entry", id: owned.entry, updatedAt: entry.updatedAt },
+        [{ kind: "moment", text: "taken", quote: "alice's situation", embedding: null }],
+        { occurredAt: entry.occurredAt, space: null },
+      ),
+    ).resolves.toEqual([]);
+
+    // A's memory is untouched and still found by A.
+    expect((await a.memories.get(owned.memory))?.text).toBe("alice's memory");
+    expect(
+      (await a.memories.nearest(space, [1, 0, 0, 0], { limit: 10, maxDistance: 2 })).map((m) => m.id),
+    ).toEqual([owned.memory]);
+    expect((await a.memories.list()).map((m) => m.text)).toEqual(["Alice", "alice's memory"]);
   });
 
   it("lists nothing of A's to B", async () => {
@@ -221,6 +264,14 @@ describe("tenant isolation", () => {
       sql`insert into corrections (user_id, entry_id, fields, previous) values (${bobId}, ${owned.entry}, '{}', '\\x01'::bytea)`,
     );
     await expect(correctionAttempt).rejects.toThrow();
+    const memoryAttempt = handle.db.execute(
+      sql`insert into memories (user_id, kind, text, quote, entry_id, occurred_at) values (${bobId}, 'moment', '\\x01'::bytea, '\\x01'::bytea, ${owned.entry}, now())`,
+    );
+    await expect(memoryAttempt).rejects.toThrow();
+    const readAttempt = handle.db.execute(
+      sql`insert into memory_reads (user_id, entry_id, source_updated_at) values (${bobId}, ${owned.entry}, now())`,
+    );
+    await expect(readAttempt).rejects.toThrow();
   });
 
   it("cannot decrypt A's ciphertext with B's key", async () => {

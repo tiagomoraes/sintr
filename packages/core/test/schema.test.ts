@@ -6,7 +6,7 @@ import { fileURLToPath } from "node:url";
 import { getTableColumns, getTableName, inArray, is, sql } from "drizzle-orm";
 import { PgTable, getTableConfig } from "drizzle-orm/pg-core";
 import { afterAll, describe, expect, it } from "vitest";
-import { KEY_MATERIAL, SEALED } from "../src/db/sealed";
+import { KEY_MATERIAL, ROTATED, SEALED } from "../src/db/sealed";
 import * as schema from "../src/db/schema";
 import { createUser, openTestDatabase } from "./support";
 
@@ -42,6 +42,8 @@ describe("schema invariants", () => {
         "insights",
         "invites",
         "links",
+        "memories",
+        "memory_reads",
         "messages",
         "notifications",
         "practices",
@@ -97,6 +99,24 @@ describe("schema invariants", () => {
     }
   });
 
+  it("stores every vector turned by its owner's rotation: each vector column is declared", () => {
+    const rotated = new Set(
+      ROTATED.map(({ table, column }) => {
+        const sqlName = (getTableColumns(table) as Record<string, { name: string }>)[column]!.name;
+        return `${getTableName(table)}.${sqlName}`;
+      }),
+    );
+    const vectors: string[] = [];
+    for (const table of tables) {
+      for (const column of getTableConfig(table).columns) {
+        if (column.getSQLType() === "vector") vectors.push(`${getTableName(table)}.${column.name}`);
+      }
+    }
+    expect(vectors).toEqual(["memories.embedding"]);
+    for (const column of vectors)
+      expect(rotated.has(column), `${column} must be declared in ROTATED`).toBe(true);
+  });
+
   it("keeps free-text fields of the ledger out of clear-text columns", () => {
     const freeText = [
       "situation",
@@ -119,6 +139,8 @@ describe("schema invariants", () => {
       "registration",
       "snapshot",
       "pdf",
+      "text",
+      "quote",
     ];
     for (const table of tables) {
       for (const column of getTableConfig(table).columns) {
@@ -221,6 +243,20 @@ describe("migrations", () => {
     expect(byId.get(spanish)).toBe("es");
     // English was everyone's default, so it says nothing of a choice: their reports follow their language.
     expect(byId.get(english)).toBeNull();
+  });
+
+  it("carry pgvector, and stop with a readable message where it is missing (0009)", async () => {
+    const rows = await db.db.execute<{ extversion: string }>(
+      sql`select extversion from pg_extension where extname = 'vector'`,
+    );
+    expect(rows[0]?.extversion).toMatch(/^0\.8\./u);
+    const root = fileURLToPath(new URL("..", import.meta.url));
+    const [check, create] = readFileSync(join(root, "drizzle/0009_memory.sql"), "utf8")
+      .split("--> statement-breakpoint")
+      .map((part) => part.trim());
+    expect(check).toContain("pg_available_extensions");
+    expect(check).toContain("RAISE EXCEPTION");
+    expect(create).toBe("CREATE EXTENSION IF NOT EXISTS vector;");
   });
 
   it("empty the one-off session date Therapy no longer asks, and keep its column (0008)", async () => {

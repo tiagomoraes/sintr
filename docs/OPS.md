@@ -1,6 +1,6 @@
 # Running sintr for other people
 
-For whoever runs sintr for people other than themselves: the hosted offer, or a self-host shared with a family or a practice. It covers the house assistant, plans, and payments. Keeping a diary on your own machine needs none of this; [`SELFHOST.md`](SELFHOST.md) is enough. Every variable is also explained in [`.env.example`](../.env.example), and the reasons are in [`DECISIONS.md`](DECISIONS.md) 69 to 83 (the house and plans) and 86 to 90 (speaking).
+For whoever runs sintr for people other than themselves: the hosted offer, or a self-host shared with a family or a practice. It covers the house assistant, plans, and payments. Keeping a diary on your own machine needs none of this; [`SELFHOST.md`](SELFHOST.md) is enough. Every variable is also explained in [`.env.example`](../.env.example), and the reasons are in [`DECISIONS.md`](DECISIONS.md) 69 to 83 (the house and plans), 86 to 90 (speaking) and 113 to 119 (the memory).
 
 ## The house assistant
 
@@ -47,6 +47,31 @@ SINTR_HOUSE_STT_LANGUAGE=pt                          # what to expect when a per
 - **It is counted.** Free has 15 minutes of speaking a month and Personal 120, counted to the second; at the end of the month's time the Speak button goes and the box stays.
 - **Someone on their own key** is heard by their own provider (OpenRouter, OpenAI, Groq or Google), never the house; with Anthropic or a local model they write, and the home says why in one line.
 - It needs the page to be served over https (a phone's browser only opens the microphone there, or on localhost).
+
+## The memory (embeddings)
+
+A person who turns on the memory in Memory has their diary read by the house's model and each memory placed by meaning by an embeddings model. By default the house uses its own provider and key, when that provider has embeddings:
+
+| House provider | Embeddings | Model by default |
+| --- | --- | --- |
+| OpenRouter (`https://openrouter.ai/api/v1`) | `/embeddings`, the house key | `openai/text-embedding-3-small` (1536 numbers) |
+| OpenAI (`https://api.openai.com/v1`) | `/embeddings`, the house key | `text-embedding-3-small` |
+| Google | `batchEmbedContents`, the house key | `gemini-embedding-001`, at 1536 |
+| Anthropic | none of its own: set an endpoint below, or the memory is not offered | |
+| another gateway (LiteLLM) | `/embeddings`, only if you name the model | `SINTR_HOUSE_EMBED_MODEL` |
+
+```bash
+SINTR_HOUSE_EMBED_MODEL=openai/text-embedding-3-small   # another model, or "off" for no memory
+# An embeddings endpoint of its own, for an Anthropic house (both together):
+# SINTR_HOUSE_EMBED_BASE_URL=https://api.openai.com/v1
+# SINTR_HOUSE_EMBED_KEY=sk-...
+```
+
+- **People are told who receives their diary**, and agree to exactly those: the house's name (`SINTR_HOUSE_NAME`) and, with an endpoint of its own, that endpoint's service (OpenAI, OpenRouter) or host. Changing either pauses everyone's memory until each person agrees again; changing the model alone re-places their memories with the new one, the next time the worker reads.
+- **It is bounded, not counted.** At most 100 pages a person a day are read (one call to the house model per 8 pages, plus one embeddings call); it does not count on anyone's plan. Every message of a person whose memory is on also places their words (one embeddings call, a fraction of a cent per thousand messages).
+- **Embeddings are not stored as the provider made them.** Each vector is turned by a rotation derived from the person's own data key (DECISIONS 114). Changing `SINTR_MASTER_KEY` is not a thing you do; if a person's data key ever changed, their memories would be placed again.
+- **Postgres needs pgvector.** The bundled stack builds it in (`docker/postgres.Dockerfile`); a Postgres of your own needs the extension installed before migration 0009 ([`SELFHOST.md`](SELFHOST.md), "Upgrading to the memory").
+- The worker logs `memory.read` (how many kept, after how many attempts), `memory.page_not_read` with `crisis_screen` (pages never sent), `memory.read_failed` and `memory.embedding_failed` with a code; never a word.
 
 ## Plans
 

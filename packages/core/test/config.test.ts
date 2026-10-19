@@ -98,6 +98,7 @@ describe("configuration", () => {
       apiKey: "sk-ant-house-secret-value",
       name: "Anthropic",
       voice: { off: false, endpoint: null, model: null, language: null },
+      memory: { off: false, endpoint: null, model: null },
     });
     // An OpenAI-compatible gateway is named after its host unless SINTR_HOUSE_NAME says otherwise.
     const gateway = {

@@ -1,12 +1,17 @@
 # Development database for make dev, make migrate and make test.
 # Bound to 127.0.0.1 only. The self-host stack lives in compose.yaml.
+# Postgres 16 on Alpine with pgvector, built from postgres.Dockerfile, the
+# same image as the self-host stack's (DECISIONS 118).
 # It joins Docker's default bridge instead of creating a network, so it also
 # starts on hosts whose address pools are exhausted. make names the project
 # after the checkout, so each worktree has its own database.
 
 services:
   db:
-    image: postgres:16-alpine
+    image: ${SINTR_DB_IMAGE:-sintr-db:local}
+    build:
+      context: .
+      dockerfile: postgres.Dockerfile
     network_mode: bridge
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-sintr}
