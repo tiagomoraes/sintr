@@ -1,13 +1,16 @@
 import type { HouseAssistant, ProviderCredentials } from "@sintr/core";
 import { describe, expect, it } from "vitest";
 import {
+  MAX_AUDIO_SECONDS,
   REHEARSAL_TRANSCRIPT,
   audioFormat,
+  countedSeconds,
   geminiInstruction,
   languageHint,
   rehearsalTranscription,
   transcribe,
   voiceRouteFor,
+  wavSeconds,
   writingLanguage,
   type Recording,
   type VoiceRoute,
@@ -317,6 +320,67 @@ describe("recordings", () => {
     expect(audioFormat("audio/wav")).toEqual({ format: "wav", mime: "audio/wav" });
     expect(audioFormat("text/plain")).toBeNull();
     expect(audioFormat(null)).toBeNull();
+  });
+});
+
+/** A WAV file of `seconds` of silence at 16 kHz mono, 16-bit. */
+function wav(seconds: number, extraChunk = false): Uint8Array {
+  const data = Math.round(seconds * 16_000) * 2;
+  const extra = extraChunk ? 8 + 6 : 0;
+  const bytes = new Uint8Array(44 + extra + data);
+  const view = new DataView(bytes.buffer);
+  const text = (offset: number, value: string) =>
+    [...value].forEach((c, i) => view.setUint8(offset + i, c.charCodeAt(0)));
+  text(0, "RIFF");
+  view.setUint32(4, 36 + extra + data, true);
+  text(8, "WAVE");
+  text(12, "fmt ");
+  view.setUint32(16, 16, true);
+  view.setUint16(20, 1, true);
+  view.setUint16(22, 1, true);
+  view.setUint32(24, 16_000, true);
+  view.setUint32(28, 32_000, true);
+  view.setUint16(32, 2, true);
+  view.setUint16(34, 16, true);
+  let offset = 36;
+  if (extraChunk) {
+    text(36, "LIST");
+    view.setUint32(40, 6, true);
+    offset += 14;
+  }
+  text(offset, "data");
+  view.setUint32(offset + 4, data, true);
+  return bytes;
+}
+
+describe("how long a recording is, as the server counts it", () => {
+  it("reads a WAV file's length from its header, past other chunks", () => {
+    expect(wavSeconds(wav(2.5))).toBeCloseTo(2.5);
+    expect(wavSeconds(wav(1, true))).toBeCloseTo(1);
+    expect(wavSeconds(new Uint8Array(100))).toBeNull();
+  });
+
+  it("takes the browser's measure, never under what the size makes it, and WAV exactly", () => {
+    const webm = (bytes: number): Recording => ({
+      bytes: new Uint8Array(bytes),
+      format: "webm",
+      mime: "audio/webm",
+    });
+    // An honest minute at 64 kbit/s: the browser's 60 seconds stand.
+    expect(countedSeconds({ claimed: 60, recording: webm(480_000) })).toMatchObject({
+      seconds: 60,
+      tooLong: false,
+    });
+    // A browser claiming one second for three megabytes is counted for at least 94 of them.
+    expect(countedSeconds({ claimed: 1, recording: webm(3_000_000) }).seconds).toBeCloseTo(93.75);
+    expect(countedSeconds({ claimed: Number.NaN, recording: webm(10) }).seconds).toBe(1);
+    // A WAV file says its own length, whatever is claimed.
+    const recording: Recording = { bytes: wav(12), format: "wav", mime: "audio/wav" };
+    expect(countedSeconds({ claimed: 1, recording })).toMatchObject({ measured: 12, seconds: 12 });
+    // Clearly longer than a recording may be: refused before anything is taken or sent.
+    expect(countedSeconds({ claimed: 1, recording: webm(12_000_000) }).tooLong).toBe(true);
+    const long: Recording = { bytes: wav(MAX_AUDIO_SECONDS + 30), format: "wav", mime: "audio/wav" };
+    expect(countedSeconds({ claimed: 10, recording: long }).tooLong).toBe(true);
   });
 });
 

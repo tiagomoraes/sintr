@@ -329,6 +329,58 @@ export async function transcribe(
   }
 }
 
+/* How long a recording is, as far as the server can tell */
+
+/** The length of a WAV file from its own header, or null if it is not one sintr can read. */
+export function wavSeconds(bytes: Uint8Array): number | null {
+  if (bytes.byteLength < 44) return null;
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  const tag = (offset: number) => String.fromCharCode(...bytes.subarray(offset, offset + 4));
+  if (tag(0) !== "RIFF" || tag(8) !== "WAVE") return null;
+  // Walk the chunks for the format's byte rate and the size of the data.
+  let byteRate = 0;
+  for (let offset = 12; offset + 8 <= bytes.byteLength;) {
+    const id = tag(offset);
+    const size = view.getUint32(offset + 4, true);
+    if (id === "fmt " && offset + 16 <= bytes.byteLength) byteRate = view.getUint32(offset + 16, true);
+    if (id === "data") {
+      if (!byteRate) return null;
+      const data = Math.min(size, bytes.byteLength - offset - 8);
+      return data / byteRate;
+    }
+    offset += 8 + size + (size % 2);
+  }
+  return null;
+}
+
+/**
+ * The densest a recording made for speech can be: 256 kbit/s. A recording
+ * cannot be shorter than its size at that rate, whatever the browser says;
+ * an honest one (recorded at 64 kbit/s) is always longer than this floor.
+ */
+const DENSEST_BYTES_PER_SECOND = 32_000;
+
+/**
+ * The seconds to count for a recording before it is written down: the
+ * browser's measure, never less than what its size makes it at the least
+ * (and exactly its length for WAV, from its header). `tooLong` when that
+ * least is already over the five minutes a recording may last.
+ */
+export function countedSeconds(input: { claimed: number; recording: Recording }): {
+  seconds: number;
+  measured: number | null;
+  tooLong: boolean;
+} {
+  const measured = input.recording.format === "wav" ? wavSeconds(input.recording.bytes) : null;
+  const floor = measured ?? input.recording.bytes.byteLength / DENSEST_BYTES_PER_SECOND;
+  const least = Math.max(floor, Number.isFinite(input.claimed) ? input.claimed : 0);
+  return {
+    seconds: Math.max(1, Math.min(MAX_AUDIO_SECONDS, measured ?? least)),
+    measured,
+    tooLong: floor > MAX_AUDIO_SECONDS + 5,
+  };
+}
+
 /* The rehearsal transcriber (SINTR_FAKE_AGENT) */
 
 /** What the rehearsal transcriber hears in any recording. */

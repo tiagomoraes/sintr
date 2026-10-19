@@ -3,12 +3,14 @@ import {
   MAX_AUDIO_BYTES,
   MAX_AUDIO_SECONDS,
   audioFormat,
+  countedSeconds,
   languageHint,
   personTexts,
   rehearsalTranscription,
   screenForRisk,
   transcribe,
   type Recording,
+  type Transcription,
 } from "@sintr/agent";
 import { z } from "zod";
 import { loadMessages } from "@/lib/server/assistant";
@@ -72,13 +74,14 @@ export async function POST(request: Request) {
   if (bytes === null) return apiError(413, "too_large");
   if (bytes.byteLength === 0) return apiError(400, "empty_audio");
   const recording: Recording = { bytes, format: format.format, mime: format.mime };
-  const seconds = Math.max(1, Math.min(MAX_AUDIO_SECONDS, query.data.seconds));
+  // Gemini is sent WAV, which says its own length.
+  if (voice.route.kind === "gemini" && recording.format !== "wav") return apiError(415, "unsupported_audio");
+  // Counted by the browser's measure, never under what the recording's size makes it.
+  const counted = countedSeconds({ claimed: query.data.seconds, recording });
+  if (counted.tooLong) return apiError(413, "too_long");
+  const seconds = counted.seconds;
   const { config } = runtime();
   const log = runtime().log.child({ userId: user.id, requestId: randomUUID() });
-
-  // The house's minutes are taken before the call and settled after it; a person's own key is never counted.
-  const taken = voice.source === "house" ? await scope.plans.takeAudio(seconds) : null;
-  if (taken && !taken.ok) return apiError(429, "audio_limit", { next: taken.period.next });
 
   // A hint of the language, from the person's own writing: this conversation, or the latest one.
   const conversations = query.data.conversation ? [] : await scope.conversations.list();
@@ -95,12 +98,21 @@ export async function POST(request: Request) {
     houseDefault: config.house?.voice.language ?? null,
   });
 
+  // The house's seconds are taken right before the call and always settled after it, to what was
+  // really heard (all of them back if nothing was); a person's own key is never counted.
+  const taken = voice.source === "house" ? await scope.plans.takeAudio(seconds) : null;
+  if (taken && !taken.ok) return apiError(429, "audio_limit", { next: taken.period.next });
   const started = Date.now();
-  const result = config.fakeAgent
-    ? rehearsalTranscription(recording, seconds)
-    : await transcribe(voice.route, recording, { mode: config.mode, language, log });
-  if (taken)
-    await scope.plans.settleAudio(taken.period, taken.seconds, result.ok ? (result.seconds ?? seconds) : 0);
+  let heard = 0;
+  let result: Transcription;
+  try {
+    result = config.fakeAgent
+      ? rehearsalTranscription(recording, seconds)
+      : await transcribe(voice.route, recording, { mode: config.mode, language, log });
+    if (result.ok) heard = result.seconds ?? counted.measured ?? seconds;
+  } finally {
+    if (taken) await scope.plans.settleAudio(taken.period, taken.seconds, heard);
+  }
   if (!result.ok) {
     log.warn("voice.failed", { code: result.problem, durationMs: Date.now() - started });
     return apiError(502, result.problem);
@@ -108,7 +120,7 @@ export async function POST(request: Request) {
   // Codes and counts only: the seconds heard, never a word of them.
   log.info("voice.transcribed", {
     code: result.text ? `${voice.source}_ok` : `${voice.source}_nothing_heard`,
-    count: Math.round(result.seconds ?? seconds),
+    count: Math.round(heard),
     durationMs: Date.now() - started,
   });
   const screening = screenForRisk(result.text);
