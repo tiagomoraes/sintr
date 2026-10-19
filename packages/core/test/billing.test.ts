@@ -227,13 +227,16 @@ describe("the calls to Stripe", () => {
         }),
       }).fetch,
     });
-    const error = await refusing.checkout(request).catch((e: unknown) => e as Error);
+    const error = (await refusing.checkout(request).then(
+      () => null,
+      (e: unknown) => e,
+    )) as Error;
     expect(error).toMatchObject({ name: "BillingError", code: "refused", status: 400 });
     expect(error.message).not.toContain("secret-address");
     const down = createStripe(config, {
-      fetch: (async () => {
+      fetch: async () => {
         throw new TypeError("fetch failed");
-      }),
+      },
     });
     await expect(down.checkout(request)).rejects.toMatchObject({ code: "unreachable" });
   });

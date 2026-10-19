@@ -135,7 +135,7 @@ describe("configuration", () => {
     expect(problem({ SINTR_HOUSE_PROVIDER: "someone", SINTR_HOUSE_KEY: secret })).toMatch(
       /SINTR_HOUSE_PROVIDER/,
     );
-    for (const env of [
+    const leaky: Record<string, string>[] = [
       { SINTR_HOUSE_KEY: secret },
       { SINTR_HOUSE_PROVIDER: "anthropic", SINTR_HOUSE_KEY: secret },
       {
@@ -143,9 +143,8 @@ describe("configuration", () => {
         SINTR_HOUSE_MODEL: "m",
         SINTR_HOUSE_BASE_URL: `https://user:${secret}@gateway.example/v1`,
       },
-    ]) {
-      expect(problem(env)).not.toContain(secret);
-    }
+    ];
+    for (const env of leaky) expect(problem(env)).not.toContain(secret);
   });
 
   it("puts a person on Free unless SINTR_PERSON_PLAN says otherwise", () => {
