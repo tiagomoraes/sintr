@@ -79,6 +79,8 @@ async function expectNoHouseKey(page: Page) {
 }
 
 test.describe("the house assistant", () => {
+  // A conversation, then a report: several waits on the assistant in one test.
+  test.slow();
   test("a new person talks it through and gets a report, without ever opening Settings", async ({ page }) => {
     await signUp(page, newEmail("house-first"));
     const userId = await currentUserId(page);

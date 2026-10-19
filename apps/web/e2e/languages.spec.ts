@@ -47,6 +47,8 @@ async function withoutScript(browser: Browser, page: Page, locale: string) {
 }
 
 test.describe("in Portuguese, from the browser", () => {
+  // Sign-up, the welcome, a conversation and a report: several waits on the assistant in one test.
+  test.slow();
   test.use({ baseURL: HOUSE, locale: "pt-BR", timezoneId: "America/Sao_Paulo" });
 
   test("signs up, is welcomed, keeps a conversation and gets its report in Portuguese", async ({ page }) => {

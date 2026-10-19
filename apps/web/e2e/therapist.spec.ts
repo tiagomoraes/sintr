@@ -290,6 +290,8 @@ test.describe("a practice invites a patient and receives a report", () => {
 });
 
 test.describe("the practice routes are scoped to their owner", () => {
+  // Two people each prepare and approve a report.
+  test.slow();
   test("another practice, another person and a stranger reach none of it", async ({ page, browser }) => {
     // A linked person shares an approved report with practice A.
     await signUpQuietly(page, newEmail("owner-practice"));

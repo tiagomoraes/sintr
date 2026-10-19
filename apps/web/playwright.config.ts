@@ -83,6 +83,10 @@ export default defineConfig({
   fullyParallel: false,
   workers: 1,
   forbidOnly: Boolean(process.env.CI),
+  // Above the longest single wait in a test (a report's preparation, REPORT in e2e/support.ts, 60 s;
+  // the assistant's, ASSISTANT, 30 s) with room for the steps before it. A test that chains several
+  // of them is marked test.slow(), three times this.
+  timeout: 90_000,
   reporter: process.env.CI ? [["list"], ["html", { open: "never" }]] : "list",
   use: {
     baseURL: url,
