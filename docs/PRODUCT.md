@@ -107,7 +107,7 @@ The owner's request: a person may go every fifteen days, twice a week, or on a r
 
 **What did not come back.** "Has a session moved?" stays gone: a moved session is simply a session on another day, chosen on the calendar, never a date that guesses which session it replaces.
 
-The reasons are in DECISIONS 124 to 130.
+The reasons are in DECISIONS 124 to 129, and 136.
 
 ## Giving another assistant a key (F12)
 
