@@ -6,10 +6,8 @@ import type { AssistantFormState, ConnectionState } from "@/app/(app)/settings/a
 import { counted } from "@/lib/plan";
 import type { AssistantState } from "@/lib/server/assistant";
 import type { VoiceView } from "@/lib/voice/view";
-import { t } from "@/messages";
+import { getMessages } from "@/lib/server/language";
 import { AssistantForm } from "./assistant-form";
-
-const S = t.settings.assistant;
 
 /** "Anthropic", "Google", or the host of an OpenAI-compatible endpoint. */
 function providerName(settings: AgentSettings): string {
@@ -45,7 +43,7 @@ function OwnKeyDoor({ open, summary, children }: { open: boolean; summary: strin
  * line says what changed, with a way back. Without a house assistant (a
  * typical self-host), the key is the way in, and the door stands open.
  */
-export function AssistantSection({
+export async function AssistantSection({
   state,
   settings,
   openDoor,
@@ -66,6 +64,8 @@ export function AssistantSection({
   back: () => Promise<void>;
   rehearsal: boolean;
 }) {
+  const t = await getMessages();
+  const S = t.settings.assistant;
   const form = <AssistantForm settings={settings} save={save} test={test} rehearsal={rehearsal} />;
   const keyNote = S.keyNote;
   const speaking =

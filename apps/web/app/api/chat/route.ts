@@ -13,6 +13,7 @@ import { consumeStream, createUIMessageStreamResponse, type LanguageModel } from
 import { z } from "zod";
 import { MAX_MESSAGE_LENGTH } from "@/lib/chat";
 import { assistantFor, loadMessages, titleFrom } from "@/lib/server/assistant";
+import { currentLanguage } from "@/lib/server/language";
 import { apiError, apiScope, runtime } from "@/lib/server/runtime";
 
 export const dynamic = "force-dynamic";
@@ -69,8 +70,9 @@ export async function POST(request: Request) {
     return apiError(409, "nothing_to_retry");
   }
 
-  const profile = await scope.profile.get();
-  const person = { language: profile.language, timezone: profile.timezone };
+  const [profile, language] = await Promise.all([scope.profile.get(), currentLanguage()]);
+  // The language the person reads sintr in: the assistant is told it, and still answers in the one they write in.
+  const person = { language: language.code, timezone: profile.timezone };
   const prelude: SintrUIMessageChunk[] = existing
     ? []
     : [{ type: "data-conversation", data: { conversationId: conversation.id }, transient: true }];

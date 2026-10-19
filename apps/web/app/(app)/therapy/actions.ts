@@ -11,7 +11,8 @@ export interface TherapyFormState {
   problems: Record<string, string>;
 }
 
-const LANGUAGES: Record<string, string> = { en: "en", pt: "pt-BR", es: "es" };
+/** The report's languages as offered; "" follows the language the person reads sintr in. */
+const LANGUAGES: Record<string, string | null> = { "": null, en: "en", pt: "pt-BR", es: "es" };
 
 function text(form: FormData, name: string): string {
   const value = form.get(name);
@@ -29,8 +30,10 @@ export async function saveTherapy(_state: TherapyFormState, form: FormData): Pro
 
   const timezone = text(form, "timezone");
   if (!isTimeZone(timezone)) problems.timezone = "Choose a time zone from the list.";
-  const language = LANGUAGES[text(form, "language")];
-  if (!language) problems.language = "Choose the report's language.";
+  const chosenLanguage = text(form, "language");
+  const language = LANGUAGES[chosenLanguage];
+  if (language === undefined || !Object.hasOwn(LANGUAGES, chosenLanguage))
+    problems.language = "Choose the report's language.";
 
   const dayValue = text(form, "sessionDay");
   const sessionDay = dayValue === "" ? null : Number(dayValue);
@@ -84,7 +87,11 @@ export async function saveTherapy(_state: TherapyFormState, form: FormData): Pro
     reportNoticeEmail: form.get("reportNoticeEmail") === "on",
   };
   try {
-    await scope.profile.update({ timezone, language: language!, displayName: displayName || null });
+    await scope.profile.update({
+      timezone,
+      reportLanguage: language ?? null,
+      displayName: displayName || null,
+    });
     await scope.therapySettings.update(patch);
   } catch (error) {
     if (error instanceof ValidationError) {

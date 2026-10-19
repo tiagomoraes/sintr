@@ -4,6 +4,7 @@ import Link from "next/link";
 import { EmptyState, PageHeading } from "@/components/empty-state";
 import { formatMoment } from "@/lib/format";
 import { requireScope } from "@/lib/server/runtime";
+import { currentLanguage } from "@/lib/server/language";
 
 export const metadata: Metadata = { title: "Check-ins" };
 
@@ -28,6 +29,7 @@ export default async function CheckinsPage({
   const { scope } = await requireScope();
   const before = (await searchParams).before;
   const to = typeof before === "string" && !Number.isNaN(Date.parse(before)) ? new Date(before) : undefined;
+  const language = await currentLanguage();
   const [checkins, profile] = await Promise.all([
     scope.checkins.list({ limit: PAGE + 1, ...(to ? { to } : {}) }),
     scope.profile.get(),
@@ -67,7 +69,7 @@ export default async function CheckinsPage({
             <li key={checkin.id} className="border-b border-rule">
               <Link href={`/checkins/${checkin.id}`} className="group block py-5 no-underline">
                 <span className="block font-serif italic text-ink-2 group-hover:text-ink">
-                  {formatMoment(checkin.occurredAt, profile)}
+                  {formatMoment(checkin.occurredAt, { language: language.code, timezone: profile.timezone })}
                 </span>
                 <span className="mt-2 flex flex-wrap gap-x-7 gap-y-2">
                   <Value label="Mood" value={checkin.mood} unit="of 5" />

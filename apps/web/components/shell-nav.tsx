@@ -4,9 +4,10 @@ import { cn } from "@sintr/ui";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef, type ReactNode } from "react";
-import { t } from "@/messages";
+import { useMessages } from "@/components/language";
+import type { Messages } from "@/messages";
 
-type Section = keyof typeof t.shell.about;
+type Section = keyof Messages["shell"]["about"];
 
 export const SECTIONS: readonly { href: string; key: Section }[] = [
   { href: "/home", key: "home" },
@@ -29,6 +30,7 @@ function isCurrent(pathname: string, href: string): boolean {
 }
 
 function Dot() {
+  const t = useMessages();
   return (
     <>
       <span aria-hidden="true" className="size-[6px] rounded-full bg-draft shadow-[0_0_0_2px_#fbe6da]" />
@@ -92,6 +94,7 @@ export function ShellNav({
   plan = false,
   dots = { sharing: false, practice: false },
 }: ShellNavProps) {
+  const t = useMessages();
   const pathname = usePathname();
   return (
     <nav aria-label={t.shell.nav.label} className="hidden min-[900px]:block">
@@ -136,6 +139,7 @@ export function PhoneMenu({
   dots = { sharing: false, practice: false },
   footer,
 }: ShellNavProps & { footer?: ReactNode }) {
+  const t = useMessages();
   const pathname = usePathname();
   const dialog = useRef<HTMLDialogElement>(null);
   // Moving to another page closes the sheet.

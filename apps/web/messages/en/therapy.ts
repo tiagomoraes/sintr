@@ -45,6 +45,8 @@ export const therapy = {
     lead: "When to prepare it",
     leadHint: "It covers the days since the last report, up to that moment, so it is fresh for the session.",
     language: "The report's language",
+    /** The first choice: the report follows the language the person reads sintr in, named. */
+    languageFollow: (name: string) => `The language you read sintr in (${name})`,
     languageHint:
       "Headings and the assistant's words follow it. Your own words stay exactly as you wrote them.",
     name: "Your name, as the report shows it",

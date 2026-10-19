@@ -24,7 +24,7 @@ import { AcceptAsPersonForm } from "@/components/sharing/join-forms";
 import { SupportStrip } from "@/components/talk/support-strip";
 import { InvitePromises } from "@/components/sharing/invite-promises";
 import { timeOfDay } from "@/lib/time-of-day";
-import { t } from "@/messages";
+import { LanguageOffers, useMessages } from "@/components/language";
 
 /** A practice's invite the person arrived with, as the invite's own page would show it. */
 export interface WelcomeInvite {
@@ -49,7 +49,6 @@ const SCENES: Record<Step, RoomScene> = {
   ready: "ready",
 };
 
-const W = t.welcome;
 const noSubscription = () => () => undefined;
 
 /** "America/Sao_Paulo" as "Sao Paulo". */
@@ -70,6 +69,7 @@ function StepFrame({
   body?: ReactNode;
   children: ReactNode;
 }) {
+  const W = useMessages().welcome;
   return (
     <div className="flex w-full max-w-[36rem] flex-1 flex-col pt-[clamp(20px,7vh,88px)]">
       {index !== null ? (
@@ -131,6 +131,8 @@ export function WelcomeFlow({
   timezones: string[];
   saved: { name: string; therapist: string; day: string; time: string; timezone: string };
 }) {
+  const t = useMessages();
+  const W = t.welcome;
   const params = useSearchParams();
   // The invite the person arrived with, as it was then: once accepted it no longer previews as valid,
   // and the page may be rendered again on the way.
@@ -520,6 +522,8 @@ export function WelcomeFlow({
         </main>
         <footer className="wrap pb-[max(20px,env(safe-area-inset-bottom))] pt-6">
           <SupportStrip />
+          {/* Before anything is asked, the other languages, each in its own words. */}
+          {step === "start" ? <LanguageOffers className="mt-3" /> : null}
         </footer>
       </div>
     </div>

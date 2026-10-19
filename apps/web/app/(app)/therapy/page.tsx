@@ -2,14 +2,16 @@ import { preparationTime, reportLanguage, upcomingSession, type TherapyNoteKind 
 import type { Metadata } from "next";
 import { PageHeading } from "@/components/empty-state";
 import { TherapyForm } from "@/components/therapy/therapy-form";
-import { formatMoment } from "@/lib/format";
+import { formatMoment, languageName } from "@/lib/format";
 import { requireScope, runtime } from "@/lib/server/runtime";
-import { LEADS, REPORT_LANGUAGE_OPTIONS } from "@/lib/therapy";
+import { LEADS } from "@/lib/therapy";
 import { toLocalInput } from "@/lib/time";
-import { t } from "@/messages";
+import { currentLanguage, getMessages } from "@/lib/server/language";
 import { saveTherapy } from "./actions";
 
-export const metadata: Metadata = { title: t.therapy.title };
+export async function generateMetadata(): Promise<Metadata> {
+  return { title: (await getMessages()).therapy.title };
+}
 
 const KIND_LABEL: Record<TherapyNoteKind, string> = {
   session: "Session note",
@@ -22,6 +24,8 @@ const KIND_LABEL: Record<TherapyNoteKind, string> = {
 const TIMEZONES = Intl.supportedValuesOf("timeZone");
 
 export default async function TherapyPage() {
+  const t = await getMessages();
+  const language = await currentLanguage();
   const { scope } = await requireScope();
   const [settings, profile, notes, account] = await Promise.all([
     scope.therapySettings.get(),
@@ -66,17 +70,17 @@ export default async function TherapyPage() {
             ),
             report: t.therapy.report.summary(
               LEADS.find((lead) => lead.minutes === settings.reportLeadMinutes)?.label ?? "",
-              REPORT_LANGUAGE_OPTIONS.find((option) => option.value === reportLanguage(profile.language))
-                ?.label ?? "English",
+              languageName(reportLanguage(profile.reportLanguage ?? language.code), language.code),
               profile.displayName,
             ),
           }}
           timezones={timezones}
           emailAvailable={runtime().email.available}
           emailVerified={account.emailVerified}
+          readIn={languageName(language.code, language.code)}
           defaults={{
             displayName: profile.displayName ?? "",
-            language: reportLanguage(profile.language),
+            language: profile.reportLanguage ? reportLanguage(profile.reportLanguage) : "",
             timezone: profile.timezone,
             therapistName: settings.therapistName ?? "",
             therapistEmail: settings.therapistContact ?? "",

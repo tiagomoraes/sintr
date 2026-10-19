@@ -6,7 +6,7 @@ import { redirect } from "next/navigation";
 import { tooManyLookups } from "@/lib/server/join";
 import { requireScope } from "@/lib/server/runtime";
 import { safeNext } from "@/lib/redirect";
-import { t } from "@/messages";
+import { getMessages } from "@/lib/server/language";
 
 /** What a step answers: saved, or one plain sentence about what to change. */
 export interface StepResult {
@@ -33,6 +33,7 @@ export async function beginWelcome(timezone: string): Promise<StepResult> {
 
 /** How the person wants to be called: kept sealed, for greetings only. */
 export async function saveName(name: string): Promise<StepResult> {
+  const t = await getMessages();
   const { scope } = await requireScope();
   const value = name.trim();
   if (value.length > 80) return fail(t.welcome.name.tooLong);
@@ -42,6 +43,7 @@ export async function saveName(name: string): Promise<StepResult> {
 
 /** The therapist's name, as the report will be for them. */
 export async function saveTherapist(name: string): Promise<StepResult> {
+  const t = await getMessages();
   const { scope } = await requireScope();
   const value = name.trim();
   if (value.length > 200) return fail(t.welcome.therapist.tooLong);
@@ -55,6 +57,7 @@ export async function saveSession(input: {
   time: string;
   timezone: string;
 }): Promise<StepResult> {
+  const t = await getMessages();
   const { scope } = await requireScope();
   const day = input.day === "" ? null : Number(input.day);
   const time = input.time.trim() === "" ? null : input.time.trim();
@@ -73,8 +76,6 @@ export async function saveSession(input: {
   return OK;
 }
 
-const INVITE = t.welcome.invite.problems;
-
 /**
  * The person accepts the practice's invite they arrived with, inside the
  * welcome: the same yes and the same consent as on the invite's own page
@@ -82,6 +83,8 @@ const INVITE = t.welcome.invite.problems;
  * accepting.
  */
 export async function acceptInWelcome(code: string, form: FormData): Promise<StepResult> {
+  const t = await getMessages();
+  const INVITE = t.welcome.invite.problems;
   const { scope } = await requireScope();
   if (await tooManyLookups()) return fail(INVITE.busy);
   if (form.get("consent") !== "on") return fail(INVITE.consent);

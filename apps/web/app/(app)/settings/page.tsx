@@ -5,17 +5,18 @@ import { KeyList } from "@/components/connect/key-list";
 import { PageHeading } from "@/components/empty-state";
 import { EmailStatus } from "@/components/account/email-status";
 import { AssistantSection } from "@/components/settings/assistant-section";
+import { LanguageSection } from "@/components/settings/language-section";
 import { PreferencesForm } from "@/components/settings/preferences-form";
 import { assistantState } from "@/lib/server/assistant";
 import { workingKeys } from "@/lib/server/keys";
 import { requireScope, runtime } from "@/lib/server/runtime";
 import { voiceView } from "@/lib/server/voice";
-import { t } from "@/messages";
+import { getMessages } from "@/lib/server/language";
 import { returnToIncludedAssistant, saveAssistant, savePreferences, testAssistant } from "./actions";
 
-export const metadata: Metadata = { title: t.settings.title };
-
-const S = t.settings;
+export async function generateMetadata(): Promise<Metadata> {
+  return { title: (await getMessages()).settings.title };
+}
 
 const TIMEZONES = Intl.supportedValuesOf("timeZone");
 
@@ -24,6 +25,8 @@ export default async function SettingsPage({
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
+  const t = await getMessages();
+  const S = t.settings;
   const { scope } = await requireScope();
   // Only what may be shown: the key is reduced to a hint on the server.
   const [settings, assistant, profile, account, params, keys, practice, voice] = await Promise.all([
@@ -86,6 +89,12 @@ export default async function SettingsPage({
             justVerified={params.verified === "1"}
           />
         </div>
+      </section>
+      <section aria-labelledby="language-title" className="mt-16 max-w-[40rem] border-t border-rule pt-12">
+        <h2 id="language-title" className="font-serif text-title-small font-normal text-ink">
+          {t.language.title}
+        </h2>
+        <LanguageSection />
       </section>
       <section aria-labelledby="practice-title" className="mt-16 max-w-[40rem] border-t border-rule pt-12">
         <h2 id="practice-title" className="font-serif text-title-small font-normal text-ink">

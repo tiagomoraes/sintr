@@ -7,6 +7,7 @@ import { EntryRows } from "@/components/ledger/entry-rows";
 import { formatMoment } from "@/lib/format";
 import { ENTRY_LABELS } from "@/lib/labels";
 import { requireScope } from "@/lib/server/runtime";
+import { currentLanguage } from "@/lib/server/language";
 
 export const metadata: Metadata = { title: "Entry" };
 
@@ -16,7 +17,7 @@ export default async function EntryPage({ params }: { params: Promise<{ id: stri
   const entry = await scope.entries.get(id);
   if (!entry) notFound();
   const [profile, corrections] = await Promise.all([scope.profile.get(), scope.entries.corrections(id)]);
-  const locale = { language: profile.language, timezone: profile.timezone };
+  const locale = { language: (await currentLanguage()).code, timezone: profile.timezone };
 
   return (
     <>

@@ -8,12 +8,15 @@ import type { ProposalView } from "@/lib/proposals";
 import { assistantState, loadMessages, proposalView } from "@/lib/server/assistant";
 import { requireScope, runtime } from "@/lib/server/runtime";
 import { voiceView } from "@/lib/server/voice";
-import { t } from "@/messages";
+import { currentLanguage, getMessages } from "@/lib/server/language";
 import { deleteConversation } from "../actions";
 
-export const metadata: Metadata = { title: t.shell.nav.home };
+export async function generateMetadata(): Promise<Metadata> {
+  return { title: (await getMessages()).shell.nav.home };
+}
 
 export default async function ConversationPage({ params }: { params: Promise<{ id: string }> }) {
+  const t = await getMessages();
   const { id } = await params;
   const { scope } = await requireScope();
   const conversation = await scope.conversations.get(id);
@@ -25,7 +28,7 @@ export default async function ConversationPage({ params }: { params: Promise<{ i
     scope.proposals.list(id),
     voiceView(scope),
   ]);
-  const locale = { language: profile.language, timezone: profile.timezone };
+  const locale = { language: (await currentLanguage()).code, timezone: profile.timezone };
   const views: Record<string, ProposalView> = Object.fromEntries(
     proposals.map((p) => [p.id, proposalView(p)]),
   );

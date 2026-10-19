@@ -19,7 +19,7 @@ COMPOSE := docker compose -f docker/compose.yaml $(if $(SINTR_DOCKER_SUBNET),-f 
 # CI passes --with-deps to also install the browser's system libraries.
 PLAYWRIGHT_INSTALL_FLAGS ?=
 
-.PHONY: help setup dev test lint typecheck build migrate db-generate report-assets mcp-bridge practice-plan person-plan selfhost-up selfhost-down db-up db-down
+.PHONY: help setup dev test lint typecheck build migrate db-generate report-assets languages mcp-bridge practice-plan person-plan selfhost-up selfhost-down db-up db-down
 
 help: ## List the targets
 	@grep -hE '^[a-z-]+:.*## ' Makefile | awk -F ':.*## ' '{printf "  make %-14s %s\n", $$1, $$2}'
@@ -48,6 +48,9 @@ db-generate: ## Write a new SQL migration after a schema change (name it with NA
 report-assets: ## Re-embed the report's fonts and light after changing them (LIGHT=1 renders the light again)
 	node scripts/report-assets.mjs $(if $(LIGHT),--light)
 
+languages: ## Register the app's languages after adding one to apps/web/messages/languages.json (docs/LANGUAGES.md)
+	node scripts/languages.mjs
+
 mcp-bridge: ## Build the stdio bridge for local MCP clients (packages/mcp/dist/sintr-mcp.mjs)
 	$(PNPM) --filter @sintr/mcp build
 
@@ -69,10 +72,11 @@ test: db-up ## Unit, integration and end-to-end tests (real Postgres, offline as
 	$(PNPM) --filter @sintr/worker test
 	$(PNPM) --filter @sintr/web test
 
-lint: ## ESLint, Prettier and the copy rules (no dashes, no emoji)
+lint: ## ESLint, Prettier, the copy rules (no dashes, no emoji) and the languages' registry
 	$(PNPM) exec eslint . --max-warnings 0
 	$(PNPM) exec prettier --check .
 	node scripts/check-copy.mjs
+	node scripts/languages.mjs --check
 
 typecheck: ## TypeScript, strict, in every package
 	$(PNPM) -r typecheck

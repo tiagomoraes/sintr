@@ -23,7 +23,7 @@ import { useHydrated } from "@/lib/use-hydrated";
 import { poolMood } from "@/lib/voice/state";
 import { canRecord, useVoice, type Heard } from "@/lib/voice/use-voice";
 import type { VoiceView } from "@/lib/voice/view";
-import { t } from "@/messages";
+import { useMessages } from "@/components/language";
 import { CrisisPanel } from "./crisis-panel";
 import { LimitNotice, PlanLine } from "./plan-notes";
 import { ProposalCard } from "./proposal-card";
@@ -78,6 +78,7 @@ const transport = new DefaultChatTransport<SintrUIMessage>({
 });
 
 function Bubble({ from, children }: { from: "you" | "assistant"; children: string }) {
+  const t = useMessages();
   return (
     <div className={cn("flex", from === "you" ? "justify-end" : "justify-start")}>
       <p
@@ -96,6 +97,7 @@ function Bubble({ from, children }: { from: "you" | "assistant"; children: strin
 }
 
 function Writing() {
+  const t = useMessages();
   return (
     <div className="flex justify-start" role="status">
       <p className="m-0 inline-flex items-center gap-1.5 rounded-bubble rounded-bl-[6px] border border-rule bg-paper px-[18px] py-[15px]">
@@ -157,6 +159,7 @@ export function Conversation({
   greeting = null,
   doors = null,
 }: Props) {
+  const t = useMessages();
   const [serverId, setServerId] = useState<string | null>(conversationId);
   const [meter, setMeter] = useState<MeterView | null>(initialMeter);
   const [proposals, setProposals] = useState(initialProposals);
@@ -551,6 +554,7 @@ export function Conversation({
 
 /** One quiet line about speaking: why it is not offered, that the month's time is used, or, while speaking, who hears it. */
 function VoiceAvailability({ voice, speaking }: { voice: VoiceView; speaking: boolean }) {
+  const t = useMessages();
   if (voice.kind === "limit")
     return <p className="mt-2 text-caption text-ink-3">{t.voice.limit(voice.next)}</p>;
   if (voice.kind === "unavailable") {

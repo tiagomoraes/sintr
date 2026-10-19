@@ -5,7 +5,7 @@ import { useId, useState, type ReactNode } from "react";
 import type { FormProblems } from "@/lib/forms";
 import { ENTRY_LABELS } from "@/lib/labels";
 import { toLocalInput } from "@/lib/time";
-import { t } from "@/messages";
+import { useMessages } from "@/components/language";
 import type { EntryView } from "./entry-rows";
 
 export interface EntryDefaults extends EntryView {
@@ -156,6 +156,7 @@ export function EntryFields({
   problems?: FormProblems;
   correctionNote?: boolean;
 }) {
+  const { entry: copy } = useMessages();
   const id = useId();
   const [thoughts, setThoughts] = useState(() => {
     const rows = (defaults.thoughts ?? []).map((text) => ({ key: rowKey(), text }));
@@ -259,9 +260,9 @@ export function EntryFields({
             aria-hidden="true"
             className="mr-2.5 inline-block size-[7px] -translate-y-px rotate-[-45deg] border-b-[1.5px] border-r-[1.5px] border-current transition-transform duration-[400ms] group-open:rotate-45"
           />
-          {t.entry.more}
+          {copy.more}
         </summary>
-        <p className="mt-2 max-w-[36em] text-caption text-ink-3">{t.entry.moreHint}</p>
+        <p className="mt-2 max-w-[36em] text-caption text-ink-3">{copy.moreHint}</p>
         <div className="mt-6 space-y-7">
           <Field label={ENTRY_LABELS.body} htmlFor={`${id}-body`}>
             <Textarea id={`${id}-body`} name="body" rows={2} defaultValue={defaults.body ?? ""} />

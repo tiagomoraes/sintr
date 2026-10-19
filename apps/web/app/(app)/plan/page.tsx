@@ -17,7 +17,7 @@ import { MAX_SEATS, allowanceLine, counted, formatNext, priceLine, sourceLine } 
 import { assistantState } from "@/lib/server/assistant";
 import { requireScope, runtime } from "@/lib/server/runtime";
 import { voiceView } from "@/lib/server/voice";
-import { t } from "@/messages";
+import { getMessages } from "@/lib/server/language";
 import { manageSubscription, subscribe } from "./actions";
 
 export const metadata: Metadata = { title: "Your plan" };
@@ -78,6 +78,7 @@ export default async function PlanPage({
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
+  const t = await getMessages();
   const { scope } = await requireScope();
   const { config, payments } = runtime();
   const [assistant, month, profile, practice, practiceSubscription, params, voice] = await Promise.all([

@@ -1,4 +1,6 @@
-import { t } from "@/messages";
+"use client";
+
+import { useMessages } from "@/components/language";
 
 /**
  * The crisis lines, one quiet line under the composer and on every step of
@@ -9,7 +11,7 @@ import { t } from "@/messages";
 export function SupportStrip() {
   const call =
     "font-semibold tabular-nums text-ink underline decoration-rule-strong underline-offset-[0.28em] hover:decoration-ink";
-  const { strip } = t.shell;
+  const { strip } = useMessages().shell;
   return (
     <p className="text-[0.875rem] leading-[1.5] text-ink-3">
       {strip.before}{" "}

@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
+import { LanguageOffers } from "@/components/language";
 import { ExceptOn, ShellFooter, ShellMain } from "@/components/shell-frame";
 import { ShellLight } from "@/components/shell-light";
 import { PhoneMenu, ShellNav } from "@/components/shell-nav";
@@ -113,6 +114,7 @@ export default async function ShellLayout({ children }: { children: ReactNode })
               </p>
             }
           />
+          <LanguageOffers className="mt-10" />
         </div>
       </footer>
     </ShellLight>

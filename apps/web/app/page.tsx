@@ -1,6 +1,7 @@
 import { Button, WindowLight, buttonVariants, linkStyles } from "@sintr/ui";
 import Link from "next/link";
 import { HeaderLink, SiteHeader } from "@/components/site-header";
+import { LanguageOffers } from "@/components/language";
 import { SupportLines } from "@/components/support-lines";
 import { getSession } from "@/lib/server/runtime";
 
@@ -77,6 +78,7 @@ export default async function Home() {
       <footer className="border-t border-rule">
         <div className="wrap py-16">
           <SupportLines />
+          <LanguageOffers className="mt-10" />
         </div>
       </footer>
     </>

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { EmptyState, PageHeading } from "@/components/empty-state";
 import { formatMoment } from "@/lib/format";
 import { requireScope } from "@/lib/server/runtime";
+import { currentLanguage } from "@/lib/server/language";
 
 export const metadata: Metadata = { title: "Entries" };
 
@@ -17,6 +18,7 @@ export default async function EntriesPage({
   const { scope } = await requireScope();
   const before = (await searchParams).before;
   const to = typeof before === "string" && !Number.isNaN(Date.parse(before)) ? new Date(before) : undefined;
+  const language = await currentLanguage();
   const [entries, profile] = await Promise.all([
     scope.entries.list({ limit: PAGE + 1, ...(to ? { to } : {}) }),
     scope.profile.get(),
@@ -61,7 +63,7 @@ export default async function EntriesPage({
               <li key={entry.id} className="border-b border-rule">
                 <Link href={`/entries/${entry.id}`} className="group block py-5 no-underline">
                   <span className="block font-serif italic text-ink-2">
-                    {formatMoment(entry.occurredAt, profile)}
+                    {formatMoment(entry.occurredAt, { language: language.code, timezone: profile.timezone })}
                   </span>
                   {words ? (
                     <span className="mt-1 line-clamp-2 block font-serif text-title-small text-ink group-hover:underline group-hover:decoration-rule-strong group-hover:decoration-1 group-hover:underline-offset-[0.2em]">

@@ -7,6 +7,7 @@ import { Corrections } from "@/components/ledger/corrections";
 import { formatMoment } from "@/lib/format";
 import { CHECKIN_LABELS } from "@/lib/labels";
 import { requireScope } from "@/lib/server/runtime";
+import { currentLanguage } from "@/lib/server/language";
 
 export const metadata: Metadata = { title: "Check-in" };
 
@@ -16,7 +17,7 @@ export default async function CheckinPage({ params }: { params: Promise<{ id: st
   const checkin = await scope.checkins.get(id);
   if (!checkin) notFound();
   const [profile, corrections] = await Promise.all([scope.profile.get(), scope.checkins.corrections(id)]);
-  const locale = { language: profile.language, timezone: profile.timezone };
+  const locale = { language: (await currentLanguage()).code, timezone: profile.timezone };
 
   return (
     <>
