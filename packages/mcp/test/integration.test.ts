@@ -1,4 +1,4 @@
-import { memoryTransport } from "@sintr/core";
+import { addDays, localDay, memoryTransport } from "@sintr/core";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { CRISIS_PROTOCOL } from "../src";
 import { call, connect, keyFor, mcpHandler, person, type Person } from "./support";
@@ -24,9 +24,11 @@ describe("an agent connected over MCP", () => {
 
   beforeAll(async () => {
     alice = await person("alice");
-    await alice.scope.therapySettings.update({
-      sessionDay: (new Date().getUTCDay() + 3) % 7,
-      sessionTime: "19:00",
+    // Weekly, from three days from now, at 19:00 where Alice is.
+    await alice.scope.sessions.add({
+      startsOn: addDays(localDay(new Date(), "America/Sao_Paulo"), 3),
+      time: "19:00",
+      repeat: "weekly",
     });
     await alice.scope.therapyNotes.create({ kind: "to_bring", body: "a reunião com o Marcos" });
   });
