@@ -22,7 +22,7 @@ import {
 } from "@/app/welcome/actions";
 import { AcceptAsPersonForm } from "@/components/sharing/join-forms";
 import { SupportStrip } from "@/components/talk/support-strip";
-import { NEVER_SHARED, SCOPE_SENTENCE } from "@/lib/sharing";
+import { InvitePromises } from "@/components/sharing/invite-promises";
 import { timeOfDay } from "@/lib/time-of-day";
 import { t } from "@/messages";
 
@@ -34,6 +34,8 @@ export interface WelcomeInvite {
   details: string | null;
   /** The practice as shown; the consent names exactly this. */
   shown: string;
+  /** The name the person put on their reports, if any, printed on every report they share. */
+  reportName: string | null;
 }
 
 type Step = "start" | "name" | "invite" | "therapist" | "session" | "ready";
@@ -120,7 +122,7 @@ function Actions({ children }: { children: ReactNode }) {
  */
 export function WelcomeFlow({
   next,
-  invite,
+  invite: arrivedWith,
   timezones,
   saved,
 }: {
@@ -130,6 +132,9 @@ export function WelcomeFlow({
   saved: { name: string; therapist: string; day: string; time: string; timezone: string };
 }) {
   const params = useSearchParams();
+  // The invite the person arrived with, as it was then: once accepted it no longer previews as valid,
+  // and the page may be rendered again on the way.
+  const [invite] = useState(arrivedWith);
   const steps: Step[] = [
     "start",
     "name",
@@ -200,7 +205,7 @@ export function WelcomeFlow({
 
   function finish() {
     startTransition(async () => {
-      await finishWelcome(next);
+      await finishWelcome(next, invite !== null);
     });
   }
 
@@ -280,9 +285,7 @@ export function WelcomeFlow({
               </p>
               {invite.details ? <p className="mt-1 text-caption text-ink-3">{invite.details}</p> : null}
             </div>
-            <p className="mt-6 border-t border-ink pt-4 text-ink-2">
-              <span className="font-medium text-ink">{SCOPE_SENTENCE}</span> {NEVER_SHARED}
-            </p>
+            <InvitePromises className="mt-6" />
           </Rise>
           {linked ? (
             <>
@@ -301,7 +304,7 @@ export function WelcomeFlow({
                 who={invite.who}
                 shown={invite.shown}
                 defaultName={name}
-                reportName={null}
+                reportName={invite.reportName}
                 accept={async (_state, form) => {
                   const result = await acceptInWelcome(invite.code, form);
                   if (result.ok) setLinked(invite.who);

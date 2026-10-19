@@ -12,6 +12,15 @@ export const metadata: Metadata = { title: t.welcome.title };
 
 const TIMEZONES = Intl.supportedValuesOf("timeZone");
 
+/** The code inside `/join/<code>`, or null when the address cannot be read. */
+function inviteCode(path: string): string | null {
+  try {
+    return decodeURIComponent(path.slice("/join/".length));
+  } catch {
+    return null;
+  }
+}
+
 /**
  * The welcome after signing up: a few questions, one a screen, each able
  * to wait. A practice's invite the person arrived with is part of it; a
@@ -25,7 +34,8 @@ export default async function WelcomePage({
   const { user, scope } = await requireScope();
   const raw = (await searchParams).next;
   const next = typeof raw === "string" ? safeNext(raw) : null;
-  const code = next?.startsWith("/join/") ? decodeURIComponent(next.slice("/join/".length)) : null;
+  const code = next?.startsWith("/join/") ? inviteCode(next) : null;
+  const [profile, therapy] = await Promise.all([scope.profile.get(), scope.therapySettings.get()]);
 
   let invite: WelcomeInvite | null = null;
   if (code && !(await tooManyLookups())) {
@@ -42,11 +52,11 @@ export default async function WelcomePage({
         professionalName: preview.practice.professionalName,
         details: practiceDetails(preview.practice),
         shown: practiceLine(preview.practice),
+        reportName: profile.displayName,
       };
     }
   }
 
-  const [profile, therapy] = await Promise.all([scope.profile.get(), scope.therapySettings.get()]);
   return (
     <WelcomeFlow
       next={next}

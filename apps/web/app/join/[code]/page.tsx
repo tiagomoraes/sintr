@@ -5,14 +5,8 @@ import Link from "next/link";
 import { HeaderLink, SiteHeader } from "@/components/site-header";
 import { AcceptAsPersonForm, AcceptAsPracticeForm } from "@/components/sharing/join-forms";
 import { formatDay } from "@/lib/format";
-import {
-  NEVER_SHARED,
-  SCOPE_SENTENCE,
-  joinPath,
-  practiceDetails,
-  practiceWho,
-  seatsLine,
-} from "@/lib/sharing";
+import { InvitePromises } from "@/components/sharing/invite-promises";
+import { joinPath, practiceDetails, practiceWho, seatsLine } from "@/lib/sharing";
 import { tooManyLookups } from "@/lib/server/join";
 import { getSession, runtime } from "@/lib/server/runtime";
 import { acceptAsPerson, acceptAsPractice } from "./actions";
@@ -99,16 +93,7 @@ export default async function JoinPage({ params }: { params: Promise<{ code: str
           </p>
           {details ? <p className="mt-1 text-caption text-ink-3">{details}</p> : null}
         </div>
-        <ul className="mt-8 list-none space-y-3 border-t border-ink p-0 pt-5 text-ink-2">
-          <li>
-            <span className="font-medium text-ink">{SCOPE_SENTENCE}</span> {NEVER_SHARED}
-          </li>
-          <li>
-            You choose for each report, unless you decide otherwise. Nothing goes to them until you approve
-            it.
-          </li>
-          <li>You can stop at any time, and they lose access at once.</li>
-        </ul>
+        <InvitePromises className="mt-8" />
         {!session ? (
           <>
             <p className="mt-8 text-[0.9375rem] text-ink-3">

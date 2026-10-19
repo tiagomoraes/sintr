@@ -12,6 +12,11 @@ export const SCOPE_SENTENCE = "Your therapist can read the reports you approve; 
 /** What never travels through a link, whatever the person chooses. */
 export const NEVER_SHARED = "Never your entries, check-ins, conversations or drafts.";
 
+/** The other two promises of a practice's invite, said the same way wherever it is answered. */
+export const EACH_REPORT =
+  "You choose for each report, unless you decide otherwise. Nothing goes to them until you approve it.";
+export const STOP_ANY_TIME = "You can stop at any time, and they lose access at once.";
+
 export const MODE_COPY: Record<ShareMode, { label: string; sentence: string }> = {
   ask: {
     label: "Ask me each time",

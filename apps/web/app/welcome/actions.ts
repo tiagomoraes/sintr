@@ -113,12 +113,16 @@ export async function acceptInWelcome(code: string, form: FormData): Promise<Ste
   return OK;
 }
 
-/** The welcome is behind the person, finished or set aside: on to the home (or where they were going). */
-export async function finishWelcome(next: string | null): Promise<void> {
+/**
+ * The welcome is behind the person, finished or set aside: on to the home,
+ * or where they were going. An invite the welcome asked about is not opened
+ * again; one it could not show (no longer valid, or too many tries) is,
+ * so its own page can say why.
+ */
+export async function finishWelcome(next: string | null, inviteAsked: boolean): Promise<void> {
   const { scope } = await requireScope();
   await scope.profile.markOnboarded();
   revalidatePath("/", "layout");
   const target = safeNext(next ?? undefined);
-  // An invite already answered inside the welcome is not opened again.
-  redirect(target.startsWith("/join/") ? "/home" : target);
+  redirect(target.startsWith("/join/") && inviteAsked ? "/home" : target);
 }
