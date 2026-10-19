@@ -79,13 +79,15 @@ export const consentPurpose = pgEnum("consent_purpose", [
   "report_send",
   "practice_link",
   "report_share",
+  "memory",
 ]);
 
 /**
  * Append-only, versioned consent log. `granted = false` records a withdrawal.
  * A `report_send` consent names the one report it approves; a `practice_link`
  * consent names the link to one practice, and a `report_share` consent names
- * both the report and the link it goes through.
+ * both the report and the link it goes through. A `memory` consent names, as
+ * its recipient, the providers that read the diary for the memory.
  */
 export const consents = pgTable(
   "consents",

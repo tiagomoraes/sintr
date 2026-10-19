@@ -55,7 +55,10 @@ export type ProfilePatch = z.input<typeof ProfilePatch>;
 export interface Profile {
   /** The name printed on reports, chosen in Therapy. */
   displayName: string | null;
-  /** How the person wants to be called in the app. Never sent to a model, never printed on a report. */
+  /**
+   * How the person wants to be called in the app. Never printed on a report;
+   * sent to their assistant only while their memory is on (DECISIONS 116).
+   */
   preferredName: string | null;
   /** The language the person chose for sintr (a catalog's code, such as pt-BR); null until they choose. */
   locale: string | null;
@@ -284,6 +287,7 @@ export const ConsentPurpose = z.enum([
   "report_send",
   "practice_link",
   "report_share",
+  "memory",
 ]);
 export type ConsentPurpose = z.infer<typeof ConsentPurpose>;
 
@@ -319,6 +323,67 @@ export const PRACTICE_LINK_CONSENT_VERSION = "2026-10-18";
 
 /** The current wording of the approval to share one report with one linked practice. */
 export const REPORT_SHARE_CONSENT_VERSION = "2026-10-18";
+
+/**
+ * The current wording of the consent to keep a memory of the person, which
+ * sends their diary to the providers it names (DECISIONS 115). The consent
+ * records those providers as its recipient; another route needs a new yes.
+ */
+export const MEMORY_CONSENT_VERSION = "2026-10-19";
+
+/* Memory (F10): what sintr remembers of a person, from their own diary */
+
+export const MemoryKind = z.enum(["name", "about", "moment"]);
+export type MemoryKind = z.infer<typeof MemoryKind>;
+
+/** A memory's sentence, as sintr wrote it or the person corrected it. */
+export const MemoryText = z.string().trim().min(1).max(300);
+/** The person's own words a memory rests on, found word for word in its source. */
+export const MemoryQuote = z.string().min(1).max(400);
+
+/** Where a memory came from: an entry, a check-in, or the welcome (the name). */
+export type MemorySource =
+  { kind: "entry"; id: string } | { kind: "checkin"; id: string } | { kind: "welcome" };
+
+export interface Memory {
+  id: string;
+  kind: MemoryKind;
+  text: string;
+  /** The person's words it rests on; null for the name. */
+  quote: string | null;
+  source: MemorySource;
+  /** When what it remembers happened (its source's time); for the name, when it was given. */
+  occurredAt: Date;
+  /** The space its vector is in ("text-embedding-3-small@1536"); null without one. */
+  embeddingModel: string | null;
+  /** When the person corrected it. */
+  editedAt: Date | null;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+/** A memory found by reading one source, before it is kept. Its vector is the provider's; the repository turns it. */
+export interface FoundMemory {
+  kind: "about" | "moment";
+  text: string;
+  quote: string;
+  embedding: number[] | null;
+}
+
+/** The model that made a set of vectors, and their length: vectors are compared only within one. */
+export interface EmbeddingSpace {
+  model: string;
+  dimensions: number;
+}
+
+/** A source of the diary not read for the memory yet (or changed since it was). */
+export type UnreadSource = { kind: "entry"; entry: Entry } | { kind: "checkin"; checkin: Checkin };
+
+/** How far the reading of the diary has gone. */
+export interface MemoryProgress {
+  read: number;
+  unread: number;
+}
 
 /* Practices, invites and links (the therapist's side) */
 
@@ -597,6 +662,22 @@ export interface HouseAssistant extends ProviderCredentials {
   name: string;
   /** How the house turns speech into text. */
   voice: HouseVoice;
+  /** How the house places a memory by meaning. */
+  memory: HouseMemory;
+}
+
+/**
+ * How the house computes the vectors of a memory (SINTR_HOUSE_EMBED_*): by
+ * default through the house assistant's own provider and key, when that
+ * provider has embeddings; or through an OpenAI-compatible endpoint of its
+ * own. Off: the house offers no memory.
+ */
+export interface HouseMemory {
+  off: boolean;
+  /** An embeddings endpoint of its own, for a house whose provider has none (Anthropic). */
+  endpoint: { baseUrl: string; apiKey: string | null } | null;
+  /** The embeddings model; null for the provider's default. */
+  model: string | null;
 }
 
 /**
@@ -858,6 +939,7 @@ export const AuditAction = z.enum([
   "share.read",
   "share.downloaded",
   "plan.changed",
+  "memory.corrected",
 ]);
 export type AuditAction = z.infer<typeof AuditAction>;
 

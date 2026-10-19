@@ -11,6 +11,7 @@ import {
   insights,
   invites,
   links,
+  memories,
   messages,
   practices,
   profiles,
@@ -104,12 +105,25 @@ export const SEALED = {
   // travels through a link, destroyed with the key when the link ends.
   links: sealedFields(links, { personName: "text" }),
   sharedReports: sealedFields(sharedReports, { snapshot: "json", pdf: "bytes" }),
+  // F10: what sintr remembers, and the person's own words it rests on.
+  memories: sealedFields(memories, { text: "text", quote: "text" }),
 } as const;
 
 /** bytea columns that hold wrapped keys rather than sealed content. */
 export const KEY_MATERIAL: readonly { table: PgTable; column: string }[] = [
   { table: userKeys, column: "wrappedDek" },
   { table: links, column: "wrappedKey" },
+];
+
+/**
+ * vector columns. A vector cannot be sealed and still be searched by the
+ * database, so it is stored turned by a rotation derived from its owner's
+ * data key (`memory/rotation.ts`): distances between one person's vectors
+ * are kept, the provider's own vectors are not (DECISIONS 114). A schema
+ * test fails if a vector column is not listed here.
+ */
+export const ROTATED: readonly { table: PgTable; column: string }[] = [
+  { table: memories, column: "embedding" },
 ];
 
 /** Seal the given fields; `null` stays `null`, absent fields stay absent. */

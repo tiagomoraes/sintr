@@ -10,6 +10,7 @@ export {
 export { MIGRATIONS_FOLDER, runMigrations } from "./migrate";
 export {
   KEY_MATERIAL,
+  ROTATED,
   SEALED,
   openValues,
   sealValues,

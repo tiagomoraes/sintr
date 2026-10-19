@@ -42,6 +42,9 @@ x-app-env: &app-env
   SINTR_HOUSE_STT_BASE_URL: ${SINTR_HOUSE_STT_BASE_URL:-}
   SINTR_HOUSE_STT_KEY: ${SINTR_HOUSE_STT_KEY:-}
   SINTR_HOUSE_STT_LANGUAGE: ${SINTR_HOUSE_STT_LANGUAGE:-}
+  SINTR_HOUSE_EMBED_MODEL: ${SINTR_HOUSE_EMBED_MODEL:-}
+  SINTR_HOUSE_EMBED_BASE_URL: ${SINTR_HOUSE_EMBED_BASE_URL:-}
+  SINTR_HOUSE_EMBED_KEY: ${SINTR_HOUSE_EMBED_KEY:-}
   SINTR_PERSON_PLAN: ${SINTR_PERSON_PLAN:-free}
   # Payments (optional, Stripe): left empty, plans come from grants only.
   SINTR_STRIPE_SECRET_KEY: ${SINTR_STRIPE_SECRET_KEY:-}
@@ -51,7 +54,12 @@ x-app-env: &app-env
 
 services:
   db:
-    image: postgres:16-alpine
+    # postgres:16-alpine with pgvector built in (postgres.Dockerfile): the same
+    # Postgres and C library as before, so an existing data volume opens as it was.
+    image: ${SINTR_DB_IMAGE:-sintr-db:local}
+    build:
+      context: .
+      dockerfile: postgres.Dockerfile
     restart: unless-stopped
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-sintr}

@@ -11,6 +11,18 @@ export const bytea = customType<{ data: Buffer; driverData: Buffer }>({
   fromDriver: (value) => Buffer.from(value),
 });
 
+/**
+ * A pgvector `vector` of any length (each row says which model made it, so
+ * only vectors of one space are compared). Written as pgvector's text form.
+ * Whether a vector column is turned by its owner's rotation is declared in
+ * `sealed.ts`; a test fails if one is not.
+ */
+export const vector = customType<{ data: number[]; driverData: string }>({
+  dataType: () => "vector",
+  toDriver: (value) => `[${value.join(",")}]`,
+  fromDriver: (value) => JSON.parse(value) as number[],
+});
+
 export const createdAt = () => timestamp("created_at", { withTimezone: true }).notNull().defaultNow();
 
 export const updatedAt = () =>

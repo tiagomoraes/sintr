@@ -10,6 +10,7 @@ export {
   providerKind,
 } from "./agent";
 export { apiTokens, auditLog } from "./integration";
+export { memories, memoryKind, memoryReads } from "./memory";
 export { userKeys } from "./keys";
 export {
   checkins,
