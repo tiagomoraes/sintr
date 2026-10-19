@@ -70,6 +70,8 @@ const shared = {
   SINTR_MASTER_KEY: process.env.SINTR_E2E_MASTER_KEY,
   SINTR_MASTER_KEY_ID: "k1",
   SINTR_LOG_LEVEL: "warn",
+  // Each test's browser decides the language (DECISIONS 98), whatever the local .env says.
+  SINTR_LANGUAGE: "",
   SINTR_FAKE_AGENT: "1",
   SINTR_EMAIL_OUTBOX: process.env.SINTR_E2E_OUTBOX,
   ...(process.env.SINTR_CHROMIUM_PATH ? { SINTR_CHROMIUM_PATH: process.env.SINTR_CHROMIUM_PATH } : {}),
@@ -81,9 +83,15 @@ export default defineConfig({
   fullyParallel: false,
   workers: 1,
   forbidOnly: Boolean(process.env.CI),
+  // Above the longest single wait in a test (a report's preparation, REPORT in e2e/support.ts, 60 s;
+  // the assistant's, ASSISTANT, 30 s) with room for the steps before it. A test that chains several
+  // of them is marked test.slow(), three times this.
+  timeout: 90_000,
   reporter: process.env.CI ? [["list"], ["html", { open: "never" }]] : "list",
   use: {
     baseURL: url,
+    // An English browser, whatever the machine's own language: the earlier suites read English (DECISIONS 98).
+    locale: "en-US",
     trace: "retain-on-failure",
     // A microphone that plays a tone, and no prompt to allow it: speaking can be tested without a person.
     launchOptions: { args: ["--use-fake-ui-for-media-stream", "--use-fake-device-for-media-stream"] },
@@ -93,7 +101,8 @@ export default defineConfig({
     {
       command: `pnpm run build && pnpm exec next start --hostname 127.0.0.1 --port ${port}`,
       url,
-      timeout: 240_000,
+      // The production build comes first; on a busy machine it alone takes several minutes.
+      timeout: 900_000,
       reuseExistingServer: false,
       stdout: "pipe",
       stderr: "pipe",
@@ -104,7 +113,7 @@ export default defineConfig({
       // The same build, started once the first server is up (and so the build is done).
       command: `node e2e/when-up.mjs ${url}/api/health && pnpm exec next start --hostname 127.0.0.1 --port ${housePort}`,
       url: houseUrl,
-      timeout: 300_000,
+      timeout: 960_000,
       reuseExistingServer: false,
       stdout: "pipe",
       stderr: "pipe",

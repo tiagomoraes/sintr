@@ -3,12 +3,13 @@
 import { Button, FieldError, FieldHint, Input, Label } from "@sintr/ui";
 import { useActionState, useId } from "react";
 import type { TherapistInviteState } from "@/app/(app)/sharing/actions";
+import { useLanguage, useMessages } from "@/components/language";
 import { useHydrated } from "@/lib/use-hydrated";
 import { submitWith } from "@/lib/use-form-action";
 import { InvitePanel } from "./invite-panel";
 
-function validUntil(iso: string, timezone: string): string {
-  return new Intl.DateTimeFormat("en-GB", {
+function validUntil(iso: string, timezone: string, intl: string): string {
+  return new Intl.DateTimeFormat(intl, {
     timeZone: timezone,
     weekday: "long",
     day: "numeric",
@@ -26,6 +27,8 @@ export function TherapistInvite({
   timezone: string;
   defaultName: string;
 }) {
+  const t = useMessages().sharing.invite;
+  const { intl } = useLanguage();
   const hydrated = useHydrated();
   const [state, action, pending] = useActionState(invite, { invite: null, problem: null });
   const id = useId();
@@ -36,23 +39,17 @@ export function TherapistInvite({
         <InvitePanel
           code={state.invite.code}
           link={state.invite.link}
-          validUntil={validUntil(state.invite.expiresAt, timezone)}
-          footer={
-            <p className="mt-2 text-[0.9375rem] text-ink-3">
-              Send it to your therapist the way you usually talk to them. When they accept it in their
-              practice on sintr, you will see it in Sharing and confirm it is them. Nothing is shared before
-              that.
-            </p>
-          }
+          validUntil={validUntil(state.invite.expiresAt, timezone, intl)}
+          footer={<p className="mt-2 text-[0.9375rem] text-ink-3">{t.made}</p>}
         />
       </div>
     );
   }
 
   return (
-    <form onSubmit={submitWith(action)} className="space-y-6" aria-label="Invite your therapist">
+    <form onSubmit={submitWith(action)} className="space-y-6" aria-label={t.title}>
       <div>
-        <Label htmlFor={id}>How they will see you</Label>
+        <Label htmlFor={id}>{t.name}</Label>
         <Input
           id={id}
           name="personName"
@@ -60,11 +57,11 @@ export function TherapistInvite({
           maxLength={80}
           className="mt-2 max-w-md"
         />
-        <FieldHint>Optional. The name your therapist knows you by; you can change it later.</FieldHint>
+        <FieldHint>{t.nameHint}</FieldHint>
       </div>
       {state.problem ? <FieldError>{state.problem}</FieldError> : null}
       <Button type="submit" disabled={!hydrated || pending}>
-        {pending ? "Making the invite" : "Make an invite for my therapist"}
+        {pending ? t.making : t.make}
       </Button>
     </form>
   );

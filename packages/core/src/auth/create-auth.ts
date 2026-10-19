@@ -12,6 +12,7 @@ import {
   type EmailMessage,
   type EmailTransport,
 } from "../email";
+import { personLanguage } from "../language";
 import type { Logger } from "../log";
 import { createRepositories } from "../repositories";
 import { hashPassword, verifyPassword } from "./password";
@@ -22,6 +23,18 @@ export interface AuthOptions {
   logger: Logger;
   /** Password reset and email verification are on only when email is available. */
   email?: EmailTransport;
+  /**
+   * The language a request is read in, as the web's pages resolve it: the
+   * person's own choice, the installation's language, the browser's
+   * (DECISIONS 98). `chosen` says it was the person's choice. Without it,
+   * emails follow the profile and the installation.
+   */
+  languageFor?: (headers: Headers, userId: string | null) => Promise<RequestLanguage>;
+}
+
+export interface RequestLanguage {
+  code: string;
+  chosen: boolean;
 }
 
 const DAY = 60 * 60 * 24;
@@ -54,17 +67,29 @@ export const EMAIL_AUTH_PATHS = [
 
 const HOUR = 60 * 60;
 
-export function createAuth({ db, config, logger, email = emailOff }: AuthOptions) {
+export function createAuth({ db, config, logger, email = emailOff, languageFor }: AuthOptions) {
   const repositories = createRepositories(db, config.masterKey);
   const log = logger.child({ service: "auth" });
   // Sending is not awaited and never throws back: neither a failure nor the
-  // time a mail server takes may tell the browser whether an address has an
-  // account. Only codes are logged.
-  const deliver = async (message: EmailMessage, kind: string) => {
-    void email.send(message).then(
-      () => log.info("auth.email_sent", { code: kind }),
-      (error: unknown) => log.warn("auth.email_failed", { code: kind, error }),
-    );
+  // time a mail server takes (or finding the person's language) may tell the
+  // browser whether an address has an account. Only codes are logged.
+  const deliver = async (message: () => Promise<EmailMessage>, kind: string) => {
+    void message()
+      .then((built) => email.send(built))
+      .then(
+        () => log.info("auth.email_sent", { code: kind }),
+        (error: unknown) => log.warn("auth.email_failed", { code: kind, error }),
+      );
+  };
+  // The language of an email about the account: as the request is read, else as the profile says.
+  // A language that cannot be found never costs the email: it goes out in the installation's language.
+  const languageOf = async (userId: string, request: Request | undefined): Promise<string | null> => {
+    try {
+      if (request && languageFor) return (await languageFor(request.headers, userId)).code;
+      return personLanguage(await (await repositories.forUser(userId)).profile.get(), config.language);
+    } catch {
+      return config.language;
+    }
   };
 
   return betterAuth({
@@ -101,8 +126,15 @@ export function createAuth({ db, config, logger, email = emailOff }: AuthOptions
       resetPasswordTokenExpiresIn: HOUR,
       ...(email.available
         ? {
-            sendResetPassword: async ({ user, url }: { user: { email: string }; url: string }) =>
-              deliver(passwordResetEmail({ to: user.email, url }), "password_reset"),
+            sendResetPassword: async (
+              { user, url }: { user: { id: string; email: string }; url: string },
+              request?: Request,
+            ) =>
+              deliver(
+                async () =>
+                  passwordResetEmail({ to: user.email, url, language: await languageOf(user.id, request) }),
+                "password_reset",
+              ),
           }
         : {}),
     },
@@ -112,8 +144,15 @@ export function createAuth({ db, config, logger, email = emailOff }: AuthOptions
             sendOnSignUp: true,
             autoSignInAfterVerification: true,
             expiresIn: HOUR,
-            sendVerificationEmail: async ({ user, url }: { user: { email: string }; url: string }) =>
-              deliver(verificationEmail({ to: user.email, url }), "verification"),
+            sendVerificationEmail: async (
+              { user, url }: { user: { id: string; email: string }; url: string },
+              request?: Request,
+            ) =>
+              deliver(
+                async () =>
+                  verificationEmail({ to: user.email, url, language: await languageOf(user.id, request) }),
+                "verification",
+              ),
           },
         }
       : {}),
@@ -162,6 +201,15 @@ export function createAuth({ db, config, logger, email = emailOff }: AuthOptions
           after: async (user, ctx) => {
             await repositories.provision(user.id);
             const scope = await repositories.forUser(user.id);
+            // The language the sign-up page was read in is the one sintr spoke to them in; one they
+            // chose on the way there (DECISIONS 98) is their choice from the start.
+            const headers = ctx?.headers ?? ctx?.request?.headers;
+            if (languageFor && headers) {
+              const language = await languageFor(headers, null);
+              await scope.profile
+                .update({ seenLocale: language.code, ...(language.chosen ? { locale: language.code } : {}) })
+                .catch((error: unknown) => log.warn("auth.language_not_kept", { error }));
+            }
             if (ctx?.path === "/sign-up/email") {
               const consent = await scope.consents.record({
                 purpose: "health_data_processing",

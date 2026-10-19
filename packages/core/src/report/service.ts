@@ -6,7 +6,15 @@
  * of that one report to that one address, recorded before it leaves.
  */
 import { REPORT_SEND_CONSENT_VERSION, type Report, type TherapySettings } from "../domain";
-import { EmailError, isEmailAddress, reportEmail, reportReadyEmail, type EmailTransport } from "../email";
+import {
+  EmailError,
+  accountCopy,
+  isEmailAddress,
+  reportEmail,
+  reportReadyEmail,
+  type EmailTransport,
+} from "../email";
+import { personLanguage } from "../language";
 import { InvalidStateError, NotFoundError, ValidationError } from "../errors";
 import type { Logger } from "../log";
 import type { UserScope } from "../repositories";
@@ -284,6 +292,8 @@ export async function notifyReportReady(input: {
   report: Report;
   /** The app's origin, for the link. */
   origin: string;
+  /** The installation's language, for a person who never chose one or opened sintr since F7. */
+  language?: string | null;
   log: Logger;
 }): Promise<boolean> {
   const { scope, email, report, log } = input;
@@ -294,8 +304,9 @@ export async function notifyReportReady(input: {
     scope.profile.get(),
   ]);
   if (!settings.reportNoticeEmail || !account.emailVerified) return false;
+  const language = personLanguage(profile, input.language ?? null);
   const session = report.sessionAt
-    ? new Intl.DateTimeFormat("en-GB", {
+    ? new Intl.DateTimeFormat(accountCopy(language).dates, {
         timeZone: profile.timezone,
         weekday: "long",
         day: "numeric",
@@ -306,7 +317,7 @@ export async function notifyReportReady(input: {
     : null;
   try {
     await email.send(
-      reportReadyEmail({ to: account.email, url: `${input.origin}/reports/${report.id}`, session }),
+      reportReadyEmail({ to: account.email, url: `${input.origin}/reports/${report.id}`, session, language }),
     );
   } catch (error) {
     log.warn("report.notice_failed", { reportId: report.id, error });

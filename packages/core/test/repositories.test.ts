@@ -3,6 +3,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { authenticateApiToken, clientName } from "../src/auth/api-tokens";
 import { API_TOKEN_ACCESS, MAX_ACTIVE_API_TOKENS, accessOf } from "../src/domain";
 import { ConsentRequiredError, DataAccessError, InvalidStateError, ValidationError } from "../src/errors";
+import { personLanguage, reportLanguageFor } from "../src/language";
 import { createRepositories, type UserScope } from "../src/repositories";
 import { createUser, openTestDatabase, testMasterKey } from "./support";
 
@@ -108,17 +109,44 @@ describe("settings", () => {
   it("upserts the profile and validates time zones", async () => {
     const profile = await scope.profile.update({
       displayName: "Ana",
-      language: "pt-BR",
+      locale: "pt-BR",
       timezone: "America/Sao_Paulo",
     });
-    expect(profile).toEqual({
+    // Not onboardedAt: schema.test.ts replays the 0006 backfill over every user of this shared database.
+    const { onboardedAt: _onboarded, ...rest } = profile;
+    expect(rest).toEqual({
       displayName: "Ana",
       preferredName: null,
-      language: "pt-BR",
+      locale: "pt-BR",
+      seenLocale: null,
+      reportLanguage: null,
       timezone: "America/Sao_Paulo",
-      onboardedAt: null,
     });
     await expect(scope.profile.update({ timezone: "Mars/Olympus" })).rejects.toBeInstanceOf(ValidationError);
+  });
+
+  it("keeps the person's language apart from what sintr last showed them and from the report's", async () => {
+    const id = await createUser(handle.db, "languages");
+    await repositories.provision(id);
+    const person = await repositories.forUser(id);
+    expect(await person.profile.get()).toMatchObject({
+      locale: null,
+      seenLocale: null,
+      reportLanguage: null,
+    });
+    await person.profile.update({ seenLocale: "pt-BR" });
+    expect(personLanguage(await person.profile.get(), "en")).toBe("pt-BR");
+    expect(reportLanguageFor(await person.profile.get(), null)).toBe("pt");
+    // Their own choice comes first; a report language chosen in Therapy comes before both.
+    await person.profile.update({ locale: "en" });
+    expect(personLanguage(await person.profile.get(), "pt-BR")).toBe("en");
+    await person.profile.update({ reportLanguage: "es" });
+    expect(reportLanguageFor(await person.profile.get(), null)).toBe("es");
+    // Back to following their language, and back to no choice of their own.
+    await person.profile.update({ reportLanguage: null, locale: null, seenLocale: null });
+    expect(personLanguage(await person.profile.get(), "pt-BR")).toBe("pt-BR");
+    expect(reportLanguageFor(await person.profile.get(), null)).toBe("en");
+    await expect(person.profile.update({ locale: "not a language" })).rejects.toBeInstanceOf(ValidationError);
   });
 
   it("keeps the name the person goes by apart from the name on their reports", async () => {

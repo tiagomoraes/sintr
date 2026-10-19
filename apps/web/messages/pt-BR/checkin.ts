@@ -1,0 +1,111 @@
+import type { Messages } from "../types";
+
+/**
+ * Um check-in: o rápido, em poucos toques, a lista, um check-in, o
+ * formulário que o muda e o rascunho que o assistente propõe.
+ */
+export const checkin = {
+  title: "Um check-in rápido.",
+  lede: "Só o que você quiser responder. Dá para pular qualquer pergunta, e nada aqui é uma avaliação.",
+  newTitle: "Novo check-in",
+  progress: (step: number, of: number) => `${step} de ${of}`,
+  scales: {
+    mood: { question: "Como está o seu humor?", hint: "0 é o mais baixo, 5 o melhor." },
+    energy: { question: "Quanta energia você tem?", hint: "0 é nenhuma, 5 de sobra." },
+    anxiety: { question: "Quanta ansiedade você sente?", hint: "0 é nada, 5 o máximo." },
+  },
+  sleep: {
+    question: "Como você dormiu?",
+    hours: "Horas de sono",
+    hoursPlaceholder: "7,5",
+    quality: "Como dormiu",
+    qualityPlaceholder: "Nas suas palavras",
+  },
+  note: {
+    question: "Algo sobre o dia?",
+    label: "Anotação",
+    hint: "Uma linha basta, ou nada.",
+    when: "Quando",
+    now: "Agora.",
+    change: "Outro horário",
+    whenHint: "No seu fuso horário.",
+  },
+  next: "Próxima",
+  skip: "Pular",
+  back: "Voltar",
+  saveNow: "Salvar agora",
+  save: "Salvar check-in",
+  cancel: "Cancelar",
+  allAtOnce: "Todas as perguntas do check-in",
+  labels: {
+    occurredAt: "Quando",
+    mood: "Humor",
+    energy: "Energia",
+    anxiety: "Ansiedade",
+    sleepHours: "Sono",
+    sleepQuality: "Como dormiu",
+    note: "Anotação",
+  },
+  inASentence: {
+    occurredAt: "quando aconteceu",
+    mood: "o humor",
+    energy: "a energia",
+    anxiety: "a ansiedade",
+    sleepHours: "as horas de sono",
+    sleepQuality: "como dormiu",
+    note: "a anotação",
+  },
+  of5: "de 5",
+  hours: (count: number) => (count === 1 ? "hora" : "horas"),
+  list: {
+    title: "Check-ins",
+    lede: "Uma linha sobre o dia: humor, energia, ansiedade, sono. Só o que você quiser.",
+    new: "Novo check-in",
+    earlierNone: "Nada antes disto.",
+    latest: "Voltar aos check-ins mais recentes",
+    empty: "Nenhum check-in ainda.",
+    emptyHint:
+      "Um check-in leva alguns segundos e nada nele é obrigatório. Dias tranquilos também valem, e nada aqui é uma avaliação.",
+    earlier: "Check-ins anteriores",
+  },
+  record: {
+    title: "Check-in",
+    all: "Todos os check-ins",
+    heading: (when: string) => `Check-in de ${when}`,
+    tag: "Check-in",
+    tagChanged: "Check-in, alterado depois",
+    change: "Mudar este check-in",
+  },
+  edit: {
+    title: "Mudar um check-in",
+    heading: "Mudar este check-in",
+    lede: "Ele vai mostrar os novos valores. Os antigos ficam guardados com a data da mudança.",
+    save: "Salvar a mudança",
+  },
+  form: {
+    notGiven: "Sem resposta",
+    hints: {
+      mood: "0 é o mais baixo, 5 o melhor.",
+      energy: "0 é nenhuma, 5 de sobra.",
+      anxiety: "0 é nenhuma, 5 o máximo.",
+    },
+    noteHint: "Opcional. Uma linha sobre o dia basta.",
+    whenHint: "No seu fuso horário. Deixe vazio para agora.",
+  },
+  draft: {
+    label: "Rascunho de check-in, esperando por você",
+    saved: "Check-in salvo",
+    head: "Um check-in para hoje",
+    edit: "Editar este check-in",
+    save: "Salvar check-in",
+    savedTo: "Salvo nos seus check-ins.",
+  },
+  problems: {
+    scale: "Escolha um valor de 0 a 5.",
+    sleepHours: "Use um número de horas de 0 a 24.",
+    when: "Confira a data e a hora.",
+    invalid: "Parte disso não pôde ser guardada como está. Confira os campos e tente de novo.",
+    empty: "Preencha pelo menos um valor. O resto pode ficar vazio.",
+    emptyDraft: "Preencha pelo menos um valor, ou descarte o rascunho.",
+  },
+} satisfies Messages["checkin"];

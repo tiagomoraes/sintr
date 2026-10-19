@@ -1,5 +1,7 @@
+"use client";
+
 import { cn } from "@sintr/ui";
-import { EACH_REPORT, NEVER_SHARED, SCOPE_SENTENCE, STOP_ANY_TIME } from "@/lib/sharing";
+import { useMessages } from "@/components/language";
 
 /**
  * What accepting a practice's invite means, in three lines: the consent
@@ -7,13 +9,14 @@ import { EACH_REPORT, NEVER_SHARED, SCOPE_SENTENCE, STOP_ANY_TIME } from "@/lib/
  * the welcome show exactly this.
  */
 export function InvitePromises({ className }: { className?: string }) {
+  const t = useMessages().sharing;
   return (
     <ul className={cn("list-none space-y-3 border-t border-ink p-0 pt-5 text-ink-2", className)}>
       <li>
-        <span className="font-medium text-ink">{SCOPE_SENTENCE}</span> {NEVER_SHARED}
+        <span className="font-medium text-ink">{t.scope}</span> {t.never}
       </li>
-      <li>{EACH_REPORT}</li>
-      <li>{STOP_ANY_TIME}</li>
+      <li>{t.eachReport}</li>
+      <li>{t.stopAnyTime}</li>
     </ul>
   );
 }

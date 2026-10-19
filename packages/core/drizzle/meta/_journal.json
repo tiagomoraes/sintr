@@ -50,6 +50,13 @@
       "when": 1792387308412,
       "tag": "0006_welcome_and_voice",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1792398997261,
+      "tag": "0007_languages",
+      "breakpoints": true
     }
   ]
 }

@@ -5,13 +5,12 @@ import { useActionState, useState, type ReactNode } from "react";
 import type { TherapyFormState } from "@/app/(app)/therapy/actions";
 import { LEADS, REPORT_LANGUAGE_OPTIONS } from "@/lib/therapy";
 import { submitWith } from "@/lib/use-form-action";
-import { t } from "@/messages";
-
-const T = t.therapy;
+import { useMessages } from "@/components/language";
 
 export interface TherapyDefaults {
   displayName: string;
-  language: "en" | "pt" | "es";
+  /** The report's language when the person chose one; "" follows the language they read sintr in. */
+  language: "" | "en" | "pt" | "es";
   timezone: string;
   therapistName: string;
   therapistEmail: string;
@@ -78,6 +77,7 @@ function Part({
   open: boolean;
   children: ReactNode;
 }) {
+  const T = useMessages().therapy;
   return (
     <details open={open || undefined} className="group border-t border-rule py-7">
       <summary className="flex cursor-pointer list-none flex-wrap items-baseline justify-between gap-x-6 gap-y-2 [&::-webkit-details-marker]:hidden">
@@ -106,15 +106,19 @@ export function TherapyForm({
   timezones,
   emailAvailable,
   emailVerified,
+  readIn,
   save,
 }: {
   defaults: TherapyDefaults;
+  /** The name of the language the person reads sintr in, which the report follows unless they choose. */
+  readIn: string;
   summaries: TherapySummaries;
   timezones: string[];
   emailAvailable: boolean;
   emailVerified: boolean;
   save: (state: TherapyFormState, form: FormData) => Promise<TherapyFormState>;
 }) {
+  const T = useMessages().therapy;
   const [state, action, pending] = useActionState(save, { saved: false, problems: {} });
   const [delivery, setDelivery] = useState(defaults.deliveryChannel);
   const [zone, setZone] = useState(defaults.timezone);
@@ -284,9 +288,9 @@ export function TherapyForm({
             defaultValue={String(defaults.reportLeadMinutes)}
             className={select}
           >
-            {LEADS.map((lead) => (
-              <option key={lead.minutes} value={lead.minutes}>
-                {lead.label}
+            {LEADS.map((minutes) => (
+              <option key={minutes} value={minutes}>
+                {T.report.leads[minutes]}
               </option>
             ))}
           </select>
@@ -298,6 +302,7 @@ export function TherapyForm({
           problem={p.language}
         >
           <select id="therapy-language" name="language" defaultValue={defaults.language} className={select}>
+            <option value="">{T.report.languageFollow(readIn)}</option>
             {REPORT_LANGUAGE_OPTIONS.map((option) => (
               <option key={option.value} value={option.value}>
                 {option.label}

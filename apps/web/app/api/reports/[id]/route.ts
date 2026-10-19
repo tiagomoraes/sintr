@@ -84,6 +84,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
           model,
           modelProblem: problem,
           metered,
+          installationLanguage: config.language,
           log,
           abortSignal: request.signal,
         });

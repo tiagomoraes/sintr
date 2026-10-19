@@ -27,13 +27,16 @@ const TimeZone = z.string().refine((value) => {
   }
 }, "must be an IANA time zone");
 
-const Language = z.string().refine((value) => {
-  try {
-    return Intl.getCanonicalLocales(value).length === 1;
-  } catch {
-    return false;
-  }
-}, "must be a BCP 47 language tag");
+const Language = z
+  .string()
+  .max(35)
+  .refine((value) => {
+    try {
+      return Intl.getCanonicalLocales(value).length === 1;
+    } catch {
+      return false;
+    }
+  }, "must be a BCP 47 language tag");
 
 /* Profile and therapy settings */
 
@@ -41,7 +44,9 @@ export const ProfilePatch = z
   .object({
     displayName: z.string().min(1).max(200).nullable(),
     preferredName: z.string().min(1).max(80).nullable(),
-    language: Language,
+    locale: Language.nullable(),
+    seenLocale: Language.nullable(),
+    reportLanguage: Language.nullable(),
     timezone: TimeZone,
   })
   .partial();
@@ -52,7 +57,12 @@ export interface Profile {
   displayName: string | null;
   /** How the person wants to be called in the app. Never sent to a model, never printed on a report. */
   preferredName: string | null;
-  language: string;
+  /** The language the person chose for sintr (a catalog's code, such as pt-BR); null until they choose. */
+  locale: string | null;
+  /** The language sintr last spoke to the person in: what it writes while they are away follows it. */
+  seenLocale: string | null;
+  /** The language the person chose for their reports in Therapy; null follows their language. */
+  reportLanguage: string | null;
   timezone: string;
   /** When the welcome after signing up was finished or set aside; null until then. */
   onboardedAt: Date | null;

@@ -59,7 +59,7 @@ let bob: UserScope;
 beforeAll(async () => {
   // Alice: São Paulo, Mondays at 18:00, an assistant, and the notice by email.
   alice = await person("alice", true);
-  await alice.profile.update({ timezone: SP, language: "pt-BR", displayName: "Alice" });
+  await alice.profile.update({ timezone: SP, locale: "pt-BR", displayName: "Alice" });
   await alice.therapySettings.update({
     sessionDay: 1,
     sessionTime: "18:00",

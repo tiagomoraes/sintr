@@ -17,6 +17,7 @@ x-app-env: &app-env
   SINTR_MODE: ${SINTR_MODE:-selfhost}
   SINTR_SIGNUP: ${SINTR_SIGNUP:-open}
   SINTR_LOG_LEVEL: ${SINTR_LOG_LEVEL:-info}
+  SINTR_LANGUAGE: ${SINTR_LANGUAGE:-}
   SINTR_AUTH_SECRET: ${SINTR_AUTH_SECRET:?run make setup to create .env}
   SINTR_MASTER_KEY: ${SINTR_MASTER_KEY:?run make setup to create .env}
   SINTR_MASTER_KEY_ID: ${SINTR_MASTER_KEY_ID:-k1}

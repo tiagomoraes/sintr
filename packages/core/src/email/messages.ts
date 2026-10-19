@@ -68,45 +68,164 @@ export function reportEmail(input: {
   };
 }
 
+/**
+ * The words of the emails a person or a professional receives about their
+ * own account, in the language sintr speaks to them in (DECISIONS 98). The
+ * languages sintr has them in; any other gets English.
+ */
+interface AccountCopy {
+  ready: {
+    subject: string;
+    body: (session: string | null) => string[];
+    link: string;
+  };
+  reset: { subject: string; body: string[]; link: string };
+  verify: { subject: string; body: string[]; link: string };
+  practice: {
+    subject: (count: number) => string;
+    body: (count: number) => string[];
+    link: string;
+  };
+  /** How the session's date is written. */
+  dates: string;
+}
+
+const ACCOUNT_COPY: Partial<Record<string, AccountCopy>> & { en: AccountCopy } = {
+  en: {
+    ready: {
+      subject: "Your report is ready to read",
+      body: (session) => [
+        session
+          ? `Your report for the session on ${session} is ready to read.`
+          : "Your weekly report is ready to read.",
+        "Nothing has been sent to anyone. It waits for you to read it, change what you want, and approve it.",
+      ],
+      link: "Read the report",
+    },
+    reset: {
+      subject: "Set a new password for your sintr diary",
+      body: [
+        "Someone asked to set a new password for the sintr diary of this address. If it was you, open the link below within an hour.",
+        "If it was not you, ignore this message: your password stays as it is.",
+      ],
+      link: "Set a new password",
+    },
+    verify: {
+      subject: "Confirm your email for sintr",
+      body: [
+        "Confirm that this address is yours, so sintr can write to it when a report is ready. Open the link below within an hour.",
+        "If you did not create a sintr diary, ignore this message.",
+      ],
+      link: "Confirm this address",
+    },
+    practice: {
+      subject: (count) =>
+        count === 1 ? "A report was shared with you" : `${count} reports were shared with you`,
+      body: (count) => [
+        count === 1
+          ? "A person you see shared a report with your practice on sintr."
+          : `People you see shared ${count} reports with your practice on sintr.`,
+        "It waits for you in your practice. This email says nothing about who shared it or what it says.",
+      ],
+      link: "Open your practice",
+    },
+    dates: "en-GB",
+  },
+  pt: {
+    ready: {
+      subject: "Seu relatório está pronto para ler",
+      body: (session) => [
+        session
+          ? `Seu relatório para a sessão de ${session} está pronto para ler.`
+          : "Seu relatório da semana está pronto para ler.",
+        "Nada foi enviado a ninguém. Ele espera você ler, mudar o que quiser e aprovar.",
+      ],
+      link: "Ler o relatório",
+    },
+    reset: {
+      subject: "Crie uma nova senha para o seu diário no sintr",
+      body: [
+        "Alguém pediu para criar uma nova senha para o diário sintr deste endereço. Se foi você, abra o link abaixo em até uma hora.",
+        "Se não foi você, ignore esta mensagem: sua senha continua a mesma.",
+      ],
+      link: "Criar uma nova senha",
+    },
+    verify: {
+      subject: "Confirme seu e-mail no sintr",
+      body: [
+        "Confirme que este endereço é seu, para que o sintr possa escrever para você quando um relatório estiver pronto. Abra o link abaixo em até uma hora.",
+        "Se você não criou um diário no sintr, ignore esta mensagem.",
+      ],
+      link: "Confirmar este endereço",
+    },
+    practice: {
+      subject: (count) =>
+        count === 1
+          ? "Um relatório foi compartilhado com você"
+          : `${count} relatórios foram compartilhados com você`,
+      body: (count) => [
+        count === 1
+          ? "Uma pessoa que você atende compartilhou um relatório com o seu consultório no sintr."
+          : `Pessoas que você atende compartilharam ${count} relatórios com o seu consultório no sintr.`,
+        count === 1
+          ? "Ele espera por você no seu consultório. Este e-mail não diz quem compartilhou nem o que o relatório diz."
+          : "Eles esperam por você no seu consultório. Este e-mail não diz quem compartilhou nem o que os relatórios dizem.",
+      ],
+      link: "Abrir o seu consultório",
+    },
+    dates: "pt-BR",
+  },
+};
+
+/** The copy for a language tag (pt-BR, en, es...): by its language, English when sintr has none. */
+export function accountCopy(language: string | null | undefined): AccountCopy {
+  const base = (language ?? "").toLowerCase().split(/[-_]/u)[0] ?? "";
+  return ACCOUNT_COPY[base] ?? ACCOUNT_COPY.en;
+}
+
 /** To the person: a report is ready to read. A link only, never its words. */
-export function reportReadyEmail(input: { to: string; url: string; session: string | null }): EmailMessage {
-  const paragraphs = [
-    input.session
-      ? `Your report for the session on ${input.session} is ready to read.`
-      : "Your weekly report is ready to read.",
-    "Nothing has been sent to anyone. It waits for you to read it, change what you want, and approve it.",
-  ];
+export function reportReadyEmail(input: {
+  to: string;
+  url: string;
+  /** The session, already written in the email's language. */
+  session: string | null;
+  language?: string | null;
+}): EmailMessage {
+  const copy = accountCopy(input.language).ready;
+  const paragraphs = copy.body(input.session);
   return {
     to: input.to,
-    subject: "Your report is ready to read",
+    subject: copy.subject,
     text: `${paragraphs.join("\n\n")}\n\n${input.url}\n\nsintr\n`,
-    html: html(paragraphs, { href: input.url, label: "Read the report" }),
+    html: html(paragraphs, { href: input.url, label: copy.link }),
   };
 }
 
-export function passwordResetEmail(input: { to: string; url: string }): EmailMessage {
-  const paragraphs = [
-    "Someone asked to set a new password for the sintr diary of this address. If it was you, open the link below within an hour.",
-    "If it was not you, ignore this message: your password stays as it is.",
-  ];
+export function passwordResetEmail(input: {
+  to: string;
+  url: string;
+  language?: string | null;
+}): EmailMessage {
+  const copy = accountCopy(input.language).reset;
   return {
     to: input.to,
-    subject: "Set a new password for your sintr diary",
-    text: `${paragraphs.join("\n\n")}\n\n${input.url}\n\nsintr\n`,
-    html: html(paragraphs, { href: input.url, label: "Set a new password" }),
+    subject: copy.subject,
+    text: `${copy.body.join("\n\n")}\n\n${input.url}\n\nsintr\n`,
+    html: html(copy.body, { href: input.url, label: copy.link }),
   };
 }
 
-export function verificationEmail(input: { to: string; url: string }): EmailMessage {
-  const paragraphs = [
-    "Confirm that this address is yours, so sintr can write to it when a report is ready. Open the link below within an hour.",
-    "If you did not create a sintr diary, ignore this message.",
-  ];
+export function verificationEmail(input: {
+  to: string;
+  url: string;
+  language?: string | null;
+}): EmailMessage {
+  const copy = accountCopy(input.language).verify;
   return {
     to: input.to,
-    subject: "Confirm your email for sintr",
-    text: `${paragraphs.join("\n\n")}\n\n${input.url}\n\nsintr\n`,
-    html: html(paragraphs, { href: input.url, label: "Confirm this address" }),
+    subject: copy.subject,
+    text: `${copy.body.join("\n\n")}\n\n${input.url}\n\nsintr\n`,
+    html: html(copy.body, { href: input.url, label: copy.link }),
   };
 }
 
@@ -114,18 +233,18 @@ export function verificationEmail(input: { to: string; url: string }): EmailMess
  * To a professional who asked for it: reports arrived in their practice. A
  * link and a count only; never who shared them or what they say.
  */
-export function practiceReportEmail(input: { to: string; url: string; count: number }): EmailMessage {
-  const paragraphs = [
-    input.count === 1
-      ? "A person you see shared a report with your practice on sintr."
-      : `People you see shared ${input.count} reports with your practice on sintr.`,
-    "It waits for you in your practice. This email says nothing about who shared it or what it says.",
-  ];
+export function practiceReportEmail(input: {
+  to: string;
+  url: string;
+  count: number;
+  language?: string | null;
+}): EmailMessage {
+  const copy = accountCopy(input.language).practice;
+  const paragraphs = copy.body(input.count);
   return {
     to: input.to,
-    subject:
-      input.count === 1 ? "A report was shared with you" : `${input.count} reports were shared with you`,
+    subject: copy.subject(input.count),
     text: `${paragraphs.join("\n\n")}\n\n${input.url}\n\nsintr\n`,
-    html: html(paragraphs, { href: input.url, label: "Open your practice" }),
+    html: html(paragraphs, { href: input.url, label: copy.link }),
   };
 }

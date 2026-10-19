@@ -5,11 +5,13 @@ import { Button, Checkbox, FieldError, FieldHint, Input, cn } from "@sintr/ui";
 import { useActionState, useEffect, useRef, useState } from "react";
 import type { AssistantFormState, ConnectionState } from "@/app/(app)/settings/actions";
 import { submitWith } from "@/lib/use-form-action";
+import { useMessages } from "@/components/language";
 
-const PROVIDERS: { kind: ProviderKind; label: string; model: string }[] = [
-  { kind: "openai_compatible", label: "OpenAI-compatible", model: "The model name at that endpoint" },
-  { kind: "anthropic", label: "Anthropic", model: "For example claude-sonnet-5-5" },
-  { kind: "google", label: "Google", model: "The Gemini model name" },
+/** The providers offered; the one that is not a name is said in the catalog. */
+const PROVIDERS: { kind: ProviderKind; name: string | null }[] = [
+  { kind: "openai_compatible", name: null },
+  { kind: "anthropic", name: "Anthropic" },
+  { kind: "google", name: "Google" },
 ];
 
 /** Common OpenAI-compatible endpoints. Ollama and LiteLLM run on your own machine. */
@@ -19,22 +21,6 @@ const PRESETS = [
   { label: "Ollama", url: "http://localhost:11434/v1" },
   { label: "LiteLLM", url: "http://localhost:4000" },
 ];
-
-const CONNECTION_COPY: Record<string, string> = {
-  not_configured: "Save a provider and a model first.",
-  key_required: "This provider needs an API key.",
-  base_url_required: "This provider needs its address.",
-  key_refused: "The provider refused the key. Check that it is complete and still active.",
-  model_not_found: "The provider does not know this model. Check its name.",
-  rate_limited: "The provider is busy, or the key has reached its limit. Try again in a moment.",
-  unreachable: "The provider could not be reached. Check the address, and that it is running.",
-  timeout: "The provider took too long to answer.",
-  provider_error: "The provider answered with an error. Check the model and the key.",
-  invalid_url: "The address does not look right.",
-  credentials_in_url: "The address must not contain a password.",
-  https_required: "The address has to use https here.",
-  private_address: "The address has to be a public one here.",
-};
 
 const segmentedOption =
   "pointer-events-none flex min-h-10 items-center rounded-pill px-4 text-[0.9375rem] font-medium text-ink-2 transition-colors duration-300 peer-hover:bg-wash peer-checked:bg-ink peer-checked:text-paper peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-ink";
@@ -50,6 +36,8 @@ export function AssistantForm({
   test: (state: ConnectionState) => Promise<ConnectionState>;
   rehearsal: boolean;
 }) {
+  const { form: F, test: T } = useMessages().settings;
+  const connectionProblems: Record<string, string> = T.problems;
   const [state, saveAction, saving] = useActionState(save, { saved: false, problems: {} });
   const [connection, testAction, testing] = useActionState(test, {
     tested: false,
@@ -59,6 +47,7 @@ export function AssistantForm({
   });
   const [provider, setProvider] = useState<ProviderKind>(settings.provider ?? "openai_compatible");
   const [baseUrl, setBaseUrl] = useState(settings.baseUrl ?? "");
+  const label = (option: (typeof PROVIDERS)[number]) => option.name ?? F.compatible;
   const current = PROVIDERS.find((p) => p.kind === provider)!;
   const keyRef = useRef<HTMLInputElement>(null);
   const removeRef = useRef<HTMLInputElement>(null);
@@ -71,9 +60,9 @@ export function AssistantForm({
 
   return (
     <div className="space-y-10">
-      <form onSubmit={submitWith(saveAction)} className="space-y-8" aria-label="The assistant">
+      <form onSubmit={submitWith(saveAction)} className="space-y-8" aria-label={F.label}>
         <fieldset className="min-w-0 border-0 p-0">
-          <legend className="p-0 text-label font-medium text-ink">Provider</legend>
+          <legend className="p-0 text-label font-medium text-ink">{F.provider}</legend>
           <div className="mt-3 inline-flex max-w-full flex-wrap gap-1 rounded-[26px] border border-rule bg-paper p-1">
             {PROVIDERS.map((option) => (
               <label key={option.kind} className="relative">
@@ -85,14 +74,12 @@ export function AssistantForm({
                   onChange={() => setProvider(option.kind)}
                   className="peer absolute inset-0 cursor-pointer opacity-0"
                 />
-                <span className={segmentedOption}>{option.label}</span>
+                <span className={segmentedOption}>{label(option)}</span>
               </label>
             ))}
           </div>
           <FieldHint>
-            {provider === "openai_compatible"
-              ? "Any endpoint that speaks the OpenAI chat API: OpenAI itself, OpenRouter, Ollama, LiteLLM and others."
-              : `sintr talks to ${current.label} directly, with your key.`}
+            {provider === "openai_compatible" ? F.compatibleHint : F.directHint(label(current))}
           </FieldHint>
           {state.problems.provider ? <FieldError>{state.problems.provider}</FieldError> : null}
         </fieldset>
@@ -100,7 +87,7 @@ export function AssistantForm({
         {provider === "openai_compatible" ? (
           <div>
             <label htmlFor="assistant-url" className="block text-label font-medium text-ink">
-              Address of the endpoint
+              {F.url}
             </label>
             <Input
               id="assistant-url"
@@ -132,17 +119,14 @@ export function AssistantForm({
                 </button>
               ))}
             </div>
-            <FieldHint>
-              When sintr runs in Docker, a model on the same machine is at http://host.docker.internal instead
-              of localhost.
-            </FieldHint>
+            <FieldHint>{F.urlHint}</FieldHint>
             {state.problems.baseUrl ? <FieldError>{state.problems.baseUrl}</FieldError> : null}
           </div>
         ) : null}
 
         <div>
           <label htmlFor="assistant-model" className="block text-label font-medium text-ink">
-            Model
+            {F.model}
           </label>
           <Input
             id="assistant-model"
@@ -150,7 +134,7 @@ export function AssistantForm({
             autoComplete="off"
             spellCheck={false}
             defaultValue={settings.model ?? ""}
-            placeholder={current.model}
+            placeholder={F.models[current.kind]}
             className="mt-2"
             aria-invalid={state.problems.model ? true : undefined}
           />
@@ -159,7 +143,7 @@ export function AssistantForm({
 
         <div>
           <label htmlFor="assistant-key" className="block text-label font-medium text-ink">
-            API key
+            {F.key}
           </label>
           <Input
             ref={keyRef}
@@ -168,21 +152,21 @@ export function AssistantForm({
             type="password"
             autoComplete="off"
             spellCheck={false}
-            placeholder={settings.hasKey ? "Leave empty to keep the saved key" : "Paste your key"}
+            placeholder={settings.hasKey ? F.keyKeep : F.keyPaste}
             className="mt-2"
             aria-invalid={state.problems.apiKey ? true : undefined}
           />
           <FieldHint>
             {settings.hasKey
-              ? `A key is saved${settings.keyHint ? `, ending in ${settings.keyHint}` : ""}. It is never shown again, and changing the provider or its address removes it.`
+              ? F.keySaved(settings.keyHint)
               : provider === "openai_compatible"
-                ? "Optional for a local endpoint such as Ollama."
-                : "From your account with the provider."}
+                ? F.keyOptional
+                : F.keyFrom}
           </FieldHint>
           {settings.hasKey ? (
             <label className="mt-3 flex items-start gap-3 text-[0.9375rem] text-ink-2">
               <Checkbox ref={removeRef} name="removeKey" />
-              Remove the saved key
+              {F.keyRemove}
             </label>
           ) : null}
           {state.problems.apiKey ? <FieldError>{state.problems.apiKey}</FieldError> : null}
@@ -190,36 +174,30 @@ export function AssistantForm({
 
         <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
           <Button type="submit" disabled={saving}>
-            Save the assistant
+            {F.save}
           </Button>
           {state.saved ? (
             <p role="status" className="text-[0.9375rem] text-ink-2">
-              Saved.
+              {F.saved}
             </p>
           ) : null}
         </div>
       </form>
 
-      <form
-        onSubmit={submitWith(testAction)}
-        className="border-t border-rule pt-6"
-        aria-label="Test the connection"
-      >
+      <form onSubmit={submitWith(testAction)} className="border-t border-rule pt-6" aria-label={T.label}>
         <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
           <Button type="submit" variant="outline" size="sm" disabled={testing}>
-            {testing ? "Testing" : "Test the connection"}
+            {testing ? T.testing : T.label}
           </Button>
-          <p className="text-[0.9375rem] text-ink-3">
-            One short request to the provider, with the saved settings.
-          </p>
+          <p className="text-[0.9375rem] text-ink-3">{T.note}</p>
         </div>
         {connection.tested ? (
           <p role="status" className="mt-4 text-[0.9375rem] text-ink">
             {connection.ok
               ? connection.rehearsal
-                ? "The rehearsal assistant answered. It is offline and scripted, so nothing left this machine."
-                : "The assistant answered. You are ready to talk."
-              : (CONNECTION_COPY[connection.problem ?? ""] ?? CONNECTION_COPY.provider_error)}
+                ? T.rehearsal
+                : T.ok
+              : (connectionProblems[connection.problem ?? ""] ?? T.problems.provider_error)}
           </p>
         ) : null}
       </form>

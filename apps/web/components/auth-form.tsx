@@ -3,37 +3,43 @@
 import { Button, Checkbox, FieldError, FieldHint, Input, Label } from "@sintr/ui";
 import { useRouter } from "next/navigation";
 import { useId, useState, type FormEvent } from "react";
+import { useMessages } from "@/components/language";
 import { authClient } from "@/lib/auth-client";
+import type { Messages } from "@/messages";
 import { ConsentStatement } from "./consent-statement";
 
 type Mode = "sign-in" | "sign-up";
 
 /** Plain-language messages for what Better Auth reports. Never echoes input. */
-function messageFor(error: { status?: number; code?: string } | null | undefined): string {
-  if (!error) return "Something went wrong. Try again in a moment.";
-  if (error.status === 429) return "Too many attempts. Wait a minute, then try again.";
+function messageFor(
+  error: { status?: number; code?: string } | null | undefined,
+  says: Messages["auth"]["errors"],
+): string {
+  if (!error) return says.generic;
+  if (error.status === 429) return says.tooMany;
   switch (error.code) {
     case "INVALID_EMAIL_OR_PASSWORD":
-      return "That email and password do not match.";
+      return says.mismatch;
     case "USER_ALREADY_EXISTS":
     case "USER_ALREADY_EXISTS_USE_ANOTHER_EMAIL":
-      return "There is already a diary for this email. Sign in instead.";
+      return says.exists;
     case "PASSWORD_TOO_SHORT":
-      return "Use a password of at least 10 characters.";
+      return says.tooShort;
     case "PASSWORD_TOO_LONG":
-      return "Use a password of at most 128 characters.";
+      return says.tooLong;
     case "INVALID_EMAIL":
-      return "Check the email address.";
+      return says.badEmail;
     case "CONSENT_REQUIRED":
-      return "To keep your diary, sintr needs your consent below.";
+      return says.consent;
     case "EMAIL_PASSWORD_SIGN_UP_DISABLED":
-      return "Sign-up is closed on this sintr.";
+      return says.closed;
     default:
-      return "Something went wrong. Try again in a moment.";
+      return says.generic;
   }
 }
 
 export function AuthForm({ mode, next }: { mode: Mode; next: string }) {
+  const t = useMessages().auth;
   const router = useRouter();
   const ids = { email: useId(), password: useId(), consent: useId(), error: useId() };
   const [error, setError] = useState<string | null>(null);
@@ -66,7 +72,7 @@ export function AuthForm({ mode, next }: { mode: Mode; next: string }) {
         : await authClient.signIn.email({ email, password });
 
     if (result.error) {
-      setError(messageFor(result.error));
+      setError(messageFor(result.error, t.errors));
       setPending(false);
       return;
     }
@@ -84,7 +90,7 @@ export function AuthForm({ mode, next }: { mode: Mode; next: string }) {
       className="space-y-6"
     >
       <div>
-        <Label htmlFor={ids.email}>Email</Label>
+        <Label htmlFor={ids.email}>{t.form.email}</Label>
         <Input
           id={ids.email}
           name="email"
@@ -96,7 +102,7 @@ export function AuthForm({ mode, next }: { mode: Mode; next: string }) {
         />
       </div>
       <div>
-        <Label htmlFor={ids.password}>Password</Label>
+        <Label htmlFor={ids.password}>{t.form.password}</Label>
         <Input
           id={ids.password}
           name="password"
@@ -108,9 +114,7 @@ export function AuthForm({ mode, next }: { mode: Mode; next: string }) {
           className="mt-2"
           aria-invalid={error ? true : undefined}
         />
-        {mode === "sign-up" ? (
-          <FieldHint>At least 10 characters. A short sentence works well.</FieldHint>
-        ) : null}
+        {mode === "sign-up" ? <FieldHint>{t.form.passwordHint}</FieldHint> : null}
       </div>
       {mode === "sign-up" ? (
         <div className="flex items-start gap-3">
@@ -122,7 +126,7 @@ export function AuthForm({ mode, next }: { mode: Mode; next: string }) {
       ) : null}
       {error ? <FieldError id={ids.error}>{error}</FieldError> : null}
       <Button type="submit" disabled={pending} className="w-full sm:w-auto">
-        {mode === "sign-up" ? "Create your diary" : "Sign in"}
+        {mode === "sign-up" ? t.form.signUp : t.form.signIn}
       </Button>
     </form>
   );

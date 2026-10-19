@@ -5,16 +5,45 @@ import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { cache } from "react";
 import { safeNext } from "@/lib/redirect";
+import { LANGUAGES, chosenInCookie, matchLanguage, resolveLanguage } from "@/messages";
 
 const holder = globalThis as typeof globalThis & { __sintrRuntime?: Runtime };
 
 /** Created on first use, so `next build` never needs the runtime secrets. */
 export function runtime(): Runtime {
-  holder.__sintrRuntime ??= createRuntime(loadConfig(), { service: "web" });
+  if (!holder.__sintrRuntime) {
+    const config = loadConfig();
+    // A language the installation names must be one it has a catalog for.
+    if (config.language && !matchLanguage(config.language)) {
+      throw new Error(
+        `invalid configuration: SINTR_LANGUAGE: this sintr has no catalog for it (it speaks ${LANGUAGES.map((l) => l.code).join(", ")}); see docs/LANGUAGES.md`,
+      );
+    }
+    holder.__sintrRuntime = createRuntime(config, {
+      service: "web",
+      // The emails about an account are written as its pages are read (DECISIONS 98).
+      languageFor: async (requestHeaders, userId) => {
+        const profile = userId ? await (await runtime().repositories.forUser(userId)).profile.get() : null;
+        const browser = chosenInCookie(requestHeaders.get("cookie"));
+        const resolved = resolveLanguage({
+          chosen: profile?.locale ?? browser,
+          installation: config.language,
+          accept: requestHeaders.get("accept-language"),
+        });
+        return { code: resolved.code, chosen: resolved.source === "person" };
+      },
+    });
+  }
   return holder.__sintrRuntime;
 }
 
 export const getSession = cache(async () => runtime().auth.api.getSession({ headers: await headers() }));
+
+/** The signed-in person's scope, without the consent gate: for what every page needs, such as its language. */
+export const sessionScope = cache(async () => {
+  const session = await getSession();
+  return session ? runtime().repositories.forUser(session.user.id) : null;
+});
 
 /** The signed-in person, or a redirect to sign in that returns here afterwards. */
 export async function requireUser() {
@@ -33,7 +62,7 @@ export async function requireUser() {
  */
 export const requireScope = cache(async () => {
   const user = await requireUser();
-  const scope = await runtime().repositories.forUser(user.id);
+  const scope = (await sessionScope()) ?? (await runtime().repositories.forUser(user.id));
   const consent = await scope.consents.latest("health_data_processing");
   if (!consent?.granted || consent.version !== HEALTH_DATA_CONSENT_VERSION) redirect("/consent");
   return { user, scope };

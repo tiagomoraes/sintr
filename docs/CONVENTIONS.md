@@ -44,7 +44,7 @@ See [`docs/PRODUCT.md`](PRODUCT.md). Short version: one core (`packages/core`), 
 
 Calm, private, precise. No em dashes or en dashes in user-facing copy, docs, or commit bodies. No emoji, no hype, no gamification (streaks, badges, scores as judgement). Prefer lowercase, plain language.
 
-The app's words live in its message catalog, `apps/web/messages/en/<feature>.ts`, one file per screen or feature; components read them as `t.<feature>`. A new or rewritten string goes there, not into a component, so the languages milestone adds a catalog instead of hunting through the code (DECISIONS 94).
+The app's words live in its message catalog, one folder per language: `apps/web/messages/en/<feature>.ts` is English and the source, `apps/web/messages/pt-BR/<feature>.ts` its Brazilian Portuguese, one file per screen or feature. Server code reads them with `const t = await getMessages()` (`@/lib/server/language`), client components with `const t = useMessages()` (`@/components/language`), and helpers that write sentences take `t` as a parameter. A new or changed string goes into English and every other language in the same change; the parity test (`apps/web/test/messages.test.ts`) fails otherwise. Dates go through `@/lib/format` in the page's language. The languages themselves are listed in `apps/web/messages/languages.json` (DECISIONS 94, 98 and 99; [`LANGUAGES.md`](LANGUAGES.md)).
 
 ## Tests and verification
 

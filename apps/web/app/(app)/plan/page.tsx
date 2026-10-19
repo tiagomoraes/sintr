@@ -11,16 +11,19 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { PageHeading } from "@/components/empty-state";
 import { MeterRow } from "@/components/plan/meter-row";
-import { OWN_KEY_HREF } from "@/components/talk/plan-notes";
 import { formatDay } from "@/lib/format";
-import { MAX_SEATS, allowanceLine, counted, formatNext, priceLine, sourceLine } from "@/lib/plan";
+import { MAX_SEATS, OWN_KEY_HREF, allowanceLine, formatNext, priceLine, sourceLine } from "@/lib/plan";
 import { assistantState } from "@/lib/server/assistant";
 import { requireScope, runtime } from "@/lib/server/runtime";
 import { voiceView } from "@/lib/server/voice";
-import { t } from "@/messages";
+import { practicePlanName } from "@/lib/sharing";
+import { currentLanguage, getMessages } from "@/lib/server/language";
+import type { Messages } from "@/messages";
 import { manageSubscription, subscribe } from "./actions";
 
-export const metadata: Metadata = { title: "Your plan" };
+export async function generateMetadata(): Promise<Metadata> {
+  return { title: (await getMessages()).plan.title };
+}
 
 const NOTICE =
   "mb-10 max-w-[40rem] rounded-file border border-rule bg-wash px-5 py-4 text-[0.9375rem] text-ink-2";
@@ -39,38 +42,43 @@ function subscriptionLine(
   subscription: Subscription | null,
   locale: { language: string; timezone: string },
   after: string,
+  words: Messages["plan"]["subscription"],
 ): string | null {
   if (!subscription || subscription.source !== "stripe") return null;
   const end = subscription.currentPeriodEnd ? formatDay(subscription.currentPeriodEnd, locale) : null;
   switch (subscription.status) {
     case "active":
     case "trialing":
-      if (subscription.cancelAtPeriodEnd) {
-        return `It ends${end ? ` on ${end}` : " at the end of this period"}. After that you are on ${after}, and your diary stays as it is.`;
-      }
-      return `Paid through Stripe${end ? `, renewing on ${end}` : ""}.`;
+      if (subscription.cancelAtPeriodEnd) return words.ends(end, after);
+      return words.paid(end);
     case "past_due":
-      return "The last payment did not go through. The plan stays while Stripe tries again; you can change the card on Stripe's page.";
+      return words.pastDue;
     default:
-      return "Your last subscription has ended.";
+      return words.ended;
   }
 }
 
-function ManageButton({ subscription }: { subscription: Subscription | null }) {
+function ManageButton({
+  subscription,
+  words,
+}: {
+  subscription: Subscription | null;
+  words: Messages["plan"]["subscription"];
+}) {
   if (!subscription?.hasCustomer || !runtime().payments) return null;
   return (
     <form action={manageSubscription} className="mt-4">
       <Button type="submit" variant="outline" size="sm">
-        {isEntitling(subscription.status) ? "Manage the subscription" : "Your payments and receipts"}
+        {isEntitling(subscription.status) ? words.manage : words.receipts}
       </Button>
     </form>
   );
 }
 
-function seatsText(use: SeatUse): string {
+function seatsText(use: SeatUse, words: Messages["plan"]["practice"]): string {
   const inUse = use.active + use.held;
-  if (use.seats === null) return `unlimited seats, ${counted(use.active, "patient", "patients")} linked`;
-  return `${counted(use.seats, "seat", "seats")}, ${inUse} in use`;
+  if (use.seats === null) return words.unlimited(use.active);
+  return words.limited(use.seats, inUse);
 }
 
 export default async function PlanPage({
@@ -78,6 +86,8 @@ export default async function PlanPage({
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
+  const [t, language] = await Promise.all([getMessages(), currentLanguage()]);
+  const P = t.plan;
   const { scope } = await requireScope();
   const { config, payments } = runtime();
   const [assistant, month, profile, practice, practiceSubscription, params, voice] = await Promise.all([
@@ -90,9 +100,12 @@ export default async function PlanPage({
     voiceView(scope),
   ]);
   const seats = practice ? await scope.practice.seats() : null;
-  const locale = { language: "en", timezone: profile.timezone };
-  const after = PERSON_PLANS[config.personPlan].label;
+  const locale = { language: language.code, timezone: profile.timezone };
+  const after = P.subscription.afterPlan(P.names[config.personPlan]);
   const { plan, subscription } = month;
+  const mine = subscriptionLine(subscription, locale, after, P.subscription);
+  const practiceLine = subscriptionLine(practiceSubscription, locale, P.practice.after, P.subscription);
+  const next = formatNext(month.period.next, language.code);
   const offerPersonal =
     assistant.kind === "house" && plan.id === "free" && payments !== null && payments.offers.personal;
   const practicePaid = practiceSubscription?.source === "stripe" && isEntitling(practiceSubscription.status);
@@ -105,19 +118,15 @@ export default async function PlanPage({
 
   return (
     <>
-      <PageHeading
-        title="Your plan"
-        lede="Your diary is the same on every plan: your entries, check-ins and reports never depend on it. A plan is only about how much of the assistant you can use."
-      />
+      <PageHeading title={P.title} lede={P.lede} />
       {subscribed ? (
         <p role="status" className={NOTICE}>
-          Thank you. Your plan changes as soon as Stripe confirms the payment, usually within a minute; this
-          page shows it once it has.
+          {P.subscribed}
         </p>
       ) : null}
       {params.billing === "unavailable" ? (
         <p role="alert" className={NOTICE}>
-          The payment page could not be opened just now. Nothing was charged; try again in a moment.
+          {P.unavailable}
         </p>
       ) : null}
 
@@ -125,75 +134,64 @@ export default async function PlanPage({
         {assistant.kind === "house" ? (
           <>
             <h2 id="mine-title" className={HEADING}>
-              You are on {plan.label}.
+              {P.on(P.names[plan.id])}
             </h2>
-            <p className="mt-3 text-ink-2">{allowanceLine(plan.allowance)}</p>
-            {sourceLine(plan.source) ? (
-              <p className="mt-2 text-[0.9375rem] text-ink-3">{sourceLine(plan.source)}</p>
+            <p className="mt-3 text-ink-2">{allowanceLine(plan.allowance, t)}</p>
+            {sourceLine(plan.source, t) ? (
+              <p className="mt-2 text-[0.9375rem] text-ink-3">{sourceLine(plan.source, t)}</p>
             ) : null}
-            {subscriptionLine(subscription, locale, after) ? (
-              <p className="mt-2 text-[0.9375rem] text-ink-3">
-                {subscriptionLine(subscription, locale, after)}
-              </p>
-            ) : null}
-            <ManageButton subscription={subscription} />
-            <h3 className="mt-10 font-sans text-label font-medium text-ink">This month</h3>
+            {mine ? <p className="mt-2 text-[0.9375rem] text-ink-3">{mine}</p> : null}
+            <ManageButton subscription={subscription} words={P.subscription} />
+            <h3 className="mt-10 font-sans text-label font-medium text-ink">{P.month}</h3>
             <dl className="mt-3 border-t border-rule">
               <MeterRow
-                label="Messages with the assistant"
+                label={P.meters.messages}
                 used={month.used.assistantMessages}
                 limit={plan.allowance.assistantMessages}
               />
-              <MeterRow
-                label="Reports written by the assistant"
-                used={month.used.reports}
-                limit={plan.allowance.reports}
-              />
+              <MeterRow label={P.meters.reports} used={month.used.reports} limit={plan.allowance.reports} />
               {voice.kind !== "unavailable" ? (
                 // Speaking is counted only where the house writes it down.
                 <MeterRow
-                  label={t.plan.speaking}
+                  label={P.speaking}
                   used={month.used.audioMinutes}
                   limit={plan.allowance.audioMinutes}
                 />
               ) : null}
             </dl>
             <p className="mt-5 text-[0.9375rem] text-ink-2">
-              {plan.allowance.assistantMessages === null
-                ? `The count starts again on ${formatNext(month.period.next)}.`
-                : t.plan.runOut(formatNext(month.period.next))}
+              {plan.allowance.assistantMessages === null ? P.startsAgain(next) : P.runOut(next)}
             </p>
           </>
         ) : assistant.kind === "own" ? (
           <>
             <h2 id="mine-title" className={HEADING}>
-              You use your own key.
+              {P.own.title}
             </h2>
             <p className="mt-3 text-ink-2">
-              Nothing is counted here, and your provider bills you directly.
+              {P.own.body}
               {assistant.house ? (
                 <>
                   {" "}
-                  You can go back to the included assistant in{" "}
+                  {P.own.back}{" "}
                   <Link href="/settings" className={linkStyles}>
-                    Settings
+                    {P.own.backLink}
                   </Link>{" "}
-                  whenever you want.
+                  {P.own.backAfter}
                 </>
               ) : null}
             </p>
-            <ManageButton subscription={subscription} />
+            <ManageButton subscription={subscription} words={P.subscription} />
           </>
         ) : (
           <>
             <h2 id="mine-title" className={HEADING}>
-              There is no plan to choose here.
+              {P.none.title}
             </h2>
             <p className="mt-3 text-ink-2">
-              This sintr has no assistant of its own, so nothing is counted: you bring your own key, and your
-              provider bills you directly.{" "}
+              {P.none.body}{" "}
               <Link href={OWN_KEY_HREF} className={linkStyles}>
-                Use your own key
+                {P.ownKey}
               </Link>
             </p>
           </>
@@ -203,36 +201,30 @@ export default async function PlanPage({
       {assistant.kind === "house" && plan.id === "free" ? (
         <section aria-labelledby="more-title" className={SECTION}>
           <h2 id="more-title" className={HEADING}>
-            More of the assistant
+            {P.more.title}
           </h2>
           <p className="mt-3 text-ink-2">
-            Personal: {allowanceLine(PERSON_PLANS.personal.allowance).replace(/^./u, (c) => c.toLowerCase())}
-            {personalPrice ? ` It costs ${priceLine(personalPrice)}.` : ""}
+            {P.more.personal(
+              P.names.personal,
+              allowanceLine(PERSON_PLANS.personal.allowance, t).replace(/^./u, (c) => c.toLowerCase()),
+              personalPrice ? priceLine(personalPrice, t, language.code) : null,
+            )}
           </p>
-          {offerPractice ? (
-            <p className="mt-2 text-[0.9375rem] text-ink-3">
-              As a therapist, the Practice plan below includes it for your own diary.
-            </p>
-          ) : null}
+          {offerPractice ? <p className="mt-2 text-[0.9375rem] text-ink-3">{P.more.practice}</p> : null}
           {offerPersonal ? (
             <>
               <form action={subscribe.bind(null, "person" satisfies SubscriptionKind)} className="mt-6">
-                <Button type="submit">Subscribe to Personal</Button>
+                <Button type="submit">{P.more.subscribe(P.names.personal)}</Button>
               </form>
-              <p className="mt-3 text-[0.9375rem] text-ink-3">
-                You pay on Stripe&apos;s page and can cancel there at any time. Your diary stays as it is
-                either way.
-              </p>
+              <p className="mt-3 text-[0.9375rem] text-ink-3">{P.more.stripe}</p>
             </>
           ) : (
-            <p className="mt-3 text-[0.9375rem] text-ink-3">
-              Subscriptions are not open on this sintr. Whoever runs it can give you a plan.
-            </p>
+            <p className="mt-3 text-[0.9375rem] text-ink-3">{P.more.closed}</p>
           )}
           <p className="mt-8 text-ink-2">
-            Or use your own key: free here, and your provider bills you.{" "}
+            {P.more.ownKey}{" "}
             <Link href={OWN_KEY_HREF} className={linkStyles}>
-              Use your own key
+              {P.ownKey}
             </Link>
           </p>
         </section>
@@ -241,30 +233,23 @@ export default async function PlanPage({
       {practice && seats ? (
         <section id="practice" aria-labelledby="practice-title" className={`${SECTION} scroll-mt-8`}>
           <h2 id="practice-title" className={HEADING}>
-            Your practice
+            {P.practice.title}
           </h2>
           <p className="mt-3 text-ink-2">
-            {seats.plan}: {seatsText(seats)}. Each seat is one patient linked to your practice, or an invite
-            waiting for an answer.
+            {P.practice.summary(practicePlanName(seats.plan, t), seatsText(seats, P.practice))}
           </p>
-          {subscriptionLine(practiceSubscription, locale, "the defaults of this sintr") ? (
-            <p className="mt-2 text-[0.9375rem] text-ink-3">
-              {subscriptionLine(practiceSubscription, locale, "the defaults of this sintr")}
-            </p>
-          ) : null}
+          {practiceLine ? <p className="mt-2 text-[0.9375rem] text-ink-3">{practiceLine}</p> : null}
           {seats.seats !== null ? (
             <dl className="mt-6 border-t border-rule">
-              <MeterRow label="Seats in use" used={seats.active + seats.held} limit={seats.seats} />
+              <MeterRow label={P.practice.inUse} used={seats.active + seats.held} limit={seats.seats} />
             </dl>
           ) : null}
           {practicePaid ? (
-            <ManageButton subscription={practiceSubscription} />
+            <ManageButton subscription={practiceSubscription} words={P.subscription} />
           ) : offerPractice ? (
             <>
               <p className="mt-6 text-ink-2">
-                The Practice plan: the seats you choose
-                {seatPrice ? `, at ${priceLine(seatPrice)} each` : ""}, and the assistant included for your
-                own diary, as on Personal.
+                {P.practice.offer(seatPrice ? priceLine(seatPrice, t, language.code) : null)}
               </p>
               <form
                 action={subscribe.bind(null, "practice" satisfies SubscriptionKind)}
@@ -272,7 +257,7 @@ export default async function PlanPage({
               >
                 <div>
                   <label htmlFor="plan-seats" className="block text-label font-medium text-ink">
-                    Seats
+                    {P.practice.seats}
                   </label>
                   <Input
                     id="plan-seats"
@@ -285,25 +270,20 @@ export default async function PlanPage({
                     className="mt-2 w-28"
                   />
                 </div>
-                <Button type="submit">Subscribe</Button>
+                <Button type="submit">{P.practice.subscribe}</Button>
               </form>
               {params.billing === "seats" ? (
                 <p role="alert" className="mt-3 text-[0.9375rem] text-ink">
-                  Choose between 1 and {MAX_SEATS} seats.
+                  {P.practice.range(MAX_SEATS)}
                 </p>
               ) : null}
             </>
           ) : (
             <p className="mt-6 text-[0.9375rem] text-ink-3">
-              {practice.seatSource === "grant"
-                ? "Granted for your practice by whoever runs this sintr."
-                : "Set by this sintr's configuration; whoever runs it can change them."}
+              {practice.seatSource === "grant" ? P.practice.grant : P.practice.config}
             </p>
           )}
-          <p className="mt-8 text-[0.9375rem] text-ink-3">
-            Your patients&apos; plans are their own. Sharing with you never changes them, so stopping costs
-            them nothing.
-          </p>
+          <p className="mt-8 text-[0.9375rem] text-ink-3">{P.practice.patients}</p>
         </section>
       ) : null}
     </>

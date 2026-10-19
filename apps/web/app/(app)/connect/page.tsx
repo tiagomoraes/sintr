@@ -8,12 +8,15 @@ import { PageHeading } from "@/components/empty-state";
 import { onlyReachableHere } from "@/lib/connect";
 import { workingKeys } from "@/lib/server/keys";
 import { requireScope, runtime } from "@/lib/server/runtime";
-import { t } from "@/messages";
+import { getMessages } from "@/lib/server/language";
 import { makeKey } from "./actions";
 
-export const metadata: Metadata = { title: t.connect.title };
+export async function generateMetadata(): Promise<Metadata> {
+  return { title: (await getMessages()).connect.title };
+}
 
 export default async function ConnectPage() {
+  const t = await getMessages();
   const { scope } = await requireScope();
   const keys = await workingKeys(scope);
   const appUrl = runtime().config.url.origin;
@@ -38,7 +41,7 @@ export default async function ConnectPage() {
           keys.length ? (
             <section aria-labelledby="connected-title" className="mb-16 max-w-[40rem]">
               <h2 id="connected-title" className="font-serif text-title-small font-normal text-ink">
-                Your assistants
+                {t.connect.connected}
               </h2>
               <div className="mt-5">
                 <KeyList keys={keys} />

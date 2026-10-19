@@ -39,6 +39,18 @@ export const shell = {
     callSamu: "Call SAMU, 192",
   },
   signOut: "Sign out",
+  /** A screen reader's name for the wordmark, which leads home. */
   homeLink: "sintr, home",
   skip: "Skip to content",
+  /** One quiet line at the top of the diary's pages, with a link to where it leads. */
+  notice: {
+    openSharing: "Open Sharing",
+    /** `when` is the session's day and time, as the page's language writes a date. */
+    reportReady: (when: string) => `Your report for the session of ${when} is ready to read.`,
+    weeklyReady: "Your weekly report is ready to read.",
+    readIt: "Read it",
+  },
+  /** Under a practice's pages, where a person's pages have the help lines. */
+  practiceNote:
+    "Reports arrive when a person approves and shares them, never in real time, and sintr does not watch over them: it is a diary people keep for themselves, not a clinical record, a monitoring tool or a crisis service. If something in a report worries you, reach the person the way you usually do.",
 } as const;

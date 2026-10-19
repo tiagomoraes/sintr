@@ -4,13 +4,10 @@ import { Button, FieldError, FieldHint, cn } from "@sintr/ui";
 import { useActionState, useState, useSyncExternalStore } from "react";
 import type { PreferencesState } from "@/app/(app)/settings/actions";
 import { submitWith } from "@/lib/use-form-action";
+import { useMessages } from "@/components/language";
 
-const RETENTION = [
-  { value: "keep", label: "Until I delete them" },
-  { value: "30", label: "30 days after the last message" },
-  { value: "90", label: "90 days after the last message" },
-  { value: "365", label: "A year after the last message" },
-];
+/** How long conversations are kept, as the form posts it; each is said in `settings.time.retention`. */
+const RETENTION = ["keep", "30", "90", "365"] as const;
 
 const noSubscription = () => () => undefined;
 
@@ -25,6 +22,7 @@ export function PreferencesForm({
   retentionDays: number | null;
   save: (state: PreferencesState, form: FormData) => Promise<PreferencesState>;
 }) {
+  const T = useMessages().settings.time;
   const [state, action, pending] = useActionState(save, { saved: false, problems: {} });
   const [zone, setZone] = useState(timezone);
   // The device's own zone, read in the browser only (null while rendering on the server).
@@ -37,10 +35,10 @@ export function PreferencesForm({
   const retention = retentionDays === null ? "keep" : String(retentionDays);
 
   return (
-    <form onSubmit={submitWith(action)} className="space-y-10" aria-label="Time zone and conversations">
+    <form onSubmit={submitWith(action)} className="space-y-10" aria-label={T.label}>
       <div>
         <label htmlFor="settings-timezone" className="block text-label font-medium text-ink">
-          Your time zone
+          {T.zone}
         </label>
         <select
           id="settings-timezone"
@@ -55,38 +53,36 @@ export function PreferencesForm({
             </option>
           ))}
         </select>
-        <FieldHint>Dates in your diary, and the assistant&apos;s sense of today, follow it.</FieldHint>
+        <FieldHint>{T.zoneHint}</FieldHint>
         {device && zone !== device ? (
           <button
             type="button"
             onClick={() => setZone(device)}
             className="mt-3 inline-flex min-h-8 items-center rounded-pill border border-rule px-3.5 text-[0.8125rem] font-medium text-ink-2 hover:border-rule-strong hover:text-ink"
           >
-            Use this device&apos;s time zone, {device.replaceAll("_", " ")}
+            {T.device(device.replaceAll("_", " "))}
           </button>
         ) : null}
         {state.problems.timezone ? <FieldError>{state.problems.timezone}</FieldError> : null}
       </div>
 
       <fieldset className="min-w-0 border-0 p-0">
-        <legend className="p-0 text-label font-medium text-ink">Keep conversations</legend>
-        <p className="mt-1 max-w-[36em] text-caption text-ink-3">
-          Entries and check-ins you saved stay in your diary either way. Only the conversations go.
-        </p>
+        <legend className="p-0 text-label font-medium text-ink">{T.keep}</legend>
+        <p className="mt-1 max-w-[36em] text-caption text-ink-3">{T.keepHint}</p>
         <div className="mt-3 space-y-2">
           {RETENTION.map((option) => (
-            <label key={option.value} className="flex items-center gap-3 text-[0.9688rem] text-ink-2">
+            <label key={option} className="flex items-center gap-3 text-[0.9688rem] text-ink-2">
               <input
                 type="radio"
                 name="retention"
-                value={option.value}
-                defaultChecked={option.value === retention}
+                value={option}
+                defaultChecked={option === retention}
                 className={cn(
                   "size-4 shrink-0 cursor-pointer appearance-none rounded-full border-[1.5px] border-ink-soft bg-paper",
                   "checked:border-[5px] checked:border-ink",
                 )}
               />
-              {option.label}
+              {T.retention[option]}
             </label>
           ))}
         </div>
@@ -95,11 +91,11 @@ export function PreferencesForm({
 
       <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
         <Button type="submit" disabled={pending}>
-          Save
+          {T.save}
         </Button>
         {state.saved ? (
           <p role="status" className="text-[0.9375rem] text-ink-2">
-            Saved.
+            {T.saved}
           </p>
         ) : null}
       </div>

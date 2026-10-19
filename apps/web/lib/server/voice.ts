@@ -1,7 +1,6 @@
 import "server-only";
 import { voiceRouteFor, type VoiceRoute, type VoiceSource } from "@sintr/agent";
 import type { UserScope } from "@sintr/core";
-import { formatNext } from "@/lib/plan";
 import type { VoiceView } from "@/lib/voice/view";
 import { runtime } from "./runtime";
 
@@ -28,6 +27,10 @@ function providerName(
   }
 }
 
+/**
+ * What the pages may offer for speaking: data only (names, a day), which
+ * each page words in its own language.
+ */
 export async function voiceView(scope: UserScope): Promise<VoiceView> {
   const voice = await voiceFor(scope);
   if (voice.route.kind === "none") {
@@ -44,7 +47,7 @@ export async function voiceView(scope: UserScope): Promise<VoiceView> {
   const minutes = month.plan.allowance.audioMinutes;
   if (minutes === null) return { ...ready, secondsLeft: null };
   const left = minutes * 60 - month.spokenSeconds;
-  if (left <= 0) return { kind: "limit", next: formatNext(month.period.next) };
+  if (left <= 0) return { kind: "limit", next: month.period.next };
   return { ...ready, secondsLeft: left };
 }
 

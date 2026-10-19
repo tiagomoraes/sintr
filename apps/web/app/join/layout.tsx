@@ -1,5 +1,6 @@
 import { WindowLight } from "@sintr/ui";
 import type { ReactNode } from "react";
+import { LanguageOffers } from "@/components/language";
 import { SupportLines } from "@/components/support-lines";
 
 /** An invite opens on a reading page: the light stays in the header and fades before the words. */
@@ -11,6 +12,7 @@ export default function JoinLayout({ children }: { children: ReactNode }) {
       <footer className="border-t border-rule">
         <div className="wrap py-14">
           <SupportLines />
+          <LanguageOffers className="mt-10" />
         </div>
       </footer>
     </>

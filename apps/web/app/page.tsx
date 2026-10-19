@@ -1,11 +1,14 @@
 import { Button, WindowLight, buttonVariants, linkStyles } from "@sintr/ui";
 import Link from "next/link";
 import { HeaderLink, SiteHeader } from "@/components/site-header";
+import { LanguageOffers } from "@/components/language";
 import { SupportLines } from "@/components/support-lines";
+import { getMessages } from "@/lib/server/language";
 import { getSession } from "@/lib/server/runtime";
 
 export default async function Home() {
   const session = await getSession();
+  const t = (await getMessages()).common.landing;
 
   return (
     <>
@@ -14,13 +17,13 @@ export default async function Home() {
       <SiteHeader>
         {session ? (
           <Link href="/home" className={buttonVariants({ size: "sm" })}>
-            Open your diary
+            {t.open}
           </Link>
         ) : (
           <>
-            <HeaderLink href="/sign-in">Sign in</HeaderLink>
+            <HeaderLink href="/sign-in">{t.signIn}</HeaderLink>
             <Link href="/sign-up" className={buttonVariants({ size: "sm" })}>
-              Create your diary
+              {t.create}
             </Link>
           </>
         )}
@@ -29,46 +32,36 @@ export default async function Home() {
       <main id="main" className="relative z-10">
         <section className="wrap grid min-h-[calc(100svh-88px)] grid-cols-12 items-center gap-x-6 pb-[clamp(64px,10vh,120px)] pt-[clamp(40px,6vh,72px)]">
           <div className="col-span-12 md:col-span-8 lg:col-span-7">
-            <h1 className="text-display">The week between sessions, kept in your own words.</h1>
-            <p className="mt-[clamp(24px,2.6vw,36px)] max-w-[34em] text-lede text-ink-2">
-              sintr is a private mood diary. Write down what happened, what went through your mind and how
-              strong it felt. Before each therapy session your week is waiting on one page, for you to read
-              first and to share only if you choose to.
-            </p>
+            <h1 className="text-display">{t.heading}</h1>
+            <p className="mt-[clamp(24px,2.6vw,36px)] max-w-[34em] text-lede text-ink-2">{t.lede}</p>
             <div className="mt-[clamp(32px,3.4vw,44px)] flex flex-wrap items-center gap-x-7 gap-y-4">
               {session ? (
                 <Button asChild>
-                  <Link href="/home">Open your diary</Link>
+                  <Link href="/home">{t.open}</Link>
                 </Button>
               ) : (
                 <>
                   <Button asChild>
-                    <Link href="/sign-up">Create your diary</Link>
+                    <Link href="/sign-up">{t.create}</Link>
                   </Button>
                   <Link href="/sign-in" className={linkStyles}>
-                    I already have one
+                    {t.already}
                   </Link>
                 </>
               )}
             </div>
-            <p className="mt-7 max-w-[36em] text-[0.9375rem] text-ink-3">
-              Everything you write is encrypted for you before it is stored. Nothing leaves without your
-              approval of that specific report.
-            </p>
+            <p className="mt-7 max-w-[36em] text-[0.9375rem] text-ink-3">{t.promise}</p>
           </div>
         </section>
 
         <section className="border-t border-rule">
           <div className="wrap grid grid-cols-12 gap-x-6 gap-y-10 py-section">
             <h2 className="col-span-12 max-w-[15.5em] text-headline md:col-span-7">
-              <span className="block">sintr keeps the record.</span>
-              <span className="block text-ink-soft">Your therapist does the therapy.</span>
+              <span className="block">{t.record}</span>
+              <span className="block text-ink-soft">{t.therapy}</span>
             </h2>
             <div className="col-span-12 md:col-span-5 md:self-end">
-              <p className="max-w-[36em] text-ink-2">
-                It is not therapy, a diagnosis or an emergency service. It will not label you or tell you what
-                to do. It keeps your words exactly as you wrote them.
-              </p>
+              <p className="max-w-[36em] text-ink-2">{t.limits}</p>
             </div>
           </div>
         </section>
@@ -77,6 +70,7 @@ export default async function Home() {
       <footer className="border-t border-rule">
         <div className="wrap py-16">
           <SupportLines />
+          <LanguageOffers className="mt-10" />
         </div>
       </footer>
     </>

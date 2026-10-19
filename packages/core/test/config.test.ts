@@ -43,6 +43,13 @@ describe("configuration", () => {
     }
   });
 
+  it("reads the installation's language as a tag, and refuses one that is not a language", () => {
+    expect(loadConfig(valid()).language).toBeNull();
+    expect(loadConfig({ ...valid(), SINTR_LANGUAGE: "pt-br" }).language).toBe("pt-BR");
+    expect(loadConfig({ ...valid(), SINTR_LANGUAGE: "" }).language).toBeNull();
+    expect(() => loadConfig({ ...valid(), SINTR_LANGUAGE: "portuguese please" })).toThrow(/SINTR_LANGUAGE/);
+  });
+
   it("requires the database URL and rejects unknown modes", () => {
     const { DATABASE_URL: _omit, ...rest } = valid();
     expect(() => loadConfig(rest)).toThrow(/DATABASE_URL/);

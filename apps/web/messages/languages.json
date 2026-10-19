@@ -1,0 +1,7 @@
+{
+  "$comment": "The languages this sintr speaks, one catalog folder each beside this file. English is the default and the source every other is checked against. code: the folder's name and the tag stored for a person's choice. name: the language in its own words. intl: how dates and numbers are written. detect: the browser languages it answers. See docs/LANGUAGES.md.",
+  "languages": [
+    { "code": "en", "name": "English", "intl": "en-GB", "detect": ["en"] },
+    { "code": "pt-BR", "name": "Português", "intl": "pt-BR", "detect": ["pt"] }
+  ]
+}

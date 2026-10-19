@@ -10,12 +10,15 @@ import { assistantState } from "@/lib/server/assistant";
 import { requireScope, runtime } from "@/lib/server/runtime";
 import { voiceView } from "@/lib/server/voice";
 import { hourIn, partOfDay } from "@/lib/time-of-day";
-import { t } from "@/messages";
+import { currentLanguage, getMessages } from "@/lib/server/language";
+import type { Messages } from "@/messages";
 
-export const metadata: Metadata = { title: t.shell.nav.home };
+export async function generateMetadata(): Promise<Metadata> {
+  return { title: (await getMessages()).shell.nav.home };
+}
 
 /** Everything else, one tap away, in a sentence rather than a menu. */
-function Doors() {
+function Doors({ t }: { t: Messages }) {
   const door =
     "text-ink-2 underline decoration-rule-strong underline-offset-[0.28em] hover:text-ink hover:decoration-ink";
   return (
@@ -43,6 +46,7 @@ function Doors() {
  * offered the way back to it, once, quietly.
  */
 export default async function HomePage() {
+  const t = await getMessages();
   const { scope } = await requireScope();
   const [assistant, profile, conversations, voice] = await Promise.all([
     assistantState(scope),
@@ -51,7 +55,7 @@ export default async function HomePage() {
     voiceView(scope),
   ]);
   const earlier = conversations.filter((c) => c.lastMessageAt !== null).slice(0, 8);
-  const locale = { language: profile.language, timezone: profile.timezone };
+  const locale = { language: (await currentLanguage()).code, timezone: profile.timezone };
   const greeting = t.home.greeting(partOfDay(hourIn(profile.timezone)), profile.preferredName);
 
   return (
@@ -78,7 +82,7 @@ export default async function HomePage() {
           meter={assistant.kind === "house" ? assistant.messages : null}
           voice={voice}
           greeting={greeting}
-          doors={<Doors />}
+          doors={<Doors t={t} />}
         />
       ) : (
         <div className="space-y-8">

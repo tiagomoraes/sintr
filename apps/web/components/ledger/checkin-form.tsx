@@ -4,6 +4,7 @@ import { Button, FieldError, linkStyles } from "@sintr/ui";
 import Link from "next/link";
 import { useActionState } from "react";
 import type { CheckinFormState } from "@/app/(app)/checkins/actions";
+import { useMessages } from "@/components/language";
 import { CheckinFields, type CheckinDefaults } from "./checkin-fields";
 
 export function CheckinForm({
@@ -21,6 +22,7 @@ export function CheckinForm({
   cancelHref: string;
   correctionNote?: boolean;
 }) {
+  const C = useMessages().checkin;
   const [state, formAction, pending] = useActionState(action, { problems: {}, failure: null });
   return (
     <form action={formAction} className="max-w-[44rem]">
@@ -36,7 +38,7 @@ export function CheckinForm({
           {submitLabel}
         </Button>
         <Link href={cancelHref} className={linkStyles}>
-          Cancel
+          {C.cancel}
         </Link>
       </div>
     </form>

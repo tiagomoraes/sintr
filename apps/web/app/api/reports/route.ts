@@ -30,6 +30,7 @@ export async function POST(request: Request) {
       model,
       modelProblem: problem,
       metered,
+      installationLanguage: config.language,
       log,
       abortSignal: request.signal,
     });

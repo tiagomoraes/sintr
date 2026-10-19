@@ -3,6 +3,7 @@
 import { Button, Checkbox, FieldError, FieldHint, Input, cn } from "@sintr/ui";
 import { useActionState } from "react";
 import type { PracticeFormState } from "@/app/(app)/practice/actions";
+import { useMessages } from "@/components/language";
 import { useHydrated } from "@/lib/use-hydrated";
 import { submitWith } from "@/lib/use-form-action";
 
@@ -47,17 +48,13 @@ export function PracticeForm({
   /** The email notice, when editing an open practice. */
   notify?: { checked: boolean; available: boolean; hint: string };
 }) {
+  const t = useMessages().practice;
   const hydrated = useHydrated();
   const [state, action, pending] = useActionState(save, { saved: false, problems: {} });
   const p = state.problems;
   return (
-    <form onSubmit={submitWith(action)} className="space-y-8" aria-label="Your practice">
-      <Field
-        id="practice-name"
-        label="Your name, as the people you see know it"
-        hint="Shown to the people you invite, with what follows."
-        problem={p.professionalName}
-      >
+    <form onSubmit={submitWith(action)} className="space-y-8" aria-label={t.title}>
+      <Field id="practice-name" label={t.form.name} hint={t.form.nameHint} problem={p.professionalName}>
         <Input
           id="practice-name"
           name="professionalName"
@@ -67,7 +64,7 @@ export function PracticeForm({
           className="mt-2 max-w-md"
         />
       </Field>
-      <Field id="practice-place" label="Practice or clinic" hint="Optional." problem={p.practiceName}>
+      <Field id="practice-place" label={t.form.place} hint={t.form.optional} problem={p.practiceName}>
         <Input
           id="practice-place"
           name="practiceName"
@@ -78,8 +75,8 @@ export function PracticeForm({
       </Field>
       <Field
         id="practice-registration"
-        label="Registration you want to show"
-        hint="Optional, such as CRP 06/123456."
+        label={t.form.registration}
+        hint={t.form.registrationHint}
         problem={p.registration}
       >
         <Input
@@ -99,7 +96,7 @@ export function PracticeForm({
             )}
           >
             <Checkbox name="notifyEmail" defaultChecked={notify.checked} disabled={!notify.available} />
-            Email me when a report arrives
+            {t.form.notify}
           </label>
           <FieldHint>{notify.hint}</FieldHint>
         </div>
@@ -111,7 +108,7 @@ export function PracticeForm({
         </Button>
         {state.saved ? (
           <p role="status" className="text-[0.9375rem] text-ink-2">
-            Saved.
+            {t.form.saved}
           </p>
         ) : null}
       </div>

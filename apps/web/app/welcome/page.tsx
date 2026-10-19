@@ -6,9 +6,11 @@ import { safeNext } from "@/lib/redirect";
 import { practiceDetails, practiceWho } from "@/lib/sharing";
 import { tooManyLookups } from "@/lib/server/join";
 import { requireScope, runtime } from "@/lib/server/runtime";
-import { t } from "@/messages";
+import { getMessages } from "@/lib/server/language";
 
-export const metadata: Metadata = { title: t.welcome.title };
+export async function generateMetadata(): Promise<Metadata> {
+  return { title: (await getMessages()).welcome.title };
+}
 
 const TIMEZONES = Intl.supportedValuesOf("timeZone");
 

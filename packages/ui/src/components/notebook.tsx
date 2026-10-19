@@ -72,15 +72,18 @@ export function NotebookRow({
   );
 }
 
-/** The small hairline pill of a scale value: "80 of 100". */
+/** The small hairline pill of a scale value: "80 of 100", or the page's own words for it. */
 export function IntensityChip({
   value,
   of = 100,
   className,
+  children,
 }: {
   value: number;
   of?: number;
   className?: string;
+  /** The value in the page's language ("80 de 100"); English when not given. */
+  children?: ReactNode;
 }) {
   return (
     <span
@@ -89,7 +92,7 @@ export function IntensityChip({
         className,
       )}
     >
-      {value} of {of}
+      {children ?? `${value} of ${of}`}
     </span>
   );
 }

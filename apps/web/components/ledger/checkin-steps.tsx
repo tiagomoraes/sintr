@@ -5,9 +5,8 @@ import Link from "next/link";
 import { useActionState, useState, type ReactNode } from "react";
 import type { CheckinFormState } from "@/app/(app)/checkins/actions";
 import { useHydrated } from "@/lib/use-hydrated";
-import { t } from "@/messages";
+import { useMessages } from "@/components/language";
 
-const C = t.checkin;
 const VALUES = ["0", "1", "2", "3", "4", "5"] as const;
 const SCALES = ["mood", "energy", "anxiety"] as const;
 type Scale = (typeof SCALES)[number];
@@ -26,6 +25,7 @@ function ScaleStep({
   onChoose: (value: string, byPointer: boolean) => void;
   problem?: string | undefined;
 }) {
+  const C = useMessages().checkin;
   const copy = C.scales[name];
   return (
     <fieldset className="min-w-0 border-0 p-0">
@@ -69,6 +69,7 @@ export function CheckinSteps({
   action: (state: CheckinFormState, form: FormData) => Promise<CheckinFormState>;
   cancelHref: string;
 }) {
+  const C = useMessages().checkin;
   const [state, formAction, pending] = useActionState(action, { problems: {}, failure: null });
   const hydrated = useHydrated();
   const [step, setStep] = useState(0);

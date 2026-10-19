@@ -14,6 +14,7 @@ import {
 } from "@sintr/agent";
 import { z } from "zod";
 import { loadMessages } from "@/lib/server/assistant";
+import { currentLanguage } from "@/lib/server/language";
 import { apiError, apiScope, runtime } from "@/lib/server/runtime";
 import { voiceFor } from "@/lib/server/voice";
 
@@ -91,10 +92,11 @@ export async function POST(request: Request) {
     conversationId && (await scope.conversations.get(conversationId))
       ? personTexts(await loadMessages(scope, conversationId)).slice(-12)
       : [];
-  const profile = await scope.profile.get();
+  // Then the language the person reads sintr in, when something set it (not English by default alone).
+  const reading = await currentLanguage();
   const language = languageHint({
     writing,
-    profileLanguage: profile.language,
+    personLanguage: reading.source === "default" ? null : reading.code,
     houseDefault: config.house?.voice.language ?? null,
   });
 

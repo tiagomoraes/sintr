@@ -3,7 +3,7 @@ import type { VoiceUnavailable } from "@sintr/agent/shapes";
 /**
  * What a page may offer for speaking, never a key: ready (and how to send
  * the recording), not available (and why, in one line), or this month's
- * time used.
+ * time used. Data only: the page words it (`t.voice`), in its own language.
  */
 export type VoiceView =
   | {
@@ -21,4 +21,8 @@ export type VoiceView =
       /** The provider of the person's own key, to name it in the line. */
       provider: string | null;
     }
-  | { kind: "limit"; next: string };
+  | {
+      kind: "limit";
+      /** The day speaking starts again, YYYY-MM-DD: for `formatNext` in the page's language. */
+      next: string;
+    };

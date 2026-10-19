@@ -21,7 +21,14 @@ export const profiles = pgTable("profiles", {
   displayName: bytea("display_name"),
   /** sealed: how the person wants to be called in the app; never sent to a model, never on a report */
   preferredName: bytea("preferred_name"),
+  /** Until F7 the report's language, chosen in Therapy. No longer read: see `report_language`. */
   language: text("language").notNull().default("en"),
+  /** The language the person chose for sintr (a catalog's code, such as pt-BR); null until they choose. */
+  locale: text("locale"),
+  /** The language sintr last spoke to the person in, for what it writes while they are away. */
+  seenLocale: text("seen_locale"),
+  /** The language the person chose for their reports in Therapy; null follows their language. */
+  reportLanguage: text("report_language"),
   timezone: text("timezone").notNull().default("UTC"),
   /** When the person finished (or set aside) the welcome after signing up; null until then. */
   onboardedAt: timestamp("onboarded_at", { withTimezone: true }),

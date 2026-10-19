@@ -57,6 +57,16 @@ The owner's decision: sintr was complete and read as too technical for the perso
 
 The reasons are in DECISIONS 84 to 97.
 
+## The same app in your language (F7)
+
+The owner's decision: the platform is multi-language through configuration, like the site. sintr spoke English to everyone, including a person in Recife whose therapist is Brazilian; the language now follows the person and the configuration, not the release.
+
+**Who decides.** The person first: a language they chose in Settings, or with the quiet link at the foot of any page ("Ler o sintr em português"). Then the installation (`SINTR_LANGUAGE`, for a sintr that is entirely in one language). Then the browser. Then English.
+
+**What follows it.** Everything the person reads: the welcome, the home, the conversation's own words, the check-in, Therapy, entries, reports, sharing and the practice, the plan, Settings, Connect, the help lines on every page, the dates and the emails sintr sends them. The weekly report is written in the person's language unless they chose another one for their therapist in Therapy. The assistant still answers in the language the person writes in, and the transcription listens for it; the person's own words are never translated. sintr ships English and Brazilian Portuguese; another language is a folder of the catalog and one line of configuration ([`LANGUAGES.md`](LANGUAGES.md)).
+
+The reasons are in DECISIONS 98 to 105.
+
 ## Voice and users
 
 People in regular therapy who want their self-observations documented between sessions but do not want another app to open, or who already live inside an AI assistant. They value privacy and plain language. Typical moment of use: right after a difficult situation ("preciso falar do que aconteceu"), or right before a session ("gera o report da semana"). They already have a therapist; they are not looking for an AI therapist.
@@ -94,7 +104,7 @@ sintr-app/
 ## Data model (multi-tenant)
 
 - **Auth**: `users`, `sessions`, `accounts`, `verification_tokens`
-- **Profile**: `profiles` (the name on reports, the name the person goes by, language, timezone, when the welcome was done)
+- **Profile**: `profiles` (the name on reports, the name the person goes by, the language they chose, the language sintr last spoke to them in, their report's language, timezone, when the welcome was done)
 - **Therapy**: `therapy_settings` (therapist, contact, `session_day`, `session_time`, `report_lead`, `require_approval`, delivery channel)
 - **Ledger**: `entries` (full CBT), `checkins`, `therapy_notes`, `insights`
 - **Reports**: `reports` (period, `status` draft/reviewed/sent, recipient, `sent_at`, content + PDF)
@@ -141,7 +151,7 @@ Columns holding sensitive content are flagged for **application-layer encryption
 - One codebase for self-host and SaaS (environment flags).
 - Free tier bounded: 100 messages and 4 reports by the assistant a month (DECISIONS 72), never a limit on the diary itself.
 - Future vision: optional E2EE with a user-held key (zero-knowledge). Recorded, not built now.
-- App i18n (the site already carries 8 languages).
+- The app in several languages, by configuration (F7): English and Brazilian Portuguese ship; adding one needs no code ([`LANGUAGES.md`](LANGUAGES.md)).
 - Accessibility and light performance.
 
 ## Milestones
@@ -153,7 +163,7 @@ Columns holding sensitive content are flagged for **application-layer encryption
 - **F4 The therapist**: practices on one account kind, invites both ways with double opt-in, the link with its consent and revocation, sharing approved reports, the therapist's dashboard, seats by configuration, notifications, audit in both accounts.
 - **F5 The house model and the plan**: the house assistant configured on the server and used by default, bring your own key behind a small door, plans and entitlements for both sides with a monthly meter, the plan screen, the subscription modelled with Stripe behind configuration, limits that never hold the diary hostage.
 - **F6 The first five minutes**: the narrative welcome, the home as the input (voice and text, the pool of light), the light that follows the person's time of day, less form on the secondary screens, mobile first, and the app's strings in one catalog.
-- **F7 Languages** (next): the app in several languages through configuration, as the site is, from the catalog F6 started.
+- **F7 Languages**: the app in English and Brazilian Portuguese through configuration, as the site is: one catalog folder per language, the person's choice, then the installation's, then the browser's, then English; the help lines, the emails and the report in the same language; parity enforced by a test.
 - **Later**: the public landing page, multi-tenant hardening, app on the domain and the deploy, LGPD export and delete in the UI, the audit view, MFA.
 
 Each milestone is delivered by an Orca/Claude Code session (`claude-opus-5-5 --effort xhigh`) with its own brief, branch, PR, and verification.

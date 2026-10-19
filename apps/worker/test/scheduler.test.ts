@@ -1,5 +1,5 @@
 import { createLogger } from "@sintr/core";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { JOBS } from "../src/jobs";
 import { createScheduler, type Job } from "../src/scheduler";
 
@@ -20,9 +20,9 @@ describe("scheduler", () => {
     const job: Job<null> = { name: "count", intervalMs: 20, run: async () => void (runs += 1) };
     const scheduler = createScheduler([job], null, log);
     scheduler.start();
-    await wait(70);
+    // Waits for the ticks rather than betting on how many fit in a fixed time on a busy machine.
+    await vi.waitFor(() => expect(runs).toBeGreaterThanOrEqual(3), { timeout: 5_000, interval: 10 });
     await scheduler.stop();
-    expect(runs).toBeGreaterThanOrEqual(3);
   });
 
   it("never overlaps a job with itself", async () => {
@@ -59,9 +59,8 @@ describe("scheduler", () => {
     };
     const scheduler = createScheduler([job], null, log);
     scheduler.start();
-    await wait(50);
+    await vi.waitFor(() => expect(runs).toBeGreaterThanOrEqual(2), { timeout: 5_000, interval: 10 });
     await scheduler.stop();
-    expect(runs).toBeGreaterThanOrEqual(2);
     const failure = lines.find((line) => line.event === "job.failed");
     expect(failure).toMatchObject({ job: "fails", errorName: "Error", errorCode: "XX000" });
     expect(JSON.stringify(lines)).not.toContain("private thought");

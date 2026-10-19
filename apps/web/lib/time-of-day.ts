@@ -9,6 +9,7 @@ export type TimeOfDay =
 
 /** The hour (0 to 23) at `now` in `timeZone`; UTC when the zone cannot be read. */
 export function hourIn(timeZone: string, now: Date = new Date()): number {
+  // Read as a number, never shown: a fixed locale keeps digits `Number` can read, whatever the page's language.
   const read = (zone: string) =>
     Number(
       new Intl.DateTimeFormat("en-GB", { timeZone: zone, hour: "numeric", hourCycle: "h23" }).format(now),

@@ -2,6 +2,7 @@
 
 import { Button } from "@sintr/ui";
 import { useState, useTransition, type ReactNode } from "react";
+import { useMessages } from "@/components/language";
 
 /**
  * A decision that cannot be taken back, in two steps: the first press says
@@ -10,7 +11,7 @@ import { useState, useTransition, type ReactNode } from "react";
 export function ConfirmButton({
   label,
   confirmLabel,
-  keepLabel = "Keep it",
+  keepLabel,
   pendingLabel,
   explanation,
   action,
@@ -18,12 +19,14 @@ export function ConfirmButton({
 }: {
   label: string;
   confirmLabel: string;
+  /** The page language's "Keep it" (`common.keep`) unless said otherwise. */
   keepLabel?: string;
   pendingLabel: string;
   explanation: ReactNode;
   action: () => Promise<void>;
   ariaLabel?: string;
 }) {
+  const t = useMessages();
   const [asking, setAsking] = useState(false);
   const [pending, start] = useTransition();
   if (!asking) {
@@ -51,7 +54,7 @@ export function ConfirmButton({
           {pending ? pendingLabel : confirmLabel}
         </Button>
         <Button type="button" variant="quiet" size="sm" disabled={pending} onClick={() => setAsking(false)}>
-          {keepLabel}
+          {keepLabel ?? t.common.keep}
         </Button>
       </div>
     </div>

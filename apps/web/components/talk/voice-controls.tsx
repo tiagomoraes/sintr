@@ -2,7 +2,7 @@
 
 import { Button } from "@sintr/ui";
 import { elapsed, type VoicePhase, type VoiceProblem } from "@/lib/voice/state";
-import { t } from "@/messages";
+import { useMessages } from "@/components/language";
 
 function MicIcon() {
   return (
@@ -20,6 +20,7 @@ function MicIcon() {
 
 /** Speak instead of typing: the composer's button while the box is empty, where the thumb rests. */
 export function VoiceButton({ onSpeak }: { onSpeak: () => void }) {
+  const t = useMessages();
   return (
     <Button type="button" onClick={onSpeak} aria-label={t.voice.speakLabel} className="shrink-0 pl-5 pr-6">
       <MicIcon />
@@ -44,6 +45,7 @@ export function VoiceBar({
   onDone: () => void;
   onCancel: () => void;
 }) {
+  const t = useMessages();
   if (phase === "transcribing") {
     return (
       <div className="flex min-h-[52px] items-center gap-3 rounded-[22px] border border-rule px-[18px]">
@@ -98,6 +100,7 @@ export function VoiceNotes({
   heard: boolean;
   onClear: () => void;
 }) {
+  const t = useMessages();
   if (problem) {
     return (
       <div

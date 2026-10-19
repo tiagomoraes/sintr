@@ -50,6 +50,8 @@ Caddy obtains and renews the certificate by itself and redirects HTTP to HTTPS. 
 
 **Keep it on localhost.** The default (`SINTR_BIND=127.0.0.1`) publishes nothing to the network. To use it from your phone on the same network, prefer a VPN such as Tailscale over binding to `0.0.0.0` without TLS.
 
+**Choose its language.** sintr speaks English and Brazilian Portuguese. Each person reads it in the language they chose in Settings; else in the installation's language, if you set one; else in the one their browser asks for; else in English. For a sintr that is entirely in one language, set `SINTR_LANGUAGE=pt-BR` (or `en`) in `.env` and run `make selfhost-up` again: everyone who has not chosen reads that one, whatever their browser says. Adding another language is a folder of translated catalog files and one line of configuration, with no code to change; [`LANGUAGES.md`](LANGUAGES.md) says exactly how.
+
 ## The assistant
 
 sintr's assistant talks to a model you choose, with your own key. Without a house assistant (below), the home says so and points to this door in Settings, "Your own key":
@@ -101,6 +103,8 @@ Email is optional. Without it, sintr works the same except that nothing is ever 
 - a link to set a new password, when you ask for one;
 - a link to confirm your address, when you create your account or ask again in Settings;
 - to a therapist who asked for it, a note that a report was shared with their practice (a link and a count).
+
+Emails to a person or a practice are written in the language the person reads sintr in (English or Portuguese; any other language gets English), and the report to a therapist in the report's language.
 
 Any provider that speaks SMTP works: your mail host, Fastmail, Gmail with an app password, Postmark, Amazon SES, a relay on your network. In `.env`:
 

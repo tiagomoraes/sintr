@@ -8,7 +8,9 @@ import type { ScopeContext } from "./context";
 const DEFAULT_PROFILE: Profile = {
   displayName: null,
   preferredName: null,
-  language: "en",
+  locale: null,
+  seenLocale: null,
+  reportLanguage: null,
   timezone: "UTC",
   onboardedAt: null,
 };
@@ -20,7 +22,9 @@ export function profileRepository({ db, userId, cipher }: ScopeContext) {
     return {
       displayName: sealed.displayName as string | null,
       preferredName: sealed.preferredName as string | null,
-      language: row.language,
+      locale: row.locale,
+      seenLocale: row.seenLocale,
+      reportLanguage: row.reportLanguage,
       timezone: row.timezone,
       onboardedAt: row.onboardedAt,
     };

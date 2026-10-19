@@ -5,6 +5,7 @@ import { Button, FieldError, FieldHint, Input, Textarea, Verbatim, linkStyles } 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, type ReactNode } from "react";
+import { useMessages } from "@/components/language";
 
 type Keyed<T> = T & { key: number };
 
@@ -29,6 +30,7 @@ function Block({ title, hint, children }: { title: string; hint?: string; childr
 }
 
 function Remove({ onClick, label }: { onClick: () => void; label: string }) {
+  const { editor } = useMessages().reports;
   return (
     <button
       type="button"
@@ -36,7 +38,7 @@ function Remove({ onClick, label }: { onClick: () => void; label: string }) {
       aria-label={label}
       className="shrink-0 rounded-pill border border-rule px-3 py-1 text-[0.8125rem] font-medium text-ink-2 hover:border-rule-strong hover:text-ink"
     >
-      Remove
+      {editor.remove}
     </button>
   );
 }
@@ -60,6 +62,7 @@ function Add({ onClick, children }: { onClick: () => void; children: ReactNode }
  * out but not rewritten. Saving keeps what the report said before.
  */
 export function ReportEditor({ id, content }: { id: string; content: ReportContent }) {
+  const { editor } = useMessages().reports;
   const router = useRouter();
 
   const [week, setWeek] = useState(content.week);
@@ -116,40 +119,33 @@ export function ReportEditor({ id, content }: { id: string; content: ReportConte
       return;
     }
     const { code } = (await response.json().catch(() => ({}))) as { code?: string };
-    setFailure(
-      code === "invalid_state"
-        ? "This report was sent, so it cannot change any more."
-        : "Some of it could not be kept as it is. Check the fields and try again.",
-    );
+    setFailure(code === "invalid_state" ? editor.sent : editor.failed);
   };
 
   return (
     <form
       className="max-w-[44rem] space-y-10"
-      aria-label="Change the report"
+      aria-label={editor.title}
       onSubmit={(event) => {
         event.preventDefault();
         void save();
       }}
     >
-      <Block
-        title="How the week went"
-        hint="Three to six plain lines. Double quotes mark your own words: use them only for words in your diary as you wrote them."
-      >
+      <Block title={editor.week.title} hint={editor.week.hint}>
         <Textarea
-          aria-label="How the week went"
+          aria-label={editor.week.title}
           rows={6}
           value={week}
           onChange={(e) => setWeek(e.target.value)}
         />
       </Block>
 
-      <Block title="For the session" hint="Your own topics first, in the order you want them.">
+      <Block title={editor.session.title} hint={editor.session.hint}>
         {topics.map((topic) => (
           <div key={topic.key} className="flex items-start gap-3">
             <div className="min-w-0 flex-1">
               <Textarea
-                aria-label="A topic for the session"
+                aria-label={editor.session.topic}
                 rows={2}
                 value={topic.text}
                 onChange={(e) =>
@@ -158,34 +154,29 @@ export function ReportEditor({ id, content }: { id: string; content: ReportConte
                   )
                 }
               />
-              {topic.suggested ? (
-                <FieldHint>Suggested by sintr. Keep it only if you want to talk about it.</FieldHint>
-              ) : null}
+              {topic.suggested ? <FieldHint>{editor.session.suggested}</FieldHint> : null}
             </div>
             <Remove
-              label="Remove this topic"
+              label={editor.session.remove}
               onClick={() => setTopics((list) => list.filter((t) => t.key !== topic.key))}
             />
           </div>
         ))}
         <Add onClick={() => setTopics((list) => [...list, { key: newKey(), text: "", suggested: false }])}>
-          Add a topic
+          {editor.session.add}
         </Add>
       </Block>
 
-      <Block
-        title="Mood, energy and sleep"
-        hint="A few lines that read the numbers. The numbers, the chart and the day-by-day grid are computed from your check-ins."
-      >
+      <Block title={editor.mood.title} hint={editor.mood.hint}>
         <Textarea
-          aria-label="Mood, energy and sleep"
+          aria-label={editor.mood.title}
           rows={4}
           value={mood}
           onChange={(e) => setMood(e.target.value)}
         />
         {content.notes.length ? (
           <fieldset className="min-w-0 border-0 p-0">
-            <legend className="p-0 text-label font-medium text-ink">In the day&apos;s own words</legend>
+            <legend className="p-0 text-label font-medium text-ink">{editor.mood.notes}</legend>
             <div className="mt-3 space-y-2">
               {content.notes.map((note) => (
                 <label key={note.checkinId} className="flex items-start gap-3 text-[0.9688rem] text-ink-2">
@@ -213,13 +204,10 @@ export function ReportEditor({ id, content }: { id: string; content: ReportConte
         ) : null}
       </Block>
 
-      <Block
-        title="Moments that stood out"
-        hint="What went through your mind and how it felt come from each entry, word for word. To change them, change the entry and prepare the report again."
-      >
+      <Block title={editor.moments.title} hint={editor.moments.hint}>
         <div>
           <label htmlFor="moments-intro" className="block text-label font-medium text-ink">
-            How they were chosen
+            {editor.moments.intro}
           </label>
           <Input
             id="moments-intro"
@@ -233,7 +221,7 @@ export function ReportEditor({ id, content }: { id: string; content: ReportConte
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0 flex-1">
                 <label className="block text-label font-medium text-ink">
-                  Title
+                  {editor.moments.momentTitle}
                   <Input
                     className="mt-2"
                     value={moment.title}
@@ -242,13 +230,13 @@ export function ReportEditor({ id, content }: { id: string; content: ReportConte
                 </label>
               </div>
               <Remove
-                label={`Remove the moment ${moment.title}`}
+                label={editor.moments.remove(moment.title)}
                 onClick={() => setMoments((list) => list.filter((m) => m.entryId !== moment.entryId))}
               />
             </div>
             {(["happened", "context", "did"] as const).map((field) => (
               <label key={field} className="mt-4 block text-label font-medium text-ink">
-                {field === "happened" ? "What happened" : field === "context" ? "Context" : "What you did"}
+                {editor.moments[field]}
                 <Textarea
                   className="mt-2"
                   rows={2}
@@ -259,7 +247,7 @@ export function ReportEditor({ id, content }: { id: string; content: ReportConte
             ))}
             {moment.thoughts.length ? (
               <div className="mt-4">
-                <p className="text-caption text-ink-3">What went through your mind, from the entry</p>
+                <p className="text-caption text-ink-3">{editor.moments.thoughts}</p>
                 <ul className="m-0 mt-1 list-none space-y-1 p-0 font-serif text-ink">
                   {moment.thoughts.map((thought, i) => (
                     <li key={i}>
@@ -271,7 +259,7 @@ export function ReportEditor({ id, content }: { id: string; content: ReportConte
             ) : null}
             {moment.felt.length ? (
               <p className="mt-3 text-caption text-ink-3">
-                How it felt, from the entry:{" "}
+                {editor.moments.felt}{" "}
                 <span className="font-serif text-[1rem] text-ink">
                   {moment.felt
                     .map((e) => (e.intensity === null ? e.name : `${e.name} ${e.intensity}`))
@@ -283,13 +271,13 @@ export function ReportEditor({ id, content }: { id: string; content: ReportConte
         ))}
       </Block>
 
-      <Block title="What repeated" hint="Each observation with its dates. What happened together, never why.">
+      <Block title={editor.patterns.title} hint={editor.patterns.hint}>
         {patterns.map((pattern) => (
           <div key={pattern.key} className="flex items-start gap-3">
             <div className="grid min-w-0 flex-1 gap-2 sm:grid-cols-[9rem_minmax(0,1fr)]">
               <Input
-                aria-label="When"
-                placeholder="Dates"
+                aria-label={editor.patterns.when}
+                placeholder={editor.patterns.dates}
                 value={pattern.when}
                 onChange={(e) =>
                   setPatterns((list) =>
@@ -298,7 +286,7 @@ export function ReportEditor({ id, content }: { id: string; content: ReportConte
                 }
               />
               <Textarea
-                aria-label="What repeated"
+                aria-label={editor.patterns.title}
                 rows={2}
                 value={pattern.text}
                 onChange={(e) =>
@@ -309,21 +297,21 @@ export function ReportEditor({ id, content }: { id: string; content: ReportConte
               />
             </div>
             <Remove
-              label="Remove this observation"
+              label={editor.patterns.remove}
               onClick={() => setPatterns((list) => list.filter((p) => p.key !== pattern.key))}
             />
           </div>
         ))}
         <Add onClick={() => setPatterns((list) => [...list, { key: newKey(), when: "", text: "" }])}>
-          Add an observation
+          {editor.patterns.add}
         </Add>
       </Block>
 
-      <Block title="What helped" hint="As you recorded it, with its date.">
+      <Block title={editor.helped.title} hint={editor.helped.hint}>
         {helped.map((item) => (
           <div key={item.key} className="flex items-start gap-3">
             <Textarea
-              aria-label="What helped"
+              aria-label={editor.helped.title}
               rows={2}
               className="min-w-0 flex-1"
               value={item.text}
@@ -334,29 +322,26 @@ export function ReportEditor({ id, content }: { id: string; content: ReportConte
               }
             />
             <Remove
-              label="Remove this"
+              label={editor.helped.remove}
               onClick={() => setHelped((list) => list.filter((h) => h.key !== item.key))}
             />
           </div>
         ))}
         <Add onClick={() => setHelped((list) => [...list, { key: newKey(), text: "" }])}>
-          Add something that helped
+          {editor.helped.add}
         </Add>
       </Block>
 
       {failure ? <FieldError>{failure}</FieldError> : null}
       <div className="flex flex-wrap items-center gap-x-7 gap-y-3 border-t border-rule pt-8">
         <Button type="submit" disabled={saving}>
-          {saving ? "Saving" : "Save the changes"}
+          {saving ? editor.saving : editor.save}
         </Button>
         <Link href={`/reports/${id}`} className={linkStyles}>
-          Cancel
+          {editor.cancel}
         </Link>
       </div>
-      <p className="text-caption text-ink-3">
-        The report becomes a draft again, to read and approve as it then reads. What it said before is kept
-        with the date.
-      </p>
+      <p className="text-caption text-ink-3">{editor.note}</p>
     </form>
   );
 }

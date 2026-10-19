@@ -1,10 +1,11 @@
 import type { NoticeView } from "@sintr/core";
 import { cn } from "@sintr/ui";
 import { formatDay } from "@/lib/format";
+import { getMessages } from "@/lib/server/language";
 import { noticeText } from "@/lib/sharing";
 
 /** What changed in the account's links lately, the unseen lines marked "New". Words only, no alarm. */
-export function Notices({
+export async function Notices({
   notices,
   locale,
   className,
@@ -14,8 +15,9 @@ export function Notices({
   className?: string;
 }) {
   if (notices.length === 0) return null;
+  const t = await getMessages();
   return (
-    <ul aria-label="What changed" className={cn("space-y-2", className)}>
+    <ul aria-label={t.sharing.notices.label} className={cn("space-y-2", className)}>
       {notices.map((notice) => (
         <li
           key={notice.id}
@@ -29,8 +31,8 @@ export function Notices({
             )}
           />
           <span>
-            {notice.readAt ? null : <span className="font-medium text-ink">New. </span>}
-            {noticeText(notice)} <span className="text-ink-3">{formatDay(notice.createdAt, locale)}</span>
+            {notice.readAt ? null : <span className="font-medium text-ink">{t.sharing.notices.new} </span>}
+            {noticeText(notice, t)} <span className="text-ink-3">{formatDay(notice.createdAt, locale)}</span>
           </span>
         </li>
       ))}

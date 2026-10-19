@@ -3,22 +3,20 @@ import { Button, linkStyles } from "@sintr/ui";
 import Link from "next/link";
 import type { ReactNode } from "react";
 import type { AssistantFormState, ConnectionState } from "@/app/(app)/settings/actions";
-import { counted } from "@/lib/plan";
+import { counted, formatNext } from "@/lib/plan";
 import type { AssistantState } from "@/lib/server/assistant";
 import type { VoiceView } from "@/lib/voice/view";
-import { t } from "@/messages";
+import { currentLanguage, getMessages } from "@/lib/server/language";
 import { AssistantForm } from "./assistant-form";
 
-const S = t.settings.assistant;
-
-/** "Anthropic", "Google", or the host of an OpenAI-compatible endpoint. */
-function providerName(settings: AgentSettings): string {
+/** "Anthropic", "Google", or the host of an OpenAI-compatible endpoint (`endpoint` when it has none). */
+function providerName(settings: AgentSettings, endpoint: string): string {
   if (settings.provider === "anthropic") return "Anthropic";
   if (settings.provider === "google") return "Google";
   try {
-    return settings.baseUrl ? new URL(settings.baseUrl).hostname : "an OpenAI-compatible endpoint";
+    return settings.baseUrl ? new URL(settings.baseUrl).hostname : endpoint;
   } catch {
-    return "an OpenAI-compatible endpoint";
+    return endpoint;
   }
 }
 
@@ -45,7 +43,7 @@ function OwnKeyDoor({ open, summary, children }: { open: boolean; summary: strin
  * line says what changed, with a way back. Without a house assistant (a
  * typical self-host), the key is the way in, and the door stands open.
  */
-export function AssistantSection({
+export async function AssistantSection({
   state,
   settings,
   openDoor,
@@ -66,13 +64,15 @@ export function AssistantSection({
   back: () => Promise<void>;
   rehearsal: boolean;
 }) {
+  const t = await getMessages();
+  const S = t.settings.assistant;
   const form = <AssistantForm settings={settings} save={save} test={test} rehearsal={rehearsal} />;
   const keyNote = S.keyNote;
   const speaking =
     voice.kind === "ready"
       ? t.settings.voice.ready(voice.heardBy)
       : voice.kind === "limit"
-        ? t.voice.limit(voice.next)
+        ? t.voice.limit(formatNext(voice.next, (await currentLanguage()).code))
         : t.voice.unavailable[voice.reason](voice.provider);
   const voiceLine = speaking ? <p className="mt-3 text-[0.9375rem] text-ink-2">{speaking}</p> : null;
 
@@ -83,10 +83,10 @@ export function AssistantSection({
         <p className="mt-3 text-ink-2">{S.included(state.name)}</p>
         {voiceLine}
         <p className="mt-3 text-ink-2">
-          {S.plan(plan.label)}
+          {S.plan(S.plans[plan.id])}
           {messages.limit === null
             ? S.planNoLimit
-            : S.planUsed(messages.used, counted(messages.limit, "message", "messages"))}{" "}
+            : S.planUsed(messages.used, counted(messages.limit, S.message.one, S.message.many))}{" "}
           <Link href="/plan" className={linkStyles}>
             {S.planLink}
           </Link>
@@ -104,7 +104,9 @@ export function AssistantSection({
   if (state.kind === "own") {
     return (
       <>
-        <p className="mt-3 text-ink-2">{S.own(providerName(settings), state.model, state.house)}</p>
+        <p className="mt-3 text-ink-2">
+          {S.own(providerName(settings, S.endpoint), state.model, state.house)}
+        </p>
         {voiceLine}
         {state.house ? (
           <form action={back} className="mt-5 flex flex-wrap items-center gap-x-5 gap-y-2">

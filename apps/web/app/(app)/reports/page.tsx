@@ -6,11 +6,14 @@ import { EmptyState, PageHeading } from "@/components/empty-state";
 import { PrepareButton } from "@/components/reports/prepare-button";
 import { formatDay, formatMoment } from "@/lib/format";
 import { formatNext } from "@/lib/plan";
-import { STATUS } from "@/lib/reports";
+import { reportTitle } from "@/lib/reports";
 import { assistantState } from "@/lib/server/assistant";
+import { currentLanguage, getMessages } from "@/lib/server/language";
 import { requireScope } from "@/lib/server/runtime";
 
-export const metadata: Metadata = { title: "Reports" };
+export async function generateMetadata(): Promise<Metadata> {
+  return { title: (await getMessages()).reports.title };
+}
 
 export default async function ReportsPage() {
   const { scope } = await requireScope();
@@ -21,56 +24,54 @@ export default async function ReportsPage() {
     assistantState(scope),
     scope.plans.current(),
   ]);
+  const [t, language] = await Promise.all([getMessages(), currentLanguage()]);
+  const words = t.reports;
   // On the house assistant, once this month's reports are used, the next ones come from the person's own words.
   const reportsUsed =
     assistant.kind === "house" &&
     month.plan.allowance.reports !== null &&
     month.used.reports >= month.plan.allowance.reports;
-  const locale = { language: "en", timezone: profile.timezone };
+  const locale = { language: language.code, timezone: profile.timezone };
   const session = upcomingSession(settings, profile.timezone, new Date());
   const prepared = session ? preparationTime(settings, session) : null;
+  const next =
+    session && prepared
+      ? words.list.next(formatMoment(prepared, locale), formatMoment(session, locale))
+      : null;
 
   return (
     <>
-      <PageHeading
-        title="Reports"
-        lede="A short page about the days since your last session, prepared before the next one. You read it first; it goes to your therapist only if you approve that report."
-      />
+      <PageHeading title={words.title} lede={words.lede} />
       <div className="-mt-4 mb-12 space-y-4 md:-mt-6">
         <p className="max-w-[36em] text-[0.9688rem] text-ink-2">
-          {session && prepared ? (
+          {prepared && next ? (
             <>
-              The next one is prepared on{" "}
-              <span className="font-serif italic text-ink">{formatMoment(prepared, locale)}</span>, for your
-              session of {formatMoment(session, locale)}.
+              {next[0]}
+              <span className="font-serif italic text-ink">{formatMoment(prepared, locale)}</span>
+              {next[1]}
             </>
           ) : (
             <>
-              No session day is set, so reports are prepared only when you ask.{" "}
+              {words.list.noSession}{" "}
               <Link href="/therapy" className={linkStyles}>
-                Set your sessions
+                {words.list.setSessions}
               </Link>
             </>
           )}
         </p>
         {reportsUsed ? (
           <p className="max-w-[36em] text-[0.9375rem] text-ink-3">
-            This month&apos;s reports written by the assistant are used, so until{" "}
-            {formatNext(month.period.next)} sintr prepares them from your own words: the moments, your notes
-            and your topics.{" "}
+            {words.list.used(formatNext(month.period.next, language.code))}{" "}
             <Link href="/plan" className={linkStyles}>
-              Your plan
+              {words.list.yourPlan}
             </Link>
           </p>
         ) : null}
-        <PrepareButton label={session ? "Prepare it now" : "Prepare this week's report"} />
+        <PrepareButton label={session ? words.list.prepareNow : words.list.prepareWeek} />
       </div>
       {reports.length === 0 ? (
-        <EmptyState title="No reports yet.">
-          <p>
-            Each report covers the days since the last one, in your own words, with the numbers from your
-            check-ins. Nothing in it is a score, and quiet weeks are fine.
-          </p>
+        <EmptyState title={words.list.empty}>
+          <p>{words.list.emptyBody}</p>
         </EmptyState>
       ) : (
         <ol className="border-t border-rule">
@@ -78,12 +79,13 @@ export default async function ReportsPage() {
             <li key={report.id} className="border-b border-rule">
               <Link href={`/reports/${report.id}`} className="group block py-5 no-underline">
                 <span className="block font-serif text-title-small text-ink group-hover:underline group-hover:decoration-rule-strong group-hover:underline-offset-[0.2em]">
-                  {report.sessionAt
-                    ? `For the session of ${formatMoment(report.sessionAt, locale)}`
-                    : `Week of ${formatDay(report.periodStart, locale)}`}
+                  {reportTitle(report, locale, t)}
                 </span>
                 <span className="mt-1 block text-[0.9375rem] text-ink-3">
-                  {formatDay(report.periodStart, locale)} to {formatDay(report.periodEnd, locale)}
+                  {words.list.range(
+                    formatDay(report.periodStart, locale),
+                    formatDay(report.periodEnd, locale),
+                  )}
                 </span>
                 <span className="mt-2 inline-flex items-center gap-2.5 text-caption text-ink-2">
                   {report.status === "draft" ? (
@@ -93,10 +95,10 @@ export default async function ReportsPage() {
                     />
                   ) : null}
                   {report.status === "sent" && report.sentAt
-                    ? `Sent to ${report.recipient ?? "your therapist"} on ${formatDay(report.sentAt, locale)}`
+                    ? words.list.sent(report.recipient, formatDay(report.sentAt, locale))
                     : report.sharedAt
-                      ? `Shared on ${formatDay(report.sharedAt, locale)}`
-                      : STATUS[report.status]}
+                      ? words.list.shared(formatDay(report.sharedAt, locale))
+                      : words.status[report.status]}
                 </span>
               </Link>
             </li>

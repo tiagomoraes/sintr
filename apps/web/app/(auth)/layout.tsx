@@ -1,6 +1,7 @@
 import { WindowLight } from "@sintr/ui";
 import type { ReactNode } from "react";
 import { SiteHeader } from "@/components/site-header";
+import { LanguageOffers } from "@/components/language";
 import { SupportLines } from "@/components/support-lines";
 
 export default function AuthLayout({ children }: { children: ReactNode }) {
@@ -17,6 +18,7 @@ export default function AuthLayout({ children }: { children: ReactNode }) {
       <footer className="border-t border-rule">
         <div className="wrap py-14">
           <SupportLines />
+          <LanguageOffers className="mt-10" />
         </div>
       </footer>
     </>

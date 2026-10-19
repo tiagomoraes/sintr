@@ -3,11 +3,13 @@
 import { Button, FieldError, FieldHint, Input, Label, linkStyles } from "@sintr/ui";
 import Link from "next/link";
 import { useId, useState, type FormEvent } from "react";
+import { useMessages } from "@/components/language";
 import { authClient } from "@/lib/auth-client";
 import { useHydrated } from "@/lib/use-hydrated";
 
 /** Set a new password with the token from the emailed link. Every session ends. */
 export function ResetPasswordForm({ token }: { token: string }) {
+  const t = useMessages().auth;
   const id = useId();
   const hydrated = useHydrated();
   const [state, setState] = useState<"idle" | "saving" | "done" | "expired" | "short">("idle");
@@ -25,9 +27,9 @@ export function ResetPasswordForm({ token }: { token: string }) {
   if (state === "done") {
     return (
       <p role="status" className="text-lede text-ink-2">
-        Your password is changed, and every open session was signed out.{" "}
+        {t.reset.done}{" "}
         <Link href="/sign-in" className={linkStyles}>
-          Sign in
+          {t.reset.signIn}
         </Link>
       </p>
     );
@@ -35,7 +37,7 @@ export function ResetPasswordForm({ token }: { token: string }) {
   return (
     <form method="post" onSubmit={(event) => void onSubmit(event)} className="space-y-6">
       <div>
-        <Label htmlFor={id}>New password</Label>
+        <Label htmlFor={id}>{t.reset.label}</Label>
         <Input
           id={id}
           name="password"
@@ -46,19 +48,19 @@ export function ResetPasswordForm({ token }: { token: string }) {
           required
           className="mt-2"
         />
-        <FieldHint>At least 10 characters. A short sentence works well.</FieldHint>
+        <FieldHint>{t.form.passwordHint}</FieldHint>
       </div>
-      {state === "short" ? <FieldError>Use a password of at least 10 characters.</FieldError> : null}
+      {state === "short" ? <FieldError>{t.errors.tooShort}</FieldError> : null}
       {state === "expired" ? (
         <FieldError>
-          This link has expired or was already used.{" "}
+          {t.reset.expired}{" "}
           <Link href="/forgot-password" className={linkStyles}>
-            Ask for a new one
+            {t.reset.askAgain}
           </Link>
         </FieldError>
       ) : null}
       <Button type="submit" disabled={!hydrated || state === "saving"}>
-        Set the new password
+        {t.reset.save}
       </Button>
     </form>
   );

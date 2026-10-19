@@ -215,6 +215,8 @@ test.describe("the weekly report", () => {
 });
 
 test.describe("the report routes are scoped to their owner", () => {
+  // A report prepared (up to a minute), then every route tried on it by another person.
+  test.slow();
   test("another person can open, print, change, approve and send none of it", async ({ page, browser }) => {
     await signUpQuietly(page, newEmail("alice"));
     await setUpAssistant(page);
