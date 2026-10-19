@@ -288,9 +288,9 @@ export function TherapyForm({
             defaultValue={String(defaults.reportLeadMinutes)}
             className={select}
           >
-            {LEADS.map((lead) => (
-              <option key={lead.minutes} value={lead.minutes}>
-                {lead.label}
+            {LEADS.map((minutes) => (
+              <option key={minutes} value={minutes}>
+                {T.report.leads[minutes]}
               </option>
             ))}
           </select>

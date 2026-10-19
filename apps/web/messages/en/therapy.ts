@@ -4,6 +4,11 @@ const DAYS = ["Sundays", "Mondays", "Tuesdays", "Wednesdays", "Thursdays", "Frid
 export const therapy = {
   title: "Your therapy",
   lede: "Who your therapist is, when you see them, and what happens to the report prepared before each session.",
+  /** Under the heading: when the next report is prepared. Parts, so the first moment can stand out. */
+  next: (prepared: string, session: string) =>
+    ["The next report will be prepared on ", prepared, `, for the session of ${session}.`] as const,
+  noNext:
+    "Without a session day and time, no report is prepared on its own. You can still prepare one from Reports whenever you want.",
   change: "Change",
   sessions: {
     title: "Your sessions",
@@ -40,9 +45,21 @@ export const therapy = {
   },
   report: {
     title: "The report before each session",
+    /** `lead` is one of `leads` below, as offered. */
     summary: (lead: string, language: string, name: string | null) =>
       `Prepared ${lead.toLowerCase()} each session, in ${language}${name ? `, with your name, ${name}` : ""}.`,
     lead: "When to prepare it",
+    /** How long before the session it is prepared, by minutes (the choices in lib/therapy.ts). */
+    leads: {
+      30: "30 minutes before",
+      60: "1 hour before",
+      120: "2 hours before",
+      180: "3 hours before",
+      360: "6 hours before",
+      720: "12 hours before",
+      1440: "A day before",
+      2880: "Two days before",
+    },
     leadHint: "It covers the days since the last report, up to that moment, so it is fresh for the session.",
     language: "The report's language",
     /** The first choice: the report follows the language the person reads sintr in, named. */
@@ -60,4 +77,29 @@ export const therapy = {
     "Every report waits for your approval. Nothing is sent to anyone without your yes for that report, and this cannot be turned off.",
   save: "Save",
   saved: "Saved.",
+  /** What the person and their therapist keep in view between sessions, listed under the form. */
+  notes: {
+    title: "Goals, themes and things to bring up",
+    kinds: {
+      session: "Session note",
+      goal: "Goal",
+      theme: "Theme",
+      task: "Task",
+      to_bring: "To bring up",
+    },
+  },
+  /** Said by the form when something it was given cannot be kept. */
+  problems: {
+    timezone: "Choose a time zone from the list.",
+    language: "Choose the report's language.",
+    sessionDay: "Choose a day of the week.",
+    sessionTime: "Write the time as hours and minutes, such as 18:00.",
+    dayAndTime: "Give both the day and the time of your sessions, or neither.",
+    lead: "Choose when to prepare the report.",
+    moved: "Give the date and the time of that session.",
+    therapistEmail: "Check the address: one email, such as name@example.com.",
+    delivery: "Choose what happens to the report.",
+    sendNeedsEmail: "To send the report, sintr needs your therapist's email.",
+    form: "Some of it could not be kept as it is. Check the fields.",
+  },
 } as const;

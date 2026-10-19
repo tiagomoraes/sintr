@@ -2,8 +2,9 @@
 
 import { ValidationError, isEmailAddress, isTimeZone, type TherapySettingsPatch } from "@sintr/core";
 import { revalidatePath } from "next/cache";
+import { getMessages } from "@/lib/server/language";
 import { requireScope } from "@/lib/server/runtime";
-import { LEADS } from "@/lib/therapy";
+import { isLead } from "@/lib/therapy";
 import { fromLocalInput } from "@/lib/time";
 
 export interface TherapyFormState {
@@ -26,51 +27,48 @@ function text(form: FormData, name: string): string {
  */
 export async function saveTherapy(_state: TherapyFormState, form: FormData): Promise<TherapyFormState> {
   const { scope } = await requireScope();
+  const said = (await getMessages()).therapy.problems;
   const problems: Record<string, string> = {};
 
   const timezone = text(form, "timezone");
-  if (!isTimeZone(timezone)) problems.timezone = "Choose a time zone from the list.";
+  if (!isTimeZone(timezone)) problems.timezone = said.timezone;
   const chosenLanguage = text(form, "language");
   const language = LANGUAGES[chosenLanguage];
-  if (language === undefined || !Object.hasOwn(LANGUAGES, chosenLanguage))
-    problems.language = "Choose the report's language.";
+  if (language === undefined || !Object.hasOwn(LANGUAGES, chosenLanguage)) problems.language = said.language;
 
   const dayValue = text(form, "sessionDay");
   const sessionDay = dayValue === "" ? null : Number(dayValue);
   if (sessionDay !== null && !(Number.isInteger(sessionDay) && sessionDay >= 0 && sessionDay <= 6)) {
-    problems.sessionDay = "Choose a day of the week.";
+    problems.sessionDay = said.sessionDay;
   }
   const timeValue = text(form, "sessionTime");
   const sessionTime = timeValue === "" ? null : timeValue;
   if (sessionTime !== null && !/^([01]\d|2[0-3]):[0-5]\d$/.test(sessionTime)) {
-    problems.sessionTime = "Write the time as hours and minutes, such as 18:00.";
+    problems.sessionTime = said.sessionTime;
   }
   if ((sessionDay === null) !== (sessionTime === null)) {
-    problems[sessionDay === null ? "sessionDay" : "sessionTime"] =
-      "Give both the day and the time of your sessions, or neither.";
+    problems[sessionDay === null ? "sessionDay" : "sessionTime"] = said.dayAndTime;
   }
 
   const lead = Number(text(form, "reportLeadMinutes"));
-  if (!LEADS.some((option) => option.minutes === lead))
-    problems.reportLeadMinutes = "Choose when to prepare the report.";
+  if (!isLead(lead)) problems.reportLeadMinutes = said.lead;
 
   const movedValue = text(form, "nextSessionAt");
   let nextSessionAt: Date | null = null;
   if (movedValue && form.get("clearNextSession") !== "on") {
     nextSessionAt = isTimeZone(timezone) ? fromLocalInput(movedValue, timezone) : null;
-    if (!nextSessionAt) problems.nextSessionAt = "Give the date and the time of that session.";
+    if (!nextSessionAt) problems.nextSessionAt = said.moved;
   }
 
   const therapistName = text(form, "therapistName");
   const therapistEmail = text(form, "therapistEmail");
   if (therapistEmail && !isEmailAddress(therapistEmail)) {
-    problems.therapistEmail = "Check the address: one email, such as name@example.com.";
+    problems.therapistEmail = said.therapistEmail;
   }
   const delivery = text(form, "deliveryChannel");
-  if (delivery !== "email" && delivery !== "download")
-    problems.deliveryChannel = "Choose what happens to the report.";
+  if (delivery !== "email" && delivery !== "download") problems.deliveryChannel = said.delivery;
   if (delivery === "email" && !therapistEmail) {
-    problems.therapistEmail = "To send the report, sintr needs your therapist's email.";
+    problems.therapistEmail = said.sendNeedsEmail;
   }
   const displayName = text(form, "displayName");
 
@@ -95,7 +93,7 @@ export async function saveTherapy(_state: TherapyFormState, form: FormData): Pro
     await scope.therapySettings.update(patch);
   } catch (error) {
     if (error instanceof ValidationError) {
-      return { saved: false, problems: { form: "Some of it could not be kept as it is. Check the fields." } };
+      return { saved: false, problems: { form: said.form } };
     }
     throw error;
   }
