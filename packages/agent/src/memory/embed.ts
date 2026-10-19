@@ -140,6 +140,8 @@ export async function embedTexts(
 /* The rehearsal embedder (SINTR_FAKE_AGENT) */
 
 const REHEARSAL_DIMENSIONS = 256;
+/** The rehearsal embedder's model name, the space its vectors are in. */
+export const REHEARSAL_MODEL = "rehearsal";
 
 /** FNV-1a, 32 bits: a word's place among the rehearsal's dimensions. */
 function hash(word: string): number {
@@ -175,5 +177,5 @@ export function rehearsalEmbedding(texts: readonly string[]): Embedding {
     if (!vector.some((value) => value !== 0)) vector[0] = 1;
     return vector;
   });
-  return { ok: true, space: { model: "rehearsal", dimensions: REHEARSAL_DIMENSIONS }, vectors };
+  return { ok: true, space: { model: REHEARSAL_MODEL, dimensions: REHEARSAL_DIMENSIONS }, vectors };
 }

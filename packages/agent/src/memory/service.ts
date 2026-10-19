@@ -12,7 +12,6 @@
 import {
   MEMORY_CONSENT_VERSION,
   type Consent,
-  type EmbeddingSpace,
   type FoundMemory,
   type Logger,
   type ReadSource,
@@ -20,7 +19,13 @@ import {
   type UserScope,
 } from "@sintr/core";
 import { resolveAssistant, type AssistantConfig } from "../assistant";
-import { embedTexts, rehearsalEmbedding, type Embedding, type EmbeddingProblem } from "./embed";
+import {
+  REHEARSAL_MODEL,
+  embedTexts,
+  rehearsalEmbedding,
+  type Embedding,
+  type EmbeddingProblem,
+} from "./embed";
 import type { MemoryNote } from "./prompt";
 import { mayRead, pagesOf, readPages, type Page } from "./read";
 import {
@@ -171,20 +176,20 @@ export interface Remembered {
 async function placePending(
   context: MemoryContext,
   route: Exclude<EmbeddingRoute, { kind: "none" }>,
-): Promise<{ placed: number; space: EmbeddingSpace | null; problem: EmbeddingProblem | null }> {
+): Promise<{ placed: number; problem: EmbeddingProblem | null }> {
   const pending = await context.scope.memories.unplaced(40);
-  if (pending.length === 0) return { placed: 0, space: null, problem: null };
+  if (pending.length === 0) return { placed: 0, problem: null };
   const result = await embed(
     context,
     route,
     pending.map((memory) => memory.text),
   );
-  if (!result.ok) return { placed: 0, space: null, problem: result.problem };
+  if (!result.ok) return { placed: 0, problem: result.problem };
   await context.scope.memories.place(
     result.space,
     pending.map((memory, index) => ({ id: memory.id, embedding: result.vectors[index]! })),
   );
-  return { placed: pending.length, space: result.space, problem: null };
+  return { placed: pending.length, problem: null };
 }
 
 /**
@@ -204,9 +209,10 @@ export async function rememberNow(
   const result: Remembered = { state: state.kind, read: 0, kept: 0, placed: 0, waiting: 0, problem: null };
   if (state.kind !== "on") return result;
 
+  // Vectors of another model (the operator changed it) are dropped first, so they are placed again.
+  await scope.memories.unplace(context.config.fakeAgent ? REHEARSAL_MODEL : state.route.model);
   const pending = await placePending(context, state.route);
   result.placed = pending.placed;
-  if (pending.space) await scope.memories.unplace(pending.space);
 
   let budget = Math.min(options.pages ?? PAGES_PER_READING, PAGES_PER_READING);
   if (state.source === "house") {

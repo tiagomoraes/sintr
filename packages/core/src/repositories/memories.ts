@@ -9,6 +9,7 @@ import {
   lt,
   ne,
   notInArray,
+  notLike,
   or,
   sql,
   type SQL,
@@ -416,13 +417,13 @@ export function memoriesRepository(ctx: ScopeContext) {
     },
 
     /**
-     * Drop the vectors that are not in `keep` (all of them for null): after
-     * the person's provider changed, the old space's vectors mean nothing
-     * to the new one, so they go and the memories are placed again.
+     * Drop the vectors not made by the model `keep` (all of them for null):
+     * after the provider or its model changed, the old space's vectors mean
+     * nothing to the new one, so they go and the memories are placed again.
      */
-    async unplace(keep: EmbeddingSpace | null): Promise<number> {
+    async unplace(keep: string | null): Promise<number> {
       const where: SQL[] = [eq(memories.userId, userId), isNotNull(memories.embedding)];
-      if (keep) where.push(ne(memories.embeddingModel, spaceId(keep)));
+      if (keep) where.push(notLike(memories.embeddingModel, `${keep.replace(/[\\%_]/gu, "\\$&")}@%`));
       const rows = await db
         .update(memories)
         .set({ embedding: null, embeddingModel: null, updatedAt: new Date() })

@@ -210,8 +210,8 @@ describe("the memory of one person", () => {
     expect(unplaced.map((memory) => memory.text)).toEqual(["Drove to the hospital."]);
     await scope.memories.place(SPACE, [{ id: unplaced[0]!.id, embedding: along(2) }]);
     expect(await scope.memories.unplaced(10)).toEqual([]);
-    expect(await scope.memories.unplace(SPACE)).toBe(0);
-    expect(await scope.memories.unplace({ model: "next-model", dimensions: 8 })).toBe(2);
+    expect(await scope.memories.unplace(SPACE.model)).toBe(0);
+    expect(await scope.memories.unplace("next-model")).toBe(2);
     expect((await scope.memories.unplaced(10)).length).toBe(2);
     await scope.memories.unplace(null);
   });

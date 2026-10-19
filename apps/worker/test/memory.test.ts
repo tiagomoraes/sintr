@@ -203,6 +203,22 @@ describe("the memory on an installation with a house assistant", () => {
     expect(await ana.memories.unplaced(10)).toEqual([]);
   });
 
+  it("places every memory again when the house's embeddings model changes, under the same consent", async () => {
+    const endpoint = house();
+    const next = {
+      ...config,
+      house: { ...config.house!, memory: { ...config.house!.memory, model: "embed-model-2" } },
+    };
+    expect((await memoryState(ana, next)).kind).toBe("on");
+    const result = await rememberNow({ scope: ana, config: next, log, fetch: endpoint.fetch });
+    expect(result.placed).toBeGreaterThan(0);
+    const placed = (await ana.memories.list()).filter((memory) => memory.kind !== "name");
+    for (const memory of placed) expect(memory.embeddingModel).toBe("embed-model-2@256");
+    expect(JSON.parse(endpoint.sent[0]!.body)).toMatchObject({ model: "embed-model-2" });
+    // And back, for the tests that follow.
+    await rememberNow({ scope: ana, config, log, fetch: house().fetch });
+  });
+
   it("pauses when the person's assistant changes, and sends nothing to the new one until they agree", async () => {
     const endpoint = house();
     await ana.agentSettings.update({
