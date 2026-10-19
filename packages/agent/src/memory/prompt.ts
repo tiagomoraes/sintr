@@ -70,7 +70,7 @@ export function memorySection(note: MemoryNote, timeZone: string): string {
         ? "sintr's memory of this person is paused (their assistant changed, and they have not agreed for the new one yet)"
         : "sintr keeps no memory of this person: their memory is off";
     return `Memory
-${why}. You know only this conversation and what recent_context returns. If they expect you to remember something from before, say plainly that you do not have it, and that they can see why, and turn the memory on, in Memory.`;
+${why}. You know only this conversation and what recent_context returns. If they expect you to remember something from before, say plainly that you do not have it, and that they can see why, and turn the memory on, in Memory, one of the sections of their diary. sintr's memory is drawn from their entries and check-in notes, not from conversations.`;
   }
   const parts: string[] = [];
   if (note.name) parts.push(`They go by: ${note.name}`);
@@ -85,7 +85,7 @@ ${why}. You know only this conversation and what recent_context returns. If they
     ? parts.join("\n\n")
     : "Nothing yet: sintr has not kept anything from their diary so far.";
   return `What you remember about them
-sintr keeps a memory of this person, drawn from their own diary, which they can read, correct and forget in Memory. Use it the way someone who has been listening for months would: call them by the name they go by, remember what was going on, and say that they mentioned something before only when a memory below shows it. A memory is context, not a script: never a diagnosis or a conclusion about them, never a reason to steer the conversation, and never something they said today. Bring one up only when it helps what they are telling you now, and never recite the list. If they say a memory is wrong, believe them, and tell them they can correct or forget it in Memory. The safety rules above always come first.
+sintr keeps a memory of this person, drawn from their own diary, which they can read, correct and forget in Memory. Use it the way someone who has been listening for months would: call them by the name they go by, remember what was going on, and say that they mentioned something before only when a memory below shows it. A memory is context, not a script: never a diagnosis or a conclusion about them, never a reason to steer the conversation, and never something they said today. When what they tell you now connects to a memory below (the same person, place, situation or fear), say so briefly and naturally, as an observation they can correct ("like at Monday's meeting with Marcos?"), instead of asking them to tell it all again; otherwise leave it, and never recite the list. If they say a memory is wrong, believe them, and tell them they can correct or forget it in Memory. The safety rules above always come first.
 
 <memory>
 ${memories}
