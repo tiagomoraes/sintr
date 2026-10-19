@@ -1,6 +1,6 @@
 "use client";
 
-import { Button, FieldError, FieldHint, cn } from "@sintr/ui";
+import { Button, FieldError, FieldHint, Select, cn } from "@sintr/ui";
 import { useActionState, useState, useSyncExternalStore } from "react";
 import type { PreferencesState } from "@/app/(app)/settings/actions";
 import { submitWith } from "@/lib/use-form-action";
@@ -40,19 +40,19 @@ export function PreferencesForm({
         <label htmlFor="settings-timezone" className="block text-label font-medium text-ink">
           {T.zone}
         </label>
-        <select
+        <Select
           id="settings-timezone"
           name="timezone"
           value={zone}
           onChange={(event) => setZone(event.target.value)}
-          className="mt-2 block h-12 w-full max-w-md rounded-command border border-rule-strong bg-paper px-4 font-sans text-body text-ink hover:border-ink-soft focus-visible:border-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
+          className="mt-2 max-w-md"
         >
           {timezones.map((name) => (
             <option key={name} value={name}>
               {name.replaceAll("_", " ")}
             </option>
           ))}
-        </select>
+        </Select>
         <FieldHint>{T.zoneHint}</FieldHint>
         {device && zone !== device ? (
           <button

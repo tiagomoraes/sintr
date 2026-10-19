@@ -1,10 +1,7 @@
-import { Button, FieldHint } from "@sintr/ui";
+import { Button, FieldHint, Select } from "@sintr/ui";
 import { languageName } from "@/lib/format";
 import { currentLanguage } from "@/lib/server/language";
 import { LANGUAGES, messagesFor } from "@/messages";
-
-const select =
-  "mt-2 block h-12 w-full max-w-md rounded-command border border-rule-strong bg-paper px-4 font-sans text-body text-ink hover:border-ink-soft focus-visible:border-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink";
 
 /**
  * The language sintr speaks to the person, said as a sentence with who
@@ -24,11 +21,11 @@ export async function LanguageSection() {
         <label htmlFor="language" className="block text-label font-medium text-ink">
           {t.label}
         </label>
-        <select
+        <Select
           id="language"
           name="language"
           defaultValue={language.source === "person" ? language.code : ""}
-          className={select}
+          className="mt-2 max-w-md"
         >
           <option value="">{t.automatic}</option>
           {LANGUAGES.map((option) => (
@@ -36,7 +33,7 @@ export async function LanguageSection() {
               {option.name}
             </option>
           ))}
-        </select>
+        </Select>
         <FieldHint>{t.automaticHint}</FieldHint>
         <Button type="submit" variant="outline" className="mt-6">
           {t.save}

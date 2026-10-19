@@ -1,6 +1,6 @@
 "use client";
 
-import { Button, FieldError, Input, Rise, RoomLight, Wordmark, cn, type RoomScene } from "@sintr/ui";
+import { Button, FieldError, Input, Rise, RoomLight, Select, Wordmark, cn, type RoomScene } from "@sintr/ui";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import {
@@ -435,18 +435,18 @@ export function WelcomeFlow({
                     <label htmlFor="welcome-zone" className="sr-only">
                       {W.session.zoneLabel}
                     </label>
-                    <select
+                    <Select
                       id="welcome-zone"
                       value={zone}
                       onChange={(event) => setChosenZone(event.target.value)}
-                      className="block h-12 w-full max-w-md rounded-command border border-rule-strong bg-paper px-4 font-sans text-body text-ink hover:border-ink-soft focus-visible:border-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
+                      className="max-w-md"
                     >
                       {timezones.map((option) => (
                         <option key={option} value={option}>
                           {option.replaceAll("_", " ")}
                         </option>
                       ))}
-                    </select>
+                    </Select>
                   </div>
                 ) : null}
               </div>

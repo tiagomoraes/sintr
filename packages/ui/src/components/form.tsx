@@ -52,6 +52,41 @@ export function Textarea({ className, rows = 3, ...props }: ComponentProps<"text
 }
 
 /**
+ * A native select, styled like Input, with the browser's arrow replaced by a
+ * drawn chevron (the disclosure's 7px border-built chevron) that keeps 16px
+ * from the right edge, room the words never run into, and turns ink with
+ * the border on hover and focus. `className` places the field (margin,
+ * width); the select fills it. Still the native control: the keyboard, the
+ * phone's own picker and forms without JavaScript work as before.
+ */
+export function Select({ className, children, ...props }: ComponentProps<"select">) {
+  return (
+    <span className={cn("relative block w-full", className)}>
+      <select
+        className={cn(
+          "peer block h-12 w-full cursor-pointer appearance-none truncate rounded-command border border-rule-strong bg-paper py-0 pl-4 pr-11",
+          "font-sans text-body text-ink",
+          "transition-[border-color] duration-300 ease-out-expo hover:border-ink-soft",
+          "focus-visible:border-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink",
+          "aria-[invalid=true]:border-ink",
+          "disabled:cursor-not-allowed disabled:opacity-60",
+        )}
+        {...props}
+      >
+        {children}
+      </select>
+      <span
+        aria-hidden="true"
+        className={cn(
+          "pointer-events-none absolute right-[18px] top-1/2 size-[7px] -translate-y-[70%] rotate-45 border-b-[1.5px] border-r-[1.5px] border-ink-3",
+          "transition-colors duration-300 ease-out-expo peer-hover:border-ink peer-focus-visible:border-ink peer-disabled:opacity-60",
+        )}
+      />
+    </span>
+  );
+}
+
+/**
  * A drawn checkbox: a 16px square, 1.5px Soft Ink outline when open, an ink
  * fill with a white check when done. It is a native input, so it works with
  * the keyboard and without JavaScript.
