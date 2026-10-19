@@ -1,4 +1,5 @@
 import type { ProblemCode, ReportSection, ReportStatus } from "@sintr/core";
+import { formatDay, formatMoment } from "./format";
 
 /** The lifecycle, in the person's words. */
 export const STATUS: Record<ReportStatus, string> = {
@@ -63,4 +64,14 @@ export function authorInWords(problem: string | null): string {
     default:
       return "Your assistant could not be reached to write this draft, so sintr prepared what it can on its own. You can write the rest, or prepare it again when the assistant answers.";
   }
+}
+
+/** "For the session of Tuesday 21 October at 18:00", or "Week of 13 October 2026". */
+export function reportTitle(
+  report: { sessionAt: Date | null; periodStart: Date },
+  locale: { language: string; timezone: string },
+): string {
+  return report.sessionAt
+    ? `For the session of ${formatMoment(report.sessionAt, locale)}`
+    : `Week of ${formatDay(report.periodStart, locale)}`;
 }

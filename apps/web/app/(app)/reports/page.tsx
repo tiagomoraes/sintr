@@ -75,7 +75,9 @@ export default async function ReportsPage() {
                   ) : null}
                   {report.status === "sent" && report.sentAt
                     ? `Sent to ${report.recipient ?? "your therapist"} on ${formatDay(report.sentAt, locale)}`
-                    : STATUS[report.status]}
+                    : report.sharedAt
+                      ? `Shared on ${formatDay(report.sharedAt, locale)}`
+                      : STATUS[report.status]}
                 </span>
               </Link>
             </li>

@@ -155,6 +155,7 @@ export function sharingRepository(ctx: SharingContext) {
         status: link.status === "active" ? ("active" as const) : ("pending" as const),
         practice: await practiceCard(db, kek, practice),
         personName: linkPersonName(kek, link),
+        number: link.number,
         shareMode: link.shareMode,
         personAcceptedAt: link.personAcceptedAt,
         practiceAcceptedAt: link.practiceAcceptedAt,

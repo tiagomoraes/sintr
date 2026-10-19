@@ -441,6 +441,8 @@ export interface PersonLink {
   status: "pending" | "active";
   practice: PracticeCard;
   personName: string | null;
+  /** The practice's neutral label for the person ("Patient 3"), shown when they chose no name. */
+  number: number;
   shareMode: ShareMode;
   personAcceptedAt: Date | null;
   practiceAcceptedAt: Date | null;

@@ -447,13 +447,18 @@ export function practiceRepository(ctx: SharingContext) {
     async reportPdf(
       id: string,
       now: Date = new Date(),
-    ): Promise<{ report: ReceivedReport; pdf: Buffer } | null> {
+    ): Promise<{ report: ReceivedReport; pdf: Buffer; label: string } | null> {
       if (!isId(id)) return null;
       return inTransaction(db, async (tx) => {
         const own = await mine(tx);
         const row = own ? await ownShare(tx, own.id, id) : undefined;
         if (!own || !row) return null;
-        const pdf = linkCipher(kek, row.link).openBytes(SEALED.sharedReports.columns.pdf, row.share.pdf);
+        const sealer = linkCipher(kek, row.link);
+        const pdf = sealer.openBytes(SEALED.sharedReports.columns.pdf, row.share.pdf);
+        const { period } = sealer.openJson(
+          SEALED.sharedReports.columns.snapshot,
+          row.share.snapshot,
+        ) as SharedReportSnapshot;
         if (!row.share.firstReadAt) {
           await tx.update(sharedReports).set({ firstReadAt: now }).where(eq(sharedReports.id, id));
         }
@@ -463,7 +468,12 @@ export function practiceRepository(ctx: SharingContext) {
           targetId: id,
           metadata: { link_id: row.link.id, practice_id: own.id },
         });
-        return { report: receivedView(row.share, row.link, linkPersonName(kek, row.link)), pdf };
+        return {
+          report: receivedView(row.share, row.link, linkPersonName(kek, row.link)),
+          pdf,
+          // The period as the person's report names it, in their time zone.
+          label: period.label,
+        };
       });
     },
 

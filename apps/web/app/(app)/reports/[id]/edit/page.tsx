@@ -12,7 +12,8 @@ export default async function EditReportPage({ params }: { params: Promise<{ id:
   const { scope } = await requireScope();
   const report = await scope.reports.get(id);
   if (!report) notFound();
-  if (report.status === "sent") redirect(`/reports/${id}`);
+  // A sent or shared report is final.
+  if (report.status === "sent" || report.sharedAt) redirect(`/reports/${id}`);
   const content = parseContent(report.content);
   if (!content) notFound();
 
