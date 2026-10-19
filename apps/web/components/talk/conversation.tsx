@@ -440,8 +440,9 @@ export function Conversation({
       <div
         className={cn(
           "z-10 -mx-1 bg-paper px-1 pb-[max(20px,env(safe-area-inset-bottom))]",
-          // Before the first word the composer follows the question; once talking, it stays at hand.
-          started ? "sticky bottom-0 border-t border-rule pt-3" : "mt-auto pt-2",
+          // Before the first word the composer follows the question; once there are words in it, or a
+          // conversation, it stays in view with its Send.
+          started || input.trim() !== "" ? "sticky bottom-0 border-t border-rule pt-3" : "mt-auto pt-2",
         )}
       >
         {started ? (
