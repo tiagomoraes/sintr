@@ -2,6 +2,11 @@
 export const settings = {
   title: "Settings",
   lede: "Who answers you, how sintr reaches you, and your time.",
+  /** One line under the heading: the welcome, again, with nothing lost. */
+  welcomeAgain: {
+    body: "You can go through the welcome again whenever you like: what you told it is already filled in, any question can be skipped, and nothing you have written is erased.",
+    link: "Go through the welcome again",
+  },
   assistant: {
     title: "Your assistant",
     included: (name: string) =>

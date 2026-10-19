@@ -71,4 +71,10 @@ export const welcome = {
     go: "Go to my diary",
   },
   problem: "That could not be saved just now. Try again in a moment.",
+  /** Run again from Settings: the answers already given are filled in, and skipping keeps them. */
+  again: {
+    heading: "Here is the welcome again.",
+    body: "What you told me before is already filled in. Change what you like and skip the rest: skipping keeps your answer as it is, and nothing you have written is erased.",
+    later: "Not now, back to Settings",
+  },
 } as const;

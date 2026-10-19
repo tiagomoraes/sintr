@@ -4,6 +4,10 @@ import type { Messages } from "../types";
 export const settings = {
   title: "Ajustes",
   lede: "Quem responde a você, como o sintr chega até você e o seu horário.",
+  welcomeAgain: {
+    body: "Você pode passar pelas boas-vindas de novo quando quiser: o que você já contou vem preenchido, qualquer pergunta pode ser pulada e nada do que você escreveu é apagado.",
+    link: "Passar pelas boas-vindas de novo",
+  },
   assistant: {
     title: "Seu assistente",
     included: (name: string) =>
