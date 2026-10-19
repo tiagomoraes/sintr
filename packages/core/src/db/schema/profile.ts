@@ -55,8 +55,8 @@ export const therapySettings = pgTable(
     therapistContact: bytea("therapist_contact"),
     /**
      * The weekly slot of F0 to F8: 0 = Sunday ... 6 = Saturday, and a time, in the
-     * profile's timezone. Unused since F11 (DECISIONS 113): the sessions are a calendar,
-     * `therapy_series`, and 0009 moved every slot there as a weekly rhythm and emptied
+     * profile's timezone. Unused since F11 (DECISIONS 124): the sessions are a calendar,
+     * `therapy_series`, and 0010 moved every slot there as a weekly rhythm and emptied
      * these. Migrations are additive, so the columns stay; nothing reads or writes them.
      */
     sessionDay: smallint("session_day"),

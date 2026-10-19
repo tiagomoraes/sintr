@@ -491,7 +491,7 @@ The app keeps every token above and borrows the site's light, not a new style. T
 
 ## The calendar (F11)
 
-Therapy's sessions as they fall, in the house's own terms (DECISIONS 118). Google Calendar's moves, none of its look: no colour, no cell borders, no event blocks.
+Therapy's sessions as they fall, in the house's own terms (DECISIONS 129). Google Calendar's moves, none of its look: no colour, no cell borders, no event blocks.
 
 - **The rhythm in a sentence.** The section opens on a label ("Your sessions") over a Title Small serif sentence per rhythm ("Every week on Tuesday at 18:00."), the small ink "Add a session" pill on its right (under it on a phone).
 - **Coming up.** The next five sessions on hairline rows: the day in the serif (1.0625rem), the time on the right at 500 and tabular, a caption under it in Ink Three with the rhythm or what happened ("Moved from Tuesday 27 October at 18:00", "Cancelled"). The next session leads with a 7px ink dot and its caption in ink ("Next session. Every week"); a cancelled one is struck through in Ink Three. Beside the grid in a 16rem column from 1180px; above it, under the sentence, on anything narrower.

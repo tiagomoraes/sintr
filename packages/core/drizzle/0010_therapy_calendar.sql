@@ -32,7 +32,7 @@ ALTER TABLE "therapy_series_changes" ADD CONSTRAINT "therapy_series_changes_user
 ALTER TABLE "therapy_series_changes" ADD CONSTRAINT "therapy_series_changes_series_owner_fk" FOREIGN KEY ("series_id","user_id") REFERENCES "public"."therapy_series"("id","user_id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 CREATE INDEX "therapy_series_user_id_idx" ON "therapy_series" USING btree ("user_id");--> statement-breakpoint
 CREATE INDEX "therapy_series_changes_user_id_idx" ON "therapy_series_changes" USING btree ("user_id");--> statement-breakpoint
--- F11: Therapy's sessions are a calendar (DECISIONS 113). Every weekly slot becomes a weekly rhythm on the same day and
+-- F11: Therapy's sessions are a calendar (DECISIONS 124). Every weekly slot becomes a weekly rhythm on the same day and
 -- time, starting on a week that has already gone by, so the next session and the report before it are what they were,
 -- and the past week's session is still one the scheduler recognises. The slot's columns stay, because migrations are
 -- additive, and are emptied, so nothing goes on reading a slot the calendar now holds.

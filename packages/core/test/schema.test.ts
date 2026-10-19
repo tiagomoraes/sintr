@@ -287,9 +287,9 @@ describe("migrations", () => {
     expect(row).toEqual({ day: 1, once: null });
   });
 
-  it("keep every weekly slot as a weekly rhythm, with the same next session, and empty the slot (0009)", async () => {
+  it("keep every weekly slot as a weekly rhythm, with the same next session, and empty the slot (0010)", async () => {
     const root = fileURLToPath(new URL("..", import.meta.url));
-    const statements = readFileSync(join(root, "drizzle/0009_therapy_calendar.sql"), "utf8")
+    const statements = readFileSync(join(root, "drizzle/0010_therapy_calendar.sql"), "utf8")
       .split("--> statement-breakpoint")
       .map((part) => part.trim())
       .filter(

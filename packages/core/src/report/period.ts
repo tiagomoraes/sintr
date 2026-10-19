@@ -13,7 +13,7 @@
  *   rhythm, with any session of it moved or cancelled on its own. Two
  *   sessions in a week are two reports. A session that moved moves the
  *   preparation with it, because the calendar says where it is now, never
- *   because a date looked near it (DECISIONS 111 and 113).
+ *   because a date looked near it (DECISIONS 111 and 125).
  */
 import type { ReportStatus } from "../domain";
 import { heldSessions, type SessionCalendar } from "./sessions";

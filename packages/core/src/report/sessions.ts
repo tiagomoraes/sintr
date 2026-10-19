@@ -8,7 +8,7 @@
  *
  * A session is named by its series and its own day in that series
  * (`occursOn`), never by its nearness to anything: moving or cancelling
- * one is a change kept for exactly that session (DECISIONS 113).
+ * one is a change kept for exactly that session (DECISIONS 124).
  */
 import { addDays, dayDiff, localDay, weekdayOf, zonedTime } from "./time";
 
