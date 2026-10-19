@@ -3,7 +3,6 @@
 import { cn } from "@sintr/ui";
 import { usePathname, useSearchParams } from "next/navigation";
 import { createContext, use, type ReactNode } from "react";
-import { chooseLanguage } from "@/lib/server/language-actions";
 import {
   DEFAULT_LANGUAGE,
   LANGUAGES,
@@ -32,8 +31,8 @@ export function useLanguage(): Language {
 
 /**
  * The other languages, quietly, each offered in its own words for whoever
- * reads it ("Ler o sintr em português" on an English page). A form post that
- * comes back to this page, so it works without JavaScript.
+ * reads it ("Ler o sintr em português" on an English page). A plain form post
+ * to /api/language that comes back to this page, so it works without JavaScript.
  */
 export function LanguageOffers({ className }: { className?: string }) {
   const current = use(LanguageContext);
@@ -43,7 +42,8 @@ export function LanguageOffers({ className }: { className?: string }) {
   if (others.length === 0) return null;
   return (
     <form
-      action={chooseLanguage}
+      method="post"
+      action="/api/language"
       aria-label={messagesFor(current).language.offers}
       className={cn("flex flex-wrap items-baseline gap-x-5 gap-y-1", className)}
     >

@@ -1,7 +1,6 @@
 import { Button, FieldHint } from "@sintr/ui";
 import { languageName } from "@/lib/format";
 import { currentLanguage } from "@/lib/server/language";
-import { chooseLanguage } from "@/lib/server/language-actions";
 import { LANGUAGES, messagesFor } from "@/messages";
 
 const select =
@@ -20,7 +19,7 @@ export async function LanguageSection() {
     <>
       <p className="mt-3 text-ink-2">{t.summary[language.source](name)}</p>
       <p className="mt-3 text-[0.9375rem] text-ink-3">{t.body}</p>
-      <form action={chooseLanguage} className="mt-8">
+      <form method="post" action="/api/language" className="mt-8">
         <input type="hidden" name="next" value="/settings" />
         <label htmlFor="language" className="block text-label font-medium text-ink">
           {t.label}
