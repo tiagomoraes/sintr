@@ -15,12 +15,12 @@ export async function POST(request: Request) {
   if (guard instanceof Response) return guard;
   const { scope } = guard;
   const { config, log } = runtime();
-  const [settings, profile, reports] = await Promise.all([
-    scope.therapySettings.get(),
+  const [schedule, profile, reports] = await Promise.all([
+    scope.sessions.schedule(),
     scope.profile.get(),
     scope.reports.recent(),
   ]);
-  const plan = planReportNow({ schedule: settings, timeZone: profile.timezone, reports, now: new Date() });
+  const plan = planReportNow({ schedule, timeZone: profile.timezone, reports, now: new Date() });
   if (plan.action === "open") return Response.json({ id: plan.reportId, created: false });
   try {
     const { model, problem, metered } = await reportModel(scope, config);
@@ -36,7 +36,7 @@ export async function POST(request: Request) {
     });
     if (!result) {
       const again = planReportNow({
-        schedule: settings,
+        schedule,
         timeZone: profile.timezone,
         reports: await scope.reports.recent(),
         now: new Date(),

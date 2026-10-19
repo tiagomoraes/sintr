@@ -33,9 +33,11 @@ async function scopeOf(page: Page) {
 async function writeDiary(page: Page) {
   const scope = await scopeOf(page);
   const now = Date.now();
-  await scope.therapySettings.update({
-    sessionDay: new Date(now + 2 * DAY).getUTCDay(),
-    sessionTime: "18:00",
+  // Weekly at 18:00 from two days ahead (the suite's people are in UTC).
+  await scope.sessions.add({
+    startsOn: new Date(now + 2 * DAY).toISOString().slice(0, 10),
+    time: "18:00",
+    repeat: "weekly",
   });
   await scope.entries.create({
     occurredAt: new Date(now - 2 * DAY),

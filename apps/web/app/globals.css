@@ -309,3 +309,78 @@
     display: block;
   }
 }
+
+/*
+ * One session of Therapy's calendar (F11), opened as a modal sheet: in the
+ * middle of a wide screen, paper with a hairline and the lifted shadow; from
+ * the bottom of a phone, as the conversation's sheet comes, where the thumb
+ * is. A native dialog over a light veil. Without JavaScript it is on the page
+ * as it is, in the same place, and its links and forms work as they are.
+ */
+.sintr-session {
+  position: fixed;
+  inset: 0;
+  z-index: 45;
+  margin: auto;
+  width: min(30rem, calc(100vw - 32px));
+  max-width: none;
+  height: fit-content;
+  max-height: calc(100dvh - 48px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 28px 28px 26px;
+  border: 1px solid var(--color-rule);
+  border-radius: var(--radius-panel);
+  background: var(--color-paper);
+  color: var(--color-ink);
+  box-shadow: var(--shadow-lift);
+}
+.sintr-session::backdrop {
+  background: rgba(22, 23, 26, 0.18);
+}
+.sintr-session__grip {
+  display: none;
+}
+@media (max-width: 719px) {
+  .sintr-session {
+    inset: auto 0 0 0;
+    width: 100%;
+    max-height: 88dvh;
+    margin: 0;
+    padding: 10px 20px max(24px, env(safe-area-inset-bottom));
+    border-width: 1px 0 0;
+    border-radius: var(--radius-bubble) var(--radius-bubble) 0 0;
+    box-shadow: 0 -18px 40px -22px rgba(22, 23, 26, 0.28);
+  }
+  .sintr-session__grip {
+    display: block;
+    width: 36px;
+    height: 4px;
+    margin: 0 auto 16px;
+    border-radius: 999px;
+    background: var(--color-rule-strong);
+  }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .sintr-session[open] {
+    animation: sintr-session-in 0.6s var(--ease-out-expo) both;
+  }
+  .sintr-session[open]::backdrop {
+    animation: sintr-fade 0.45s ease both;
+  }
+  @media (max-width: 719px) {
+    .sintr-session[open] {
+      animation-name: sintr-sheet-up;
+    }
+  }
+}
+@keyframes sintr-session-in {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+}
+/* The chosen weekdays come with their choice, also without JavaScript. */
+.sintr-session-form:has(input[name="repeat"][value="weekdays"]:checked) .sintr-session-weekdays {
+  display: block;
+}

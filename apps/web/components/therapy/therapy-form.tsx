@@ -11,20 +11,15 @@ export interface TherapyDefaults {
   displayName: string;
   /** The report's language when the person chose one; "" follows the language they read sintr in. */
   language: "" | "en" | "pt" | "es";
-  timezone: string;
   therapistName: string;
   therapistEmail: string;
-  sessionDay: number | null;
-  sessionTime: string;
   reportLeadMinutes: number;
-  /** The one-off session as a datetime-local value in the person's zone, or "". */
   deliveryChannel: "email" | "download";
   reportNoticeEmail: boolean;
 }
 
-/** What is set, as sentences, one for each part of the page. */
+/** What is set, as sentences, one for each part of the form (the sessions are the calendar above it). */
 export interface TherapySummaries {
-  sessions: string;
   therapist: string;
   report: string;
 }
@@ -101,7 +96,6 @@ function Part({
 export function TherapyForm({
   defaults,
   summaries,
-  timezones,
   emailAvailable,
   emailVerified,
   readIn,
@@ -111,7 +105,6 @@ export function TherapyForm({
   /** The name of the language the person reads sintr in, which the report follows unless they choose. */
   readIn: string;
   summaries: TherapySummaries;
-  timezones: string[];
   emailAvailable: boolean;
   emailVerified: boolean;
   save: (state: TherapyFormState, form: FormData) => Promise<TherapyFormState>;
@@ -119,78 +112,11 @@ export function TherapyForm({
   const T = useMessages().therapy;
   const [state, action, pending] = useActionState(save, { saved: false, problems: {} });
   const [delivery, setDelivery] = useState(defaults.deliveryChannel);
-  const [zone, setZone] = useState(defaults.timezone);
-  const [day, setDay] = useState(defaults.sessionDay === null ? "" : String(defaults.sessionDay));
   const p = state.problems;
   const has = (...fields: string[]) => fields.some((field) => Boolean(p[field]));
 
   return (
     <form onSubmit={submitWith(action)} aria-label={T.title}>
-      <Part
-        id="sessions"
-        title={T.sessions.title}
-        summary={summaries.sessions}
-        open={has("sessionDay", "sessionTime", "timezone")}
-      >
-        <fieldset className="min-w-0 border-0 p-0">
-          <legend className="p-0 text-label font-medium text-ink">{T.sessions.day}</legend>
-          <div className="mt-3 grid max-w-md grid-cols-7 gap-1.5">
-            {[1, 2, 3, 4, 5, 6, 0].map((value) => (
-              <label key={value} className="relative">
-                <input
-                  type="radio"
-                  name="sessionDay"
-                  value={String(value)}
-                  checked={day === String(value)}
-                  onChange={() => setDay(String(value))}
-                  aria-label={T.sessions.days[value]}
-                  className="peer absolute inset-0 cursor-pointer opacity-0"
-                />
-                <span className="pointer-events-none flex min-h-11 items-center justify-center rounded-pill border border-rule bg-paper text-[0.875rem] font-medium text-ink-2 transition-colors duration-300 peer-hover:border-rule-strong peer-checked:border-ink peer-checked:bg-ink peer-checked:text-paper peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-ink">
-                  {T.sessions.short[value]}
-                </span>
-              </label>
-            ))}
-          </div>
-          <label className="mt-3 flex items-center gap-3 text-[0.9375rem] text-ink-2">
-            <input
-              type="radio"
-              name="sessionDay"
-              value=""
-              checked={day === ""}
-              onChange={() => setDay("")}
-              className="size-4 shrink-0 cursor-pointer appearance-none rounded-full border-[1.5px] border-ink-soft bg-paper checked:border-[5px] checked:border-ink"
-            />
-            {T.sessions.noDay}
-          </label>
-          {p.sessionDay ? <FieldError>{p.sessionDay}</FieldError> : null}
-        </fieldset>
-        <Field id="therapy-time" label={T.sessions.time} problem={p.sessionTime}>
-          <Input
-            id="therapy-time"
-            name="sessionTime"
-            type="time"
-            defaultValue={defaults.sessionTime}
-            className="mt-2 max-w-48"
-          />
-        </Field>
-        <Field id="therapy-timezone" label={T.sessions.zone} hint={T.sessions.zoneHint} problem={p.timezone}>
-          <Select
-            id="therapy-timezone"
-            name="timezone"
-            value={zone}
-            onChange={(event) => setZone(event.target.value)}
-            className={select}
-          >
-            {timezones.map((name) => (
-              <option key={name} value={name}>
-                {name.replaceAll("_", " ")}
-              </option>
-            ))}
-          </Select>
-        </Field>
-      </Part>
-
       <Part
         id="therapist"
         title={T.therapist.title}

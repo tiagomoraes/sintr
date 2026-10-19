@@ -17,10 +17,10 @@ export async function generateMetadata(): Promise<Metadata> {
 
 export default async function ReportsPage() {
   const { scope } = await requireScope();
-  const [reports, profile, settings, assistant, month] = await Promise.all([
+  const [reports, profile, schedule, assistant, month] = await Promise.all([
     scope.reports.list(),
     scope.profile.get(),
-    scope.therapySettings.get(),
+    scope.sessions.schedule(),
     assistantState(scope),
     scope.plans.current(),
   ]);
@@ -32,8 +32,8 @@ export default async function ReportsPage() {
     month.plan.allowance.reports !== null &&
     month.used.reports >= month.plan.allowance.reports;
   const locale = { language: language.code, timezone: profile.timezone };
-  const session = upcomingSession(settings, profile.timezone, new Date());
-  const prepared = session ? preparationTime(settings, session) : null;
+  const session = upcomingSession(schedule, profile.timezone, new Date());
+  const prepared = session ? preparationTime(schedule, session) : null;
   const next =
     session && prepared
       ? words.list.next(formatMoment(prepared, locale), formatMoment(session, locale))

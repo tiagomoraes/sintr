@@ -1,4 +1,4 @@
-import { practiceLine } from "@sintr/core";
+import { localDay, nextSeriesDay, practiceLine, weekdayOf } from "@sintr/core";
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { WelcomeFlow, type WelcomeInvite } from "@/components/welcome/welcome-flow";
@@ -39,7 +39,15 @@ export default async function WelcomePage({
   const raw = query.next;
   const next = typeof raw === "string" ? safeNext(raw) : null;
   const code = next?.startsWith("/join/") ? inviteCode(next) : null;
-  const [profile, therapy] = await Promise.all([scope.profile.get(), scope.therapySettings.get()]);
+  const [profile, therapy, calendar] = await Promise.all([
+    scope.profile.get(),
+    scope.therapySettings.get(),
+    scope.sessions.calendar(),
+  ]);
+  // The welcome asks for one weekly rhythm: it is filled in when the calendar holds just that.
+  const today = localDay(new Date(), profile.timezone);
+  const going = calendar.series.filter((series) => nextSeriesDay(series, today) !== null);
+  const weekly = going.length === 1 && going[0]!.repeat === "weekly" ? going[0]! : null;
 
   let invite: WelcomeInvite | null = null;
   if (code && !(await tooManyLookups())) {
@@ -70,8 +78,8 @@ export default async function WelcomePage({
       saved={{
         name: profile.preferredName ?? "",
         therapist: therapy.therapistName ?? "",
-        day: therapy.sessionDay === null ? "" : String(therapy.sessionDay),
-        time: therapy.sessionTime ?? "",
+        day: weekly ? String(weekdayOf(weekly.startsOn)) : "",
+        time: weekly?.time ?? "",
         timezone: profile.timezone,
       }}
     />

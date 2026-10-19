@@ -20,6 +20,18 @@ test.afterAll(async () => {
   await closeCore();
 });
 
+/** The calendar holds exactly one weekly rhythm, on Tuesdays at 18:00. */
+async function tuesdays(scope: Awaited<ReturnType<ReturnType<typeof core>["repositories"]["forUser"]>>) {
+  const { series, changes } = await scope.sessions.calendar();
+  return (
+    changes.length === 0 &&
+    series.length === 1 &&
+    series[0]!.repeat === "weekly" &&
+    series[0]!.time === "18:00" &&
+    new Date(`${series[0]!.startsOn}T12:00:00Z`).getUTCDay() === 2
+  );
+}
+
 async function createDiary(page: Page, email: string) {
   await page.goto("/sign-up");
   await page.getByLabel("Email").fill(email);
@@ -95,11 +107,9 @@ test.describe("the welcome", () => {
     const profile = await scope.profile.get();
     expect(profile).toMatchObject({ preferredName: "Bia", displayName: null, timezone: "America/Sao_Paulo" });
     expect(profile.onboardedAt).toBeInstanceOf(Date);
-    expect(await scope.therapySettings.get()).toMatchObject({
-      therapistName: "Dr. Lima",
-      sessionDay: 2,
-      sessionTime: "18:00",
-    });
+    expect(await scope.therapySettings.get()).toMatchObject({ therapistName: "Dr. Lima" });
+    // Tuesdays at 18:00, in one move: a weekly rhythm in the calendar.
+    expect(await tuesdays(scope)).toBe(true);
     // Sealed at rest, like everything else the person writes.
     const [row] = await sql<
       { dump: string }[]
@@ -108,7 +118,8 @@ test.describe("the welcome", () => {
 
     // Therapy says it back in sentences.
     await page.goto("/therapy");
-    await expect(page.getByText("Tuesdays at 18:00, in Sao Paulo time.")).toBeVisible();
+    await expect(page.getByText("Every week on Tuesday at 18:00.")).toBeVisible();
+    await expect(page.getByText("Times are in Sao Paulo time.")).toBeVisible();
     await expect(page.getByText("Dr. Lima. Reports stay with you, to download and bring.")).toBeVisible();
   });
 
@@ -156,11 +167,8 @@ test.describe("the welcome", () => {
 
     // Nothing was erased or changed.
     expect(await scope.profile.get()).toMatchObject({ preferredName: "Bia" });
-    expect(await scope.therapySettings.get()).toMatchObject({
-      therapistName: "Dr. Lima",
-      sessionDay: 2,
-      sessionTime: "18:00",
-    });
+    expect(await scope.therapySettings.get()).toMatchObject({ therapistName: "Dr. Lima" });
+    expect(await tuesdays(scope)).toBe(true);
     expect(await scope.entries.count()).toBe(1);
   });
 
@@ -189,10 +197,8 @@ test.describe("the welcome", () => {
     await expect(page.getByText("You stopped partway through setting up.")).toHaveCount(0);
 
     expect(await scope.profile.get()).toMatchObject({ preferredName: null, displayName: null });
-    expect(await scope.therapySettings.get()).toMatchObject({
-      therapistName: null,
-      sessionDay: null,
-      sessionTime: null,
-    });
+    expect(await scope.therapySettings.get()).toMatchObject({ therapistName: null });
+    // "It changes from week to week": nothing in the calendar, and nothing erased from it.
+    expect(await scope.sessions.calendar()).toEqual({ series: [], changes: [] });
   });
 });

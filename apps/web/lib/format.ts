@@ -54,3 +54,24 @@ export function languageName(code: string, language: string): string {
   const base = code.split(/[-_]/u)[0] ?? code;
   return new Intl.DisplayNames([intlOf(language)], { type: "language" }).of(base) ?? code;
 }
+
+/** A local day (`YYYY-MM-DD`, already the person's) as the page says it: "Tuesday 21 October", "terça-feira, 21 de outubro". */
+export function formatDate(day: string, language: string): string {
+  const [year, month, date] = day.split("-").map(Number) as [number, number, number];
+  return new Intl.DateTimeFormat(intlOf(language), {
+    timeZone: "UTC",
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+  }).format(new Date(Date.UTC(year, month - 1, date, 12)));
+}
+
+/** A month (`YYYY-MM`) as a calendar's title: "October 2026", "outubro de 2026". */
+export function formatMonth(month: string, language: string): string {
+  const [year, number] = month.split("-").map(Number) as [number, number];
+  return new Intl.DateTimeFormat(intlOf(language), {
+    timeZone: "UTC",
+    month: "long",
+    year: "numeric",
+  }).format(new Date(Date.UTC(year, number - 1, 15, 12)));
+}

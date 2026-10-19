@@ -1,5 +1,12 @@
 /** Therapy: who the therapist is, when the sessions are, what happens to the report. Said as sentences first. */
-const DAYS = ["Sundays", "Mondays", "Tuesdays", "Wednesdays", "Thursdays", "Fridays", "Saturdays"] as const;
+const DAY = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"] as const;
+
+/** "Tuesday and Thursday", "Monday, Wednesday and Friday". */
+function andList(items: readonly string[]): string {
+  return items.length <= 1 ? (items[0] ?? "") : `${items.slice(0, -1).join(", ")} and ${items.at(-1)}`;
+}
+
+const on = (days: readonly number[]) => andList(days.map((day) => DAY[day] ?? ""));
 
 export const therapy = {
   title: "Your therapy",
@@ -8,19 +15,129 @@ export const therapy = {
   next: (prepared: string, session: string) =>
     ["The next report will be prepared on ", prepared, `, for the session of ${session}.`] as const,
   noNext:
-    "Without a session day and time, no report is prepared on its own. You can still prepare one from Reports whenever you want.",
+    "Without a session in your calendar, no report is prepared on its own. You can still prepare one from Reports whenever you want.",
   change: "Change",
-  sessions: {
+  /**
+   * The calendar of sessions (F11): each session a day and a time, alone or
+   * in a rhythm, and any session of a rhythm moved or cancelled on its own.
+   * Days are numbers (0 is Sunday) and dates come already written in the
+   * page's language, so each language writes its own grammar around them.
+   */
+  calendar: {
     title: "Your sessions",
-    summary: (day: number | null, time: string | null, zone: string) =>
-      day !== null && time ? `${DAYS[day]} at ${time}, in ${zone} time.` : "No fixed day yet.",
-    day: "Day",
-    noDay: "No fixed day",
-    days: DAYS,
-    short: ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"],
-    time: "Time",
-    zone: "Your time zone",
-    zoneHint: "The day and time of your sessions are read in it.",
+    /** Each rhythm (or single session still to come) as a sentence of its own. */
+    summary: (rhythms: readonly string[]) =>
+      rhythms.length === 0 ? "None in your calendar yet." : rhythms.map((rhythm) => `${rhythm}.`).join(" "),
+    rhythm: {
+      weekly: (day: number, time: string) => `Every week on ${DAY[day]} at ${time}`,
+      fortnightly: (day: number, time: string) => `Every two weeks on ${DAY[day]} at ${time}`,
+      every_15_days: (time: string) => `Every 15 days at ${time}`,
+      weekdays: (days: readonly number[], time: string) => `Every week on ${on(days)} at ${time}`,
+      once: (date: string, time: string) => `Once, on ${date} at ${time}`,
+    },
+    /** Under a session in a list: what it is part of, or what happened to it. */
+    caption: {
+      weekly: "Every week",
+      fortnightly: "Every two weeks",
+      every_15_days: "Every 15 days",
+      weekdays: (days: readonly number[]) => `Every week on ${on(days)}`,
+      once: "Does not repeat",
+      moved: (from: string) => `Moved from ${from}`,
+      cancelled: "Cancelled",
+      passed: "Passed",
+      next: "Next session",
+    },
+    add: "Add a session",
+    addOn: (day: string) => `Add a session on ${day}`,
+    comingUp: "Coming up",
+    noneComing: "Nothing coming up. Add a session, and the report is prepared before it.",
+    month: {
+      grid: (month: string) => `Your sessions in ${month}`,
+      previous: "Previous month",
+      next: "Next month",
+      today: "Today",
+    },
+    day: {
+      empty: "No session on this day.",
+      sessions: (count: number) => (count === 1 ? "1 session" : `${count} sessions`),
+    },
+    zone: (zone: string) => `Times are in ${zone} time.`,
+    changeZone: "Change the time zone",
+    zoneLabel: "Your time zone",
+    zoneHint:
+      "Every session keeps its day and time, read in this zone, and so does the hour each report is prepared.",
+    saveZone: "Save the time zone",
+    /** One session, opened from the calendar or the list. */
+    session: {
+      report: (moment: string) => `Its report is prepared on ${moment}.`,
+      movedFrom: (from: string) => `Moved from ${from}. The rest of the rhythm is where it was.`,
+      cancelled: "Cancelled. The rest of the rhythm goes on.",
+      passed: "This session has passed.",
+      change: "Change",
+      cancel: "Cancel this session",
+      putBack: (where: string) => `Put it back on ${where}`,
+      close: "Close",
+    },
+    /** Adding a session, or changing one. */
+    form: {
+      addTitle: "Add a session",
+      changeTitle: "Change this session",
+      day: "Day",
+      time: "Time",
+      repeat: "Repeats",
+      repeats: {
+        once: "Does not repeat",
+        weekly: (day: number) => `Every week on ${DAY[day]}`,
+        fortnightly: (day: number) => `Every two weeks on ${DAY[day]}`,
+        every_15_days: "Every 15 days",
+        weekdays: "On days of the week I choose",
+      },
+      weekdays: "On these days",
+      /** The short names of the days, Sunday first, for the day chips. */
+      short: ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"],
+      days: DAY,
+      which: "Which sessions",
+      onlyThis: "Only this one",
+      onlyThisHint: "Every other session of the rhythm stays where it is.",
+      fromThis: "This one and the ones after it",
+      fromThisHint: "The rhythm changes from here. The sessions before it stay as they were.",
+      onlyThisRhythm: "A new rhythm changes the sessions after this one too.",
+      add: "Add the session",
+      save: "Save",
+      back: "Back",
+    },
+    /** Cancelling: one session, or a rhythm from one session on. */
+    cancel: {
+      title: "Cancel this session",
+      onlyThis: "Only this one",
+      onlyThisHint: "The rest of the rhythm goes on.",
+      fromThis: "This one and every one after it",
+      fromThisHint: "The rhythm stops here. The sessions before it stay as they were.",
+      once: "It is taken out of your calendar.",
+      confirm: "Cancel the session",
+      keep: "Keep it",
+    },
+    /** Said once a change is kept, so the person knows exactly what moved. */
+    done: {
+      added: "Added to your calendar.",
+      moved: "Moved. Only that session changed: the rest of the rhythm is where it was.",
+      changed: "Changed from that session on. The sessions before it stay as they were.",
+      cancelled: "Cancelled. Only that session: the rest of the rhythm goes on.",
+      stopped: "The rhythm stops there. The sessions before it stay as they were.",
+      removed: "Taken out of your calendar.",
+      restored: "Put back where the rhythm has it.",
+      zone: "Time zone saved.",
+    },
+    problems: {
+      day: "Choose a day.",
+      time: "Write the time as hours and minutes, such as 18:00.",
+      repeat: "Choose how it repeats.",
+      weekdays: "Choose at least one day of the week.",
+      gone: "That session is no longer in your calendar. Here it is as it is now.",
+      passed: "That session has passed, so it stays as it was.",
+      timezone: "Choose a time zone from the list.",
+      form: "That could not be kept just now. Try again in a moment.",
+    },
   },
   therapist: {
     title: "Your therapist",
@@ -86,11 +203,7 @@ export const therapy = {
   },
   /** Said by the form when something it was given cannot be kept. */
   problems: {
-    timezone: "Choose a time zone from the list.",
     language: "Choose the report's language.",
-    sessionDay: "Choose a day of the week.",
-    sessionTime: "Write the time as hours and minutes, such as 18:00.",
-    dayAndTime: "Give both the day and the time of your sessions, or neither.",
     lead: "Choose when to prepare the report.",
     therapistEmail: "Check the address: one email, such as name@example.com.",
     delivery: "Choose what happens to the report.",
