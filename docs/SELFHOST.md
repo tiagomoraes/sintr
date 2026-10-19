@@ -1,6 +1,6 @@
 # Self-hosting sintr
 
-sintr runs on your own machine as four containers behind one command: Caddy (the only thing that listens on the host), the app, the worker and Postgres 16. Everything is configured by `.env`; every variable is explained in [`.env.example`](../.env.example).
+sintr runs on your own machine as four containers behind one command: Caddy (the only thing that listens on the host), the app, the worker and Postgres 16 with pgvector. Everything is configured by `.env`; every variable is explained in [`.env.example`](../.env.example).
 
 ## What you need
 
@@ -21,7 +21,7 @@ make selfhost-up
 On the first run this:
 
 1. writes `.env` from `.env.example` with fresh random secrets (file mode 600);
-2. builds the image (`sintr-app:local`);
+2. builds the images: the app (`sintr-app:local`) and Postgres with pgvector (`sintr-db:local`, from `postgres:16-alpine`; the build fetches pgvector's source from GitHub);
 3. starts Postgres, applies the database migrations (the `migrate` service runs once and exits), then the app, the worker and Caddy;
 4. waits until every service is healthy and prints the address.
 
@@ -59,6 +59,8 @@ sintr's assistant talks to a model you choose, with your own key. Without a hous
 - **OpenAI-compatible** covers OpenAI (`https://api.openai.com/v1`), OpenRouter (`https://openrouter.ai/api/v1`) and anything that speaks the same API. For a model on the same machine (Ollama, LiteLLM), use `http://host.docker.internal:11434/v1` (or the port it listens on): inside the stack, `localhost` is the app container itself, and the compose file maps `host.docker.internal` to the host. A local endpoint needs no key.
 - **Anthropic** and **Google** take a key and a model name.
 - **Test the connection** makes one short request with the saved settings and tells you whether the key and the model work.
+
+The memory (Memory, in the diary: your assistant knows your name and what you told your diary before) works with OpenRouter, OpenAI and Google keys, which place each memory by meaning with your key; with Anthropic or a local model it is not available, and Memory says so. It is off until you turn it on there.
 
 Speaking on the home works with OpenRouter, OpenAI, Groq and Google keys (each writes down what you say with your key; the recording is never kept); with Anthropic or a local model you write, and the home says so. It needs https, or localhost: a phone's browser opens the microphone only there.
 
@@ -160,6 +162,26 @@ The image is rebuilt and the `migrate` service applies any new migrations before
 
 If a new version adds a variable to `.env.example`, your existing `.env` is left as it is and the default from `docker/compose.yaml` applies; copy the variable over if you want to change it.
 
+### Upgrading to the memory
+
+The memory (F10, migration 0009) needs the pgvector extension in Postgres. The stack used to run `postgres:16-alpine`, which does not have it. It now builds its own Postgres image, `sintr-db:local`, from `docker/postgres.Dockerfile`: the same `postgres:16-alpine` with pgvector compiled in. Nothing changes for you beyond the usual upgrade:
+
+```bash
+# first, a backup, as for any upgrade (see "The keys, and backups")
+docker compose -f docker/compose.yaml --env-file .env exec -T db \
+  sh -c 'pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB" --format=custom' > sintr-$(date +%F).dump
+git pull
+make selfhost-up
+```
+
+`make selfhost-up` builds the new Postgres image (about a minute; the build needs to reach GitHub), recreates the `db` container on your existing `pgdata` volume, and the `migrate` service creates the extension. Your volume is opened by the same Postgres 16 on the same C library (Alpine's musl) as before, so it opens as it was.
+
+**Do not point your existing volume at the pgvector project's own images** (`pgvector/pgvector:pg16` and friends). They are built on Debian, whose C library sorts text differently from Alpine's. A volume made by `postgres:16-alpine` and opened by a Debian image starts and seems fine, but every index on text (email addresses, session tokens, ids) is then in the wrong order for the new library, and Postgres does not warn, because the Alpine image recorded no collation version. Lookups can then miss rows. If you ever want to move to a Debian image, move the data with a dump and a restore (`pg_dump`, then `pg_restore` into the new container), not by sharing the volume.
+
+**If you run sintr on a Postgres of your own** (not the stack's `db` service), install pgvector there before upgrading (your distribution's `postgresql-16-pgvector` package, or the extension's own instructions), and make sure the role in `DATABASE_URL` may create it (on a managed service, the owner role usually can). Without it, migration 0009 stops before changing anything, with this message in the `migrate` logs: `sintr 0009 needs the pgvector extension (vector) in this Postgres`, and the new app does not start (it waits for the migrations). Install the extension and run `make selfhost-up` again; until then, the previous version runs on the same database as before.
+
+**Another image name.** `SINTR_DB_IMAGE` names the Postgres image the stack builds and runs (`sintr-db:local` by default), for a machine that runs more than one sintr side by side.
+
 ## Logs
 
 ```bash
@@ -188,8 +210,8 @@ Logs are JSON lines with event names, ids, counts and error codes. They never co
 | --- | --- | --- |
 | `caddy` | `caddy:2-alpine` | the edge: HTTP or automatic HTTPS, compression, reverse proxy to the app |
 | `app` | `sintr-app:local` | the Next.js app (UI, API, auth, the MCP endpoint at `/mcp`) on port 3000, inside the network only; prints report PDFs with the Chromium in the image and sends approved reports |
-| `worker` | `sintr-app:local` | background jobs: prepares each report before its session (checked every minute), sends the "report ready" note and the practices' "report shared" note (every minute), removes expired sessions, conversations past their retention and invites a month past use (hourly) |
+| `worker` | `sintr-app:local` | background jobs: prepares each report before its session (checked every minute), sends the "report ready" note and the practices' "report shared" note (every minute), reads new pages into the memory of those who turned it on (every minute), removes expired sessions, conversations past their retention and invites a month past use (hourly) |
 | `migrate` | `sintr-app:local` | applies migrations, then exits |
-| `db` | `postgres:16-alpine` | the database, on the `pgdata` volume |
+| `db` | `sintr-db:local` | Postgres 16 (`postgres:16-alpine`) with pgvector built in, on the `pgdata` volume |
 
 The same code runs the hosted offer; `SINTR_MODE=saas` is the switch, and nothing is built separately.
