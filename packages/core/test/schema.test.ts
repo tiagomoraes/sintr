@@ -195,4 +195,31 @@ describe("migrations", () => {
     expect(byId.get(withoutRow)?.at).toBeInstanceOf(Date);
     expect(byId.get(finished)?.at).toEqual(done);
   });
+
+  it("keep a report language chosen before F7, and let the default follow the person (0007)", async () => {
+    const root = fileURLToPath(new URL("..", import.meta.url));
+    const backfill = readFileSync(join(root, "drizzle/0007_languages.sql"), "utf8")
+      .split("--> statement-breakpoint")
+      .map((statement) => statement.trim())
+      .find((statement) => statement.includes('UPDATE "profiles"'));
+    expect(backfill, "the backfill statement").toBeDefined();
+    const chose = await createUser(db.db, "report-pt");
+    const spanish = await createUser(db.db, "report-es");
+    const english = await createUser(db.db, "report-en");
+    await db.db.insert(schema.profiles).values([
+      { userId: chose, language: "pt-BR" },
+      { userId: spanish, language: "es" },
+      { userId: english, language: "en" },
+    ]);
+    await db.db.execute(sql.raw(backfill!));
+    const rows = await db.db
+      .select({ userId: schema.profiles.userId, report: schema.profiles.reportLanguage })
+      .from(schema.profiles)
+      .where(inArray(schema.profiles.userId, [chose, spanish, english]));
+    const byId = new Map(rows.map((row) => [row.userId, row.report]));
+    expect(byId.get(chose)).toBe("pt-BR");
+    expect(byId.get(spanish)).toBe("es");
+    // English was everyone's default, so it says nothing of a choice: their reports follow their language.
+    expect(byId.get(english)).toBeNull();
+  });
 });
