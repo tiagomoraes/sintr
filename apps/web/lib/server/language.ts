@@ -2,6 +2,7 @@ import "server-only";
 import { headers } from "next/headers";
 import { cache } from "react";
 import {
+  chosenInCookie,
   languageOf,
   messagesFor,
   resolveLanguage,
@@ -9,7 +10,7 @@ import {
   type LanguageSource,
   type Messages,
 } from "@/messages";
-import { chosenInBrowser, runtime, sessionScope } from "./runtime";
+import { runtime, sessionScope } from "./runtime";
 
 export interface PageLanguage extends Language {
   /** Who decided it: the person, the installation, the browser, or nobody (English). */
