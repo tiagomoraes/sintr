@@ -152,6 +152,7 @@ Email is off unless the operator configures an SMTP server (`SINTR_SMTP_*`). Whe
 - **the approved report to the therapist**: the PDF the person approved, as an attachment, with a subject and two sentences that name the person (their display name, if they set one) and the session's date. This is the only message that carries diary content, and only after the per-report consent above;
 - **a "report ready" note to the person**: a link to the report and a sentence, never its words; sent only if the person asked for it in Therapy, and only to an address they confirmed;
 - **a link to set a new password**, and **a link to confirm the address**, valid for an hour;
+- each of these in the language the person reads sintr in (English or Portuguese); the report to the therapist in the report's own language;
 - **a "report shared" note to a professional** who asked for it in their practice, at a confirmed address: a link to the practice and a count, never who shared it or what it says.
 
 What this means: email is not end-to-end encrypted. The SMTP provider the operator chose, and the therapist's mailbox provider, can read a sent report's PDF, and both see the addresses and the subject. The connection to the SMTP server uses TLS unless the operator chose a plain relay on their own network (refused in saas mode). The therapist's address is stored sealed (in `therapy_settings`, the consent and the report); it never appears in the audit log or the logs. Email addresses, links and tokens never reach the logs; a failed send is logged as a code, and the mail server's own words are dropped because they can repeat an address.
@@ -163,6 +164,10 @@ A report's PDF is printed inside the app by headless Chromium from a page sintr 
 ## The name you go by
 
 The welcome after signing up asks how the person wants to be called. That name is sealed like the diary, used only to greet them on the home, never sent to the assistant and never printed on a report; the name on reports is a separate choice in Therapy.
+
+## Your language
+
+The language sintr speaks to a person (F7) is kept in the clear on their profile: the one they chose, if they chose one; the one sintr last showed them, which is what their choice, the installation's language or their browser's `Accept-Language` made it (so that a report prepared, or an email sent, while they are away is in the language they read); and the language they chose for their reports in Therapy. Each is a language tag such as `pt-BR`, nothing more. A language chosen before signing in is kept in a cookie (`sintr_language`, HTTP-only, SameSite=Lax, a year) that holds only that tag. The browser's other languages are read on each request and never stored. The language is never sent to a provider except as the one line the assistant's instructions already had ("their app language is ..."), and the transcriber's hint of the language to listen for.
 
 ## Retention, export and deletion
 
