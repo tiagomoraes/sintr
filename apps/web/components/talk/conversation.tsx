@@ -2,17 +2,33 @@
 
 import { useChat } from "@ai-sdk/react";
 import type { CheckinDraft, EntryDraft, SintrUIMessage } from "@sintr/agent/shapes";
-import { Button, cn } from "@sintr/ui";
+import { Button, LightPool, Panel, Rise, cn } from "@sintr/ui";
 import { DefaultChatTransport } from "ai";
 import Link from "next/link";
-import { useEffect, useRef, useState, type FormEvent, type KeyboardEvent } from "react";
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type FormEvent,
+  type KeyboardEvent,
+  type ReactNode,
+} from "react";
+import { SupportLines } from "@/components/support-lines";
+import { useRoomScene } from "@/components/shell-light";
 import { MAX_MESSAGE_LENGTH, needsSetup, problemCopy } from "@/lib/chat";
 import { atTheLimit, limitReplyText, type MeterView } from "@/lib/plan";
 import type { ProposalView } from "@/lib/proposals";
+import { useHydrated } from "@/lib/use-hydrated";
+import { poolMood } from "@/lib/voice/state";
+import { canRecord, useVoice, type Heard } from "@/lib/voice/use-voice";
+import type { VoiceView } from "@/lib/voice/view";
+import { t } from "@/messages";
 import { CrisisPanel } from "./crisis-panel";
 import { LimitNotice, PlanLine } from "./plan-notes";
 import { ProposalCard } from "./proposal-card";
 import { SupportStrip } from "./support-strip";
+import { VoiceBar, VoiceButton, VoiceNotes } from "./voice-controls";
 
 interface Props {
   /** Null for a new conversation: the server creates it on the first message. */
@@ -28,6 +44,12 @@ interface Props {
   source?: "own" | "house";
   /** This month's messages with the house assistant; null on the person's own key, which is never counted. */
   meter?: MeterView | null;
+  /** Whether the person can speak here, and how. */
+  voice?: VoiceView;
+  /** "Good evening, Ana.", above the first question. */
+  greeting?: string | null;
+  /** Quiet ways elsewhere, under the first question. */
+  doors?: ReactNode;
 }
 
 function textOf(message: SintrUIMessage): string {
@@ -66,7 +88,7 @@ function Bubble({ from, children }: { from: "you" | "assistant"; children: strin
             : "rounded-bubble rounded-bl-[6px] border border-rule bg-paper text-ink-2",
         )}
       >
-        <span className="sr-only">{from === "you" ? "You: " : "sintr: "}</span>
+        <span className="sr-only">{from === "you" ? t.home.you : t.home.them}</span>
         {children}
       </p>
     </div>
@@ -77,7 +99,7 @@ function Writing() {
   return (
     <div className="flex justify-start" role="status">
       <p className="m-0 inline-flex items-center gap-1.5 rounded-bubble rounded-bl-[6px] border border-rule bg-paper px-[18px] py-[15px]">
-        <span className="sr-only">sintr is writing</span>
+        <span className="sr-only">{t.home.writing}</span>
         {[0, 1, 2].map((dot) => (
           <span
             key={dot}
@@ -91,10 +113,36 @@ function Writing() {
   );
 }
 
+/** Drafts on screen that wait for the person: proposed by the assistant, or kept at the limit. */
+function waitingDrafts(messages: SintrUIMessage[], proposals: Record<string, ProposalView>): boolean {
+  for (const message of messages) {
+    if (message.role !== "assistant") continue;
+    for (const part of message.parts) {
+      let id: string | null = null;
+      if (
+        (part.type === "tool-propose_entry" || part.type === "tool-propose_checkin") &&
+        part.state === "output-available" &&
+        part.output.ok
+      ) {
+        id = (part.output as { proposalId: string }).proposalId;
+      } else if (part.type === "data-limit" && part.data.kept) {
+        id = part.data.kept.proposalId;
+      }
+      if (id && (proposals[id]?.status ?? "proposed") === "proposed") return true;
+    }
+  }
+  return false;
+}
+
 /**
- * The capture conversation. The browser sends only the person's new words;
- * the server keeps the conversation (sealed), runs the assistant and streams
- * the reply. Drafts arrive as cards to confirm, edit or discard.
+ * The home, which is the input. A new conversation opens on one question,
+ * "Tell me what happened.", beside a pool of light that breathes; the
+ * person speaks or writes. Speaking is written down and lands in the box
+ * for them to read and change; nothing is sent until they send it. The
+ * browser sends only the person's new words; the server keeps the
+ * conversation (sealed), screens it for risk before any model, runs the
+ * assistant and streams the reply. Drafts arrive as cards to confirm, edit
+ * or discard, and the pool shows what is happening all along.
  */
 export function Conversation({
   conversationId,
@@ -105,22 +153,28 @@ export function Conversation({
   ready = true,
   source = "own",
   meter: initialMeter = null,
+  voice = { kind: "unavailable", reason: "not_configured", provider: null },
+  greeting = null,
+  doors = null,
 }: Props) {
   const [serverId, setServerId] = useState<string | null>(conversationId);
   const [meter, setMeter] = useState<MeterView | null>(initialMeter);
   const [proposals, setProposals] = useState(initialProposals);
   const [input, setInput] = useState("");
+  // The words the transcriber heard, until the person changes or sends them.
+  const [heard, setHeard] = useState<Heard | null>(null);
   // Read out once a reply is complete, instead of every streamed word.
   const [announcement, setAnnouncement] = useState("");
   const endRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const hydrated = useHydrated();
 
   const { messages, sendMessage, status, error, regenerate, clearError } = useChat<SintrUIMessage>({
     ...(conversationId ? { id: conversationId } : {}),
     messages: initialMessages,
     transport,
     onFinish: ({ message }) => {
-      if (message.role === "assistant") setAnnouncement(`sintr: ${textOf(message)}`);
+      if (message.role === "assistant") setAnnouncement(`${t.home.them}${textOf(message)}`);
     },
     onData: (part) => {
       if (part.type === "data-usage") {
@@ -159,6 +213,23 @@ export function Conversation({
     },
   });
 
+  const onHeard = useCallback((words: Heard) => {
+    setInput((current) => (current.trim() ? `${current.trimEnd()} ${words.text}` : words.text));
+    setHeard(words);
+    textareaRef.current?.focus();
+  }, []);
+  const conversationRef = useRef(serverId);
+  useEffect(() => {
+    conversationRef.current = serverId;
+  }, [serverId]);
+  const currentConversation = useCallback(() => conversationRef.current, []);
+  const speaking = useVoice({
+    wav: voice.kind === "ready" && voice.wav,
+    secondsLeft: voice.kind === "ready" ? voice.secondsLeft : null,
+    conversationId: currentConversation,
+    onHeard,
+  });
+
   const busy = status === "submitted" || status === "streaming";
   const stopped = messages.some(
     (m) => m.role === "assistant" && m.parts.some((p) => p.type === "data-crisis"),
@@ -171,6 +242,18 @@ export function Conversation({
   const limited = meter !== null && atTheLimit(meter);
   // Once sintr has answered for the limit, the reply itself says it; the notice is for before.
   const limitAnswered = last?.role === "assistant" && last.parts.some((p) => p.type === "data-limit");
+  const started = messages.length > 0;
+  const recordable = hydrated && canRecord();
+  const canSpeak = ready && !stopped && voice.kind === "ready" && recordable && !speaking.spent;
+  const listening = speaking.state.phase === "listening" || speaking.state.phase === "asking";
+  const transcribing = speaking.state.phase === "transcribing";
+  const mood = poolMood({
+    voice: speaking.state.phase,
+    chat: status,
+    paused: stopped,
+    draftWaiting: waitingDrafts(messages, proposals),
+  });
+  useRoomScene(listening || transcribing ? "listening" : started ? "conversation" : null);
 
   useEffect(() => {
     if (messages.length === 0) return;
@@ -183,6 +266,7 @@ export function Conversation({
     const text = input.trim() === "" ? "" : input;
     if (!text || busy) return;
     setInput("");
+    setHeard(null);
     void sendMessage({ text }, { body: serverId ? { conversationId: serverId } : {} });
     textareaRef.current?.focus();
   }
@@ -194,22 +278,44 @@ export function Conversation({
     }
   }
 
-  return (
-    <div className="flex min-h-[calc(100svh-260px)] flex-col">
-      {messages.length === 0 ? (
-        <section aria-labelledby="talk-empty" className="pb-10 pt-2">
-          <h1 id="talk-empty" className="text-title">
-            Tell me what happened.
-          </h1>
-          <p className="mt-4 max-w-[34em] text-lede text-ink-2">
-            {limited
-              ? "In your own words, as much or as little as you want. Nothing is kept as an entry until you confirm it."
-              : "In your own words, as much or as little as you want. I will listen, ask a question or two, and draft an entry for you to check. Nothing is kept as an entry until you confirm it."}
-          </p>
-        </section>
-      ) : null}
+  const lede = limited ? t.home.ledeAtLimit : canSpeak || !hydrated ? t.home.lede : t.home.ledeWriteOnly;
 
-      <div role="log" aria-label="Conversation" aria-live="off" className="flex flex-1 flex-col gap-3 pb-6">
+  return (
+    <div className="flex min-h-[calc(100svh-220px)] flex-col">
+      {started ? null : (
+        <section
+          aria-labelledby="talk-empty"
+          className="grid items-center gap-x-10 gap-y-2 pb-8 md:grid-cols-[minmax(0,1fr)_auto] md:gap-y-6 md:pb-10 md:pt-6"
+        >
+          <div>
+            {greeting ? (
+              <Rise as="p" index={0} className="font-serif text-[1.1875rem] italic text-ink-3">
+                {greeting}
+              </Rise>
+            ) : null}
+            <Rise index={1}>
+              <h1 id="talk-empty" className="mt-1 text-title">
+                {t.home.title}
+              </h1>
+            </Rise>
+            <Rise as="p" index={2} className="mt-4 max-w-[34em] text-lede text-ink-2">
+              {lede}
+            </Rise>
+            {doors ? (
+              <Rise index={3} className="mt-6">
+                {doors}
+              </Rise>
+            ) : null}
+          </div>
+          <LightPool
+            mood={mood}
+            levelRef={speaking.levelRef}
+            className="sintr-fade -order-1 mx-auto [--pool-size:120px] md:order-none md:mx-0 md:[--pool-size:216px]"
+          />
+        </section>
+      )}
+
+      <div role="log" aria-label={t.home.log} aria-live="off" className="flex flex-1 flex-col gap-3 pb-6">
         {messages.map((message) => {
           if (message.role === "user") {
             return (
@@ -290,7 +396,7 @@ export function Conversation({
           <LimitNotice meter={meter} />
         ) : null}
         {error ? (
-          <div className="rounded-file border border-rule px-5 py-4" role="alert">
+          <div className="rounded-file border border-rule bg-paper px-5 py-4" role="alert">
             <p className="text-[0.9375rem] text-ink">{problemCopy(error.message, source)}</p>
             <div className="mt-3 flex flex-wrap items-center gap-x-6 gap-y-2">
               {needsSetup(error.message) ? null : (
@@ -302,7 +408,7 @@ export function Conversation({
                     void regenerate({ body: serverId ? { conversationId: serverId } : {} });
                   }}
                 >
-                  Try again
+                  {t.home.tryAgain}
                 </Button>
               )}
               {source === "own" ? (
@@ -310,27 +416,56 @@ export function Conversation({
                   href="/settings"
                   className="text-[0.9375rem] text-ink-2 underline decoration-rule-strong underline-offset-[0.28em] hover:text-ink"
                 >
-                  Check the assistant in Settings
+                  {t.home.checkSettings}
                 </Link>
               ) : null}
             </div>
           </div>
         ) : null}
+        {heard?.risk && !stopped ? (
+          // What was said may be about danger: the lines first, before anything is sent.
+          <Panel
+            className="border-ink px-[clamp(20px,4vw,30px)] py-7"
+            role="region"
+            aria-label={t.home.heardRisk}
+          >
+            <SupportLines headingLevel={3} />
+            <p className="mt-5 border-t border-rule pt-4 text-[0.9375rem] text-ink-2">{t.home.heardRisk}</p>
+          </Panel>
+        ) : null}
         {/* Scrolled to with room for the composer that sits over the end. */}
         <div ref={endRef} className="scroll-mb-56" />
       </div>
 
-      <div className="sticky bottom-0 z-10 -mx-1 border-t border-rule bg-paper px-1 pb-5 pt-4">
+      <div
+        className={cn(
+          "z-10 -mx-1 bg-paper px-1 pb-[max(20px,env(safe-area-inset-bottom))]",
+          // Before the first word the composer follows the question; once talking, it stays at hand.
+          started ? "sticky bottom-0 border-t border-rule pt-3" : "mt-auto pt-2",
+        )}
+      >
+        {started ? (
+          // The pool comes down beside the box and says, in a few words, what it is doing.
+          <div className="mb-2 flex h-8 items-center gap-1" aria-hidden="true">
+            <LightPool mood={mood} levelRef={speaking.levelRef} className="-ml-1 [--pool-size:40px]" />
+            {mood !== "resting" ? (
+              <p className="sintr-fade text-caption text-ink-3">{t.home.status[mood]}</p>
+            ) : null}
+          </div>
+        ) : null}
+        <p className="sr-only" role="status">
+          {t.home.status[mood]}
+        </p>
         {stopped ? (
           <p className="mb-3 text-[0.9375rem] text-ink-2">
-            The diary is paused here.{" "}
+            {t.home.paused}{" "}
             <Link
-              href="/talk"
+              href="/home"
               className="text-ink underline decoration-rule-strong underline-offset-[0.28em] hover:decoration-ink"
             >
-              Start a new conversation
+              {t.home.pausedLink}
             </Link>{" "}
-            whenever you are ready.
+            {t.home.pausedAfter}
           </p>
         ) : null}
         <p className="sr-only" role="status">
@@ -338,54 +473,92 @@ export function Conversation({
         </p>
         {ready ? null : (
           <p className="mb-3 text-[0.9375rem] text-ink-2">
-            This sintr has no assistant of its own. Use your own key in{" "}
+            {t.home.noAssistant}{" "}
             <Link
               href="/settings?key=own#own-key"
               className="text-ink underline decoration-rule-strong underline-offset-[0.28em] hover:decoration-ink"
             >
-              Settings
+              {t.home.noAssistantLink}
             </Link>{" "}
-            to continue this conversation.
+            {t.home.noAssistantAfter}
           </p>
         )}
-        <form onSubmit={submit} className={cn("flex items-end gap-3", !ready && "hidden")}>
-          <label htmlFor="talk-message" className="sr-only">
-            Your message
-          </label>
-          <textarea
-            id="talk-message"
-            ref={textareaRef}
-            value={input}
-            onChange={(event) => setInput(event.target.value)}
-            onKeyDown={onKeyDown}
-            rows={2}
-            maxLength={MAX_MESSAGE_LENGTH}
-            placeholder={
-              limited ? "Write what happened" : messages.length === 0 ? "What happened?" : "Write here"
-            }
-            className="block max-h-56 min-h-[52px] w-full flex-1 resize-none rounded-[22px] border border-rule-strong bg-paper px-[18px] py-3 font-sans text-[1rem] leading-[1.5] text-ink placeholder:text-ink-3 transition-[border-color] duration-300 [field-sizing:content] hover:border-ink-soft focus-visible:border-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
+        <VoiceNotes
+          problem={speaking.state.problem}
+          onDismiss={speaking.dismiss}
+          heard={heard !== null && input.trim() !== ""}
+          onClear={() => {
+            setInput("");
+            setHeard(null);
+            textareaRef.current?.focus();
+          }}
+        />
+        {listening || transcribing ? (
+          <VoiceBar
+            phase={speaking.state.phase}
+            spokenMs={speaking.spokenMs}
+            onDone={speaking.stop}
+            onCancel={speaking.cancel}
           />
-          <Button type="submit" disabled={busy || input.trim() === ""} className="shrink-0">
-            Send
-          </Button>
-        </form>
+        ) : (
+          <form onSubmit={submit} className={cn("flex items-end gap-3", !ready && "hidden")}>
+            <label htmlFor="talk-message" className="sr-only">
+              {t.home.messageLabel}
+            </label>
+            <textarea
+              id="talk-message"
+              ref={textareaRef}
+              value={input}
+              onChange={(event) => setInput(event.target.value)}
+              onKeyDown={onKeyDown}
+              rows={2}
+              maxLength={MAX_MESSAGE_LENGTH}
+              placeholder={
+                limited
+                  ? t.home.placeholder.atLimit
+                  : started
+                    ? t.home.placeholder.next
+                    : t.home.placeholder.first
+              }
+              className="block max-h-56 min-h-[52px] w-full flex-1 resize-none rounded-[22px] border border-rule-strong bg-paper px-[18px] py-3 font-sans text-[1rem] leading-[1.5] text-ink placeholder:text-ink-3 transition-[border-color] duration-300 [field-sizing:content] hover:border-ink-soft focus-visible:border-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
+            />
+            {canSpeak && input.trim() === "" && !busy ? (
+              <VoiceButton onSpeak={speaking.start} />
+            ) : (
+              <Button type="submit" disabled={busy || input.trim() === ""} className="shrink-0">
+                {t.home.send}
+              </Button>
+            )}
+          </form>
+        )}
         <div className="mt-3 flex flex-wrap items-baseline justify-between gap-x-6 gap-y-1">
           <SupportStrip />
-          <p className="hidden text-caption text-ink-3 sm:block">
-            Enter sends. Shift and Enter for a new line.
-          </p>
+          <p className="hidden text-caption text-ink-3 sm:block">{t.home.keys}</p>
         </div>
+        {ready && !stopped && hydrated && recordable ? (
+          <VoiceAvailability voice={voice} speaking={listening || transcribing} />
+        ) : null}
         {ready && source === "house" && meter && !(limited && !limitAnswered && !stopped) ? (
           // At the limit, before anything is sent, the notice above says it all.
           <PlanLine meter={meter} />
         ) : null}
-        {rehearsal ? (
-          <p className="mt-2 text-caption text-ink-3">
-            Rehearsal mode: replies come from a scripted, offline assistant (SINTR_FAKE_AGENT). Nothing is
-            sent to a provider.
-          </p>
-        ) : null}
+        {rehearsal ? <p className="mt-2 text-caption text-ink-3">{t.home.rehearsal}</p> : null}
       </div>
     </div>
   );
+}
+
+/** One quiet line about speaking: why it is not offered, that the month's time is used, or, while speaking, who hears it. */
+function VoiceAvailability({ voice, speaking }: { voice: VoiceView; speaking: boolean }) {
+  if (voice.kind === "limit")
+    return <p className="mt-2 text-caption text-ink-3">{t.voice.limit(voice.next)}</p>;
+  if (voice.kind === "unavailable") {
+    const line = t.voice.unavailable[voice.reason](voice.provider);
+    return line ? <p className="mt-2 text-caption text-ink-3">{line}</p> : null;
+  }
+  if (voice.secondsLeft !== null && voice.secondsLeft < 180) {
+    return <p className="mt-2 text-caption text-ink-3">{t.voice.left(Math.ceil(voice.secondsLeft / 60))}</p>;
+  }
+  // Who hears it, said while the person speaks, before anything leaves the device.
+  return speaking ? <p className="mt-2 text-caption text-ink-3">{t.voice.privacy(voice.heardBy)}</p> : null;
 }

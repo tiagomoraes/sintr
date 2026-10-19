@@ -1,0 +1,44 @@
+/** The diary's frame: the sections, the menu on a phone, and the light. */
+export const shell = {
+  nav: {
+    label: "Your diary",
+    practiceLabel: "Your practice",
+    something: ", something new",
+    home: "Home",
+    entries: "Entries",
+    checkins: "Check-ins",
+    therapy: "Therapy",
+    reports: "Reports",
+    sharing: "Sharing",
+    connect: "Other assistants",
+    settings: "Settings",
+    plan: "Plan",
+    practice: "Practice",
+    dashboard: "Dashboard",
+  },
+  /** One line under each section in the phone's menu: what is there, in plain words. */
+  about: {
+    home: "Say what happened, by voice or in writing.",
+    entries: "The moments you kept, in your words.",
+    checkins: "A line about the day: mood, energy, sleep.",
+    therapy: "Your therapist, and when your sessions are.",
+    reports: "Your week on one page, before each session.",
+    sharing: "Let your therapist read the reports you approve.",
+    connect: "Keep your diary from ChatGPT, Claude or Gemini.",
+    settings: "The assistant, your email, your time zone.",
+    plan: "How much of the assistant you have this month.",
+    practice: "The reports your patients share with you.",
+  },
+  menu: { open: "Menu", close: "Close", title: "Your diary" },
+  /** The crisis lines in one line (the full block is in every page's footer). */
+  strip: {
+    before: "If you are in danger or thinking about harming yourself, call",
+    or: "or",
+    after: "sintr is a diary, not a crisis service.",
+    callCvv: "Call CVV, 188",
+    callSamu: "Call SAMU, 192",
+  },
+  signOut: "Sign out",
+  homeLink: "sintr, home",
+  skip: "Skip to content",
+} as const;

@@ -22,9 +22,9 @@ export const metadata: Metadata = { title: "An invite" };
 function Shell({ children, signedIn }: { children: React.ReactNode; signedIn: boolean }) {
   return (
     <>
-      <SiteHeader home={signedIn ? "/entries" : "/"}>
+      <SiteHeader home={signedIn ? "/home" : "/"}>
         {signedIn ? (
-          <HeaderLink href="/entries">Your diary</HeaderLink>
+          <HeaderLink href="/home">Your diary</HeaderLink>
         ) : (
           <HeaderLink href="/sign-in">Sign in</HeaderLink>
         )}
@@ -64,7 +64,7 @@ function Invalid({ signedIn, busy }: { signedIn: boolean; busy: boolean }) {
           : "It may have expired, been cancelled or been used already. Ask the person who sent it for a new one."}
       </p>
       <p className="mt-10">
-        <Link href={signedIn ? "/entries" : "/"} className={linkStyles}>
+        <Link href={signedIn ? "/home" : "/"} className={linkStyles}>
           {signedIn ? "Back to your diary" : "What is sintr?"}
         </Link>
       </p>

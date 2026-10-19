@@ -23,7 +23,7 @@ export default async function ConsentPage({
   const user = await requireUser();
   const scope = await runtime().repositories.forUser(user.id);
   const latest = await scope.consents.latest("health_data_processing");
-  if (latest?.granted && latest.version === HEALTH_DATA_CONSENT_VERSION) redirect("/entries");
+  if (latest?.granted && latest.version === HEALTH_DATA_CONSENT_VERSION) redirect("/home");
   const missing = (await searchParams).missing === "1";
 
   return (

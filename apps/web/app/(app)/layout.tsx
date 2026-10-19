@@ -1,13 +1,15 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { ExceptOn, ShellFooter, ShellMain } from "@/components/shell-frame";
-import { ShellNav } from "@/components/shell-nav";
+import { ShellLight } from "@/components/shell-light";
+import { PhoneMenu, ShellNav } from "@/components/shell-nav";
 import { SignOutButton } from "@/components/sign-out-button";
 import { SiteHeader } from "@/components/site-header";
 import { SupportLines } from "@/components/support-lines";
 import { formatMoment } from "@/lib/format";
 import { noticeText } from "@/lib/sharing";
 import { requireScope, runtime } from "@/lib/server/runtime";
+import { hourIn, timeOfDay } from "@/lib/time-of-day";
 
 /** A calm notice, for a report of the last week only: an old draft is not chased. */
 function recent(periodEnd: Date): boolean {
@@ -39,20 +41,32 @@ export default async function ShellLayout({ children }: { children: ReactNode })
       ? ((await scope.notices.list(10)).find((n) => n.side === "person" && !n.readAt) ?? null)
       : null;
   const notice = !sharingNotice && waiting && recent(waiting.periodEnd) ? waiting : null;
+  const nav = {
+    practice: practice !== null,
+    plan: runtime().config.house !== null || runtime().payments !== null,
+    dots: { sharing: unread.person > 0, practice: unread.practice > 0 },
+  };
   return (
-    <>
-      <SiteHeader home="/entries">
-        <span className="hidden text-caption text-ink-3 sm:inline">{user.email}</span>
-        <SignOutButton />
+    <ShellLight time={timeOfDay(hourIn(profile.timezone))}>
+      <SiteHeader home="/home">
+        <span className="hidden text-caption text-ink-3 min-[900px]:inline">{user.email}</span>
+        <span className="hidden min-[900px]:inline-flex">
+          <SignOutButton />
+        </span>
+        <PhoneMenu
+          {...nav}
+          footer={
+            <div className="flex flex-wrap items-center justify-between gap-3 border-t border-rule pt-5">
+              <span className="min-w-0 truncate text-caption text-ink-3">{user.email}</span>
+              <SignOutButton />
+            </div>
+          }
+        />
       </SiteHeader>
-      <div className="wrap grid grid-cols-12 gap-x-6 gap-y-8 pb-24 pt-4 min-[900px]:pt-12">
-        <aside className="col-span-12 min-[900px]:col-span-3">
+      <div className="wrap grid grid-cols-12 gap-x-6 gap-y-8 pb-24 pt-2 min-[900px]:pt-12">
+        <aside className="hidden min-[900px]:col-span-3 min-[900px]:block">
           <div className="min-[900px]:sticky min-[900px]:top-7">
-            <ShellNav
-              practice={practice !== null}
-              plan={runtime().config.house !== null || runtime().payments !== null}
-              dots={{ sharing: unread.person > 0, practice: unread.practice > 0 }}
-            />
+            <ShellNav {...nav} />
           </div>
         </aside>
         <ShellMain>
@@ -101,6 +115,6 @@ export default async function ShellLayout({ children }: { children: ReactNode })
           />
         </div>
       </footer>
-    </>
+    </ShellLight>
   );
 }
