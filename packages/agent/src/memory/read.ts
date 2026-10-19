@@ -9,8 +9,10 @@
  *   rule, decision 33), and its dashes are smoothed;
  * - nothing the crisis screen stops becomes a memory, in the sentence or
  *   in the quote (pages that the screen stops are never sent at all).
- * A refused memory goes back to the model once with the reason; what is
- * still wrong is dropped.
+ * A refused memory goes back to the model with the reason, twice at most;
+ * what is still wrong is dropped. The quote says where a memory comes
+ * from: one the model labelled with the wrong page is kept with the page
+ * its words are on, and a line label copied from the page is not part of it.
  */
 import {
   MEMORIES_PER_SOURCE,
@@ -27,8 +29,8 @@ import { describeProviderError } from "../providers";
 import { findVerbatim } from "../words";
 import { memoryInput, memoryReadingPrompt } from "./prompt";
 
-/** A first reading, and one chance to fix what was refused. */
-export const READING_ATTEMPTS = 2;
+/** A first reading, and two chances to fix what was refused (as a report has). */
+export const READING_ATTEMPTS = 3;
 
 /** A page as the model reads it: a short reference, its day, its labelled words. */
 export interface Page {
@@ -132,6 +134,31 @@ export function mayRead(page: Page): boolean {
 
 const QUOTE_MARKS = /^[\s"'“”‘’«»„]+|[\s"'“”‘’«»„]+$/gu;
 
+/** The label sintr writes before a line of the page ("what happened: "): its words, not the person's. */
+const LINE_LABEL =
+  /^\s*(?:title|what happened|thoughts|feelings|feelings after|body|what they did|context|notes?|strongest thought|evidence for|evidence against|alternative thought|sleep)\s*:\s*/iu;
+
+/**
+ * The person's span for a proposed quote, and the page it is on. The quote
+ * is what says where a memory comes from: one the model labelled with the
+ * wrong page is kept with the one page its words are on, and a line label
+ * it copied from the page is not part of it.
+ */
+function findQuote(
+  quote: string,
+  named: Page,
+  pages: ReadonlyMap<string, Page>,
+): { page: Page; quote: string } | null {
+  const candidate = quote.replace(QUOTE_MARKS, "").replace(LINE_LABEL, "").replace(QUOTE_MARKS, "");
+  const here = findVerbatim(named.texts, candidate);
+  if (here) return { page: named, quote: here };
+  const elsewhere = [...pages.values()].flatMap((page) => {
+    const found = page === named ? null : findVerbatim(page.texts, candidate);
+    return found ? [{ page, quote: found }] : [];
+  });
+  return elsewhere.length === 1 ? elsewhere[0]! : null;
+}
+
 /** Why a memory was refused, as a code the logs may carry. */
 type Refusal = "page" | "empty" | "quote" | "label" | "cause" | "risk";
 
@@ -145,8 +172,8 @@ function check(
   const text = smoothDashText(memory.text).replace(/\s+/gu, " ").trim();
   if (!text) return { ok: false, code: "empty", reason: `${memory.page}: the sentence is empty.` };
   // Models often wrap a quote in quotation marks of their own; the person's words are inside them.
-  const quote = findVerbatim(page.texts, memory.quote.replace(QUOTE_MARKS, ""));
-  if (!quote) {
+  const found = findQuote(memory.quote, page, pages);
+  if (!found) {
     return {
       ok: false,
       code: "quote",
@@ -168,12 +195,17 @@ function check(
       reason: `${memory.page}: "${causes[0]}" states a cause. Say what happened instead.`,
     };
   }
+  const { quote } = found;
   if (screenForRisk(text).risk || screenForRisk(quote).risk) {
-    return { ok: false, code: "risk", reason: `${memory.page}: this is not something to keep in the memory.` };
+    return {
+      ok: false,
+      code: "risk",
+      reason: `${memory.page}: this is not something to keep in the memory.`,
+    };
   }
   return {
     ok: true,
-    page: page.ref,
+    page: found.page.ref,
     memory: { kind: memory.kind, text: text.slice(0, 300), quote: quote.slice(0, 400) },
   };
 }

@@ -339,6 +339,55 @@ describe("reading the diary", () => {
     expect(instructionsOf(model.calls[0]!)).toContain("Every memory rests on the person's own words");
   });
 
+  it("keeps a memory with the page its words are on, even if the model named another, and without a copied label", async () => {
+    const meeting: UnreadSource = {
+      kind: "entry",
+      entry: entry({
+        id: "00000000-0000-4000-8000-000000000002",
+        situation: "O chefe, Marcos, perguntou do prazo.",
+      }),
+    };
+    const two = pagesOf([PAGE, meeting], "UTC");
+    const model = scriptedModel([
+      {
+        toolCalls: [
+          {
+            toolName: "remember",
+            input: {
+              memories: [
+                // The meeting is on p2, though the model says p1.
+                {
+                  page: "p1",
+                  kind: "about",
+                  text: "Tem um chefe, Marcos.",
+                  quote: "O chefe, Marcos, perguntou do prazo",
+                },
+                {
+                  page: "p1",
+                  kind: "moment",
+                  text: "Ana ligou do hospital.",
+                  quote: "what happened: Minha irmã Ana ligou do hospital",
+                },
+                // Words on no page are still refused.
+                { page: "p2", kind: "about", text: "Gosta de café.", quote: "eu adoro café" },
+              ],
+            },
+          },
+        ],
+      },
+      { toolCalls: [{ toolName: "remember", input: { memories: [] } }] },
+    ]);
+    const reading = await readPages({ model, pages: two, known: [], log: capturedLogger().log });
+    if (!reading.ok) throw new Error("reading failed");
+    expect(reading.found.get("p1")).toEqual([
+      { kind: "moment", text: "Ana ligou do hospital.", quote: "Minha irmã Ana ligou do hospital" },
+    ]);
+    expect(reading.found.get("p2")).toEqual([
+      { kind: "about", text: "Tem um chefe, Marcos.", quote: "O chefe, Marcos, perguntou do prazo" },
+    ]);
+    expect(JSON.stringify(toolResultsOf(model.calls[1]!))).toContain("eu adoro café");
+  });
+
   it("refuses an invented quote, a cause or a clinical label, tells the model why once, and keeps what holds", async () => {
     const model = scriptedModel([
       {
