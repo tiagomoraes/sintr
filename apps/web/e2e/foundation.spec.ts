@@ -23,6 +23,9 @@ test.describe("the app boots against a real Postgres", () => {
     expect(headers["x-frame-options"]).toBe("DENY");
     expect(headers["x-content-type-options"]).toBe("nosniff");
     expect(headers["referrer-policy"]).toBe("no-referrer");
+    // The microphone, for speaking on the home, is sintr's own pages' only; nothing they embed gets it.
+    expect(headers["permissions-policy"]).toContain("microphone=(self)");
+    expect(headers["permissions-policy"]).toContain("camera=()");
     expect(headers["x-powered-by"]).toBeUndefined();
   });
 });
@@ -86,6 +89,8 @@ test.describe("sign up, the diary, sign out", () => {
   }) => {
     const email = newEmail("alice");
     await signUp(page, email);
+    await expect(page.getByRole("heading", { level: 1, name: "Tell me what happened." })).toBeVisible();
+    await page.getByRole("link", { name: "Entries", exact: true }).click();
     await expect(page.getByRole("heading", { level: 1, name: "Entries" })).toBeVisible();
     await expect(page.getByText("Nothing written yet.")).toBeVisible();
     for (const [label, heading] of [
@@ -110,6 +115,7 @@ test.describe("sign up, the diary, sign out", () => {
     const bobContext = await browser.newContext();
     const bob = await bobContext.newPage();
     await signUp(bob, newEmail("bob"));
+    await bob.goto("/entries");
     await expect(bob.getByText("Nothing written yet.")).toBeVisible();
     await expect(bob.getByText(words)).toHaveCount(0);
     await bobContext.close();

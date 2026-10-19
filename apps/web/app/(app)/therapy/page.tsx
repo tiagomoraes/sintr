@@ -4,10 +4,12 @@ import { PageHeading } from "@/components/empty-state";
 import { TherapyForm } from "@/components/therapy/therapy-form";
 import { formatMoment } from "@/lib/format";
 import { requireScope, runtime } from "@/lib/server/runtime";
+import { LEADS, REPORT_LANGUAGE_OPTIONS } from "@/lib/therapy";
 import { toLocalInput } from "@/lib/time";
+import { t } from "@/messages";
 import { saveTherapy } from "./actions";
 
-export const metadata: Metadata = { title: "Therapy" };
+export const metadata: Metadata = { title: t.therapy.title };
 
 const KIND_LABEL: Record<TherapyNoteKind, string> = {
   session: "Session note",
@@ -36,10 +38,7 @@ export default async function TherapyPage() {
 
   return (
     <>
-      <PageHeading
-        title="Therapy"
-        lede="When your sessions are, who your therapist is, and what happens to the report prepared before each one."
-      />
+      <PageHeading title={t.therapy.title} lede={t.therapy.lede} />
       <p role="status" className="-mt-4 mb-12 max-w-[36em] text-[0.9688rem] text-ink-2 md:-mt-6">
         {session && prepared ? (
           <>
@@ -54,6 +53,24 @@ export default async function TherapyPage() {
       <div className="max-w-[40rem]">
         <TherapyForm
           save={saveTherapy}
+          summaries={{
+            sessions: t.therapy.sessions.summary(
+              settings.sessionDay,
+              settings.sessionTime,
+              (profile.timezone.split("/").at(-1) ?? profile.timezone).replaceAll("_", " "),
+            ),
+            therapist: t.therapy.therapist.summary(
+              settings.therapistName,
+              settings.therapistContact,
+              settings.deliveryChannel === "email",
+            ),
+            report: t.therapy.report.summary(
+              LEADS.find((lead) => lead.minutes === settings.reportLeadMinutes)?.label ?? "",
+              REPORT_LANGUAGE_OPTIONS.find((option) => option.value === reportLanguage(profile.language))
+                ?.label ?? "English",
+              profile.displayName,
+            ),
+          }}
           timezones={timezones}
           emailAvailable={runtime().email.available}
           emailVerified={account.emailVerified}

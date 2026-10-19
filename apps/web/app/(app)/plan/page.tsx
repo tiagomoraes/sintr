@@ -16,6 +16,8 @@ import { formatDay } from "@/lib/format";
 import { MAX_SEATS, allowanceLine, counted, formatNext, priceLine, sourceLine } from "@/lib/plan";
 import { assistantState } from "@/lib/server/assistant";
 import { requireScope, runtime } from "@/lib/server/runtime";
+import { voiceView } from "@/lib/server/voice";
+import { t } from "@/messages";
 import { manageSubscription, subscribe } from "./actions";
 
 export const metadata: Metadata = { title: "Your plan" };
@@ -78,13 +80,14 @@ export default async function PlanPage({
 }) {
   const { scope } = await requireScope();
   const { config, payments } = runtime();
-  const [assistant, month, profile, practice, practiceSubscription, params] = await Promise.all([
+  const [assistant, month, profile, practice, practiceSubscription, params, voice] = await Promise.all([
     assistantState(scope),
     scope.plans.current(),
     scope.profile.get(),
     scope.practice.get(),
     scope.plans.subscription("practice"),
     searchParams,
+    voiceView(scope),
   ]);
   const seats = practice ? await scope.practice.seats() : null;
   const locale = { language: "en", timezone: profile.timezone };
@@ -146,11 +149,19 @@ export default async function PlanPage({
                 used={month.used.reports}
                 limit={plan.allowance.reports}
               />
+              {voice.kind !== "unavailable" ? (
+                // Speaking is counted only where the house writes it down.
+                <MeterRow
+                  label={t.plan.speaking}
+                  used={month.used.audioMinutes}
+                  limit={plan.allowance.audioMinutes}
+                />
+              ) : null}
             </dl>
             <p className="mt-5 text-[0.9375rem] text-ink-2">
               {plan.allowance.assistantMessages === null
                 ? `The count starts again on ${formatNext(month.period.next)}.`
-                : `When they run out, nothing is lost. You can still write in Talk, and what you write is kept as a draft entry in your own words; check-ins and your report keep working, prepared from what you wrote. The count starts again on ${formatNext(month.period.next)}.`}
+                : t.plan.runOut(formatNext(month.period.next))}
             </p>
           </>
         ) : assistant.kind === "own" ? (

@@ -64,8 +64,11 @@ async function writeDiary(page: Page) {
 async function configureTherapy(page: Page, therapistEmail: string) {
   const sessionDay = WEEKDAYS[new Date(Date.now() + 2 * DAY).getUTCDay()]!;
   await page.goto("/therapy");
-  await page.getByLabel("Day", { exact: true }).selectOption({ label: sessionDay });
+  // Therapy opens on sentences; each part opens to change it.
+  await page.getByText("Your sessions", { exact: true }).click();
+  await page.getByRole("radio", { name: `${sessionDay}s`, exact: true }).check();
   await page.getByLabel("Time", { exact: true }).fill("18:00");
+  await page.getByText("Your therapist", { exact: true }).click();
   await page.getByLabel("Name", { exact: true }).fill("Dr. Example");
   await page.getByLabel("Email", { exact: true }).fill(therapistEmail);
   await page.getByRole("radio", { name: "Send it to my therapist" }).check();
@@ -73,6 +76,8 @@ async function configureTherapy(page: Page, therapistEmail: string) {
   await expect(page.getByText("Saved.", { exact: true })).toBeVisible();
   await page.reload();
   await expect(page.getByText(/The next report will be prepared on/)).toBeVisible();
+  await expect(page.getByText(`${sessionDay}s at 18:00, in UTC time.`)).toBeVisible();
+  await expect(page.getByText(`Dr. Example, at ${therapistEmail}.`, { exact: false })).toBeVisible();
   await expect(page.getByText("Every report waits for your approval.", { exact: false })).toBeVisible();
 }
 
@@ -98,6 +103,7 @@ test.describe("the weekly report", () => {
 
     // The therapy settings refuse a send without an address.
     await page.goto("/therapy");
+    await page.getByText("Your therapist", { exact: true }).click();
     await page.getByRole("radio", { name: "Send it to my therapist" }).check();
     await page.getByRole("button", { name: "Save", exact: true }).click();
     await expect(page.getByText("To send the report, sintr needs your therapist's email.")).toBeVisible();
@@ -295,7 +301,7 @@ test.describe("email for the account", () => {
     await page.getByLabel("Email").fill(email);
     await page.getByLabel("Password").fill("a brand new long password");
     await page.getByRole("button", { name: "Sign in" }).click();
-    await expect(page).toHaveURL(/\/entries$/);
+    await expect(page).toHaveURL(/\/home$/);
   });
 
   test("the address is confirmed through the link sent at sign-up", async ({ page }) => {

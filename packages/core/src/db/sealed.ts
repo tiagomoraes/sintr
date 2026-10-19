@@ -63,7 +63,7 @@ export function sealedFields<T extends PgTable, const F extends Partial<Record<C
 }
 
 export const SEALED = {
-  profiles: sealedFields(profiles, { displayName: "text" }),
+  profiles: sealedFields(profiles, { displayName: "text", preferredName: "text" }),
   therapySettings: sealedFields(therapySettings, { therapistName: "text", therapistContact: "text" }),
   entries: sealedFields(entries, {
     title: "text",

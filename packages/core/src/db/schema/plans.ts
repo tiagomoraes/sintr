@@ -87,7 +87,10 @@ export const usageCounters = pgTable(
     period: date("period", { mode: "string" }).notNull(),
     assistantMessages: integer("assistant_messages").notNull().default(0),
     reports: integer("reports").notNull().default(0),
+    /** Never counted: F5's placeholder. Spoken time is counted in seconds, below (DECISIONS 86). */
     audioMinutes: integer("audio_minutes").notNull().default(0),
+    /** Seconds of speech the house transcribed this month. */
+    audioSeconds: integer("audio_seconds").notNull().default(0),
     updatedAt: updatedAt(),
   },
   (t) => [
@@ -97,6 +100,7 @@ export const usageCounters = pgTable(
       "usage_counters_not_negative",
       sql`${t.assistantMessages} >= 0 and ${t.reports} >= 0 and ${t.audioMinutes} >= 0`,
     ),
+    check("usage_counters_audio_seconds_not_negative", sql`${t.audioSeconds} >= 0`),
   ],
 );
 

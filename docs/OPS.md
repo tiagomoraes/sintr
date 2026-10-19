@@ -1,6 +1,6 @@
 # Running sintr for other people
 
-For whoever runs sintr for people other than themselves: the hosted offer, or a self-host shared with a family or a practice. It covers the house assistant, plans, and payments. Keeping a diary on your own machine needs none of this; [`SELFHOST.md`](SELFHOST.md) is enough. Every variable is also explained in [`.env.example`](../.env.example), and the reasons are in [`DECISIONS.md`](DECISIONS.md) 69 to 83.
+For whoever runs sintr for people other than themselves: the hosted offer, or a self-host shared with a family or a practice. It covers the house assistant, plans, and payments. Keeping a diary on your own machine needs none of this; [`SELFHOST.md`](SELFHOST.md) is enough. Every variable is also explained in [`.env.example`](../.env.example), and the reasons are in [`DECISIONS.md`](DECISIONS.md) 69 to 83 (the house and plans) and 86 to 90 (speaking).
 
 ## The house assistant
 
@@ -21,6 +21,32 @@ Then start again (`make selfhost-up`, or your deploy). A missing piece stops the
 - **Choose the route with care.** Everything people say to the assistant goes to that provider under your agreement with it, and Settings names it (`SINTR_HOUSE_NAME`). Prefer a route that does not train on what it receives and keeps it no longer than needed (zero data retention), and say which in your privacy notice. A gateway on your own private network is allowed (`http://litellm:4000/v1`), even in saas mode, where it must ask for a key (`SINTR_HOUSE_KEY`) and be named (`SINTR_HOUSE_NAME`): a gateway that answers anyone could be used as someone's "own" provider, uncounted. Nobody can save the house's own address as their key.
 - **Choose the model for the cost.** A message with a draft is two calls of 3,000 to 4,000 tokens; on a small model that is about one cent, so a person using all of Personal costs in the order of 6 USD a month (DECISIONS 72).
 - **People can still bring their own key**, in Settings behind "Use your own key instead". Then their words go to their provider, and nothing of theirs is counted.
+
+## Speaking (speech to text)
+
+People can speak on the home instead of typing; what they say is written down, handed back to them to read, and sent only when they send it. By default the house writes it down through its own provider and key, when that provider transcribes:
+
+| House provider | Transcription | Model by default |
+| --- | --- | --- |
+| OpenRouter (`openai_compatible`, `https://openrouter.ai/api/v1`) | `/audio/transcriptions`, the house key | `openai/whisper-large-v3-turbo` |
+| OpenAI (`https://api.openai.com/v1`) | `/audio/transcriptions`, the house key | `gpt-4o-mini-transcribe` |
+| Groq (`https://api.groq.com/openai/v1`) | `/audio/transcriptions`, the house key | `whisper-large-v3-turbo` |
+| Google | Gemini listens (the recording is sent as WAV) | the house model |
+| Anthropic | none of its own: set an endpoint below, or speaking stays off | |
+| another gateway (LiteLLM) | `/audio/transcriptions`, only if you name the model | `SINTR_HOUSE_STT_MODEL` |
+
+```bash
+SINTR_HOUSE_STT_MODEL=openai/whisper-large-v3-turbo   # another model, or "off" for no speaking
+SINTR_HOUSE_STT_LANGUAGE=pt                          # what to expect when a person's writing says nothing
+# A transcription endpoint of its own, for an Anthropic house (both together):
+# SINTR_HOUSE_STT_BASE_URL=https://openrouter.ai/api/v1
+# SINTR_HOUSE_STT_KEY=sk-or-...
+```
+
+- **The recording is not kept.** It is held in memory for the one call and dropped; the log has a code and the seconds. Choose the route as for the assistant: OpenRouter's account privacy settings (zero data retention, no training) apply to transcription too.
+- **It is counted.** Free has 15 minutes of speaking a month and Personal 120, counted to the second; at the end of the month's time the Speak button goes and the box stays.
+- **Someone on their own key** is heard by their own provider (OpenRouter, OpenAI, Groq or Google), never the house; with Anthropic or a local model they write, and the home says why in one line.
+- It needs the page to be served over https (a phone's browser only opens the microphone there, or on localhost).
 
 ## Plans
 

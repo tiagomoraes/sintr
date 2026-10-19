@@ -7,5 +7,5 @@ import { requireScope } from "@/lib/server/runtime";
 export async function deleteConversation(id: string): Promise<void> {
   const { scope } = await requireScope();
   await scope.conversations.remove(id);
-  redirect("/talk");
+  redirect("/home");
 }

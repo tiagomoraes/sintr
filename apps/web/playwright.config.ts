@@ -12,7 +12,9 @@ import { defineConfig, devices } from "@playwright/test";
  * through the environment of this process. The assistant is the offline
  * rehearsal model (SINTR_FAKE_AGENT), whoever's key it stands for: no test
  * ever reaches a real provider. Payments go to a fake Stripe the house
- * tests start on this machine. Email goes to an outbox directory
+ * tests start on this machine. Speech is written down by the offline
+ * rehearsal transcriber, from Chromium's fake microphone (a tone), so no
+ * test sends audio anywhere. Email goes to an outbox directory
  * (SINTR_EMAIL_OUTBOX), never to a server.
  */
 const base = process.env.DATABASE_URL;
@@ -33,6 +35,8 @@ const housePort = port + 1;
 const houseUrl = `http://127.0.0.1:${housePort}`;
 process.env.SINTR_E2E_HOUSE_URL ??= houseUrl;
 process.env.SINTR_E2E_HOUSE_KEY ??= `sk-house-e2e-${randomBytes(16).toString("hex")}`;
+// The house's own transcription endpoint (an Anthropic house cannot take audio itself).
+process.env.SINTR_E2E_HOUSE_VOICE_KEY ??= `sk-voice-e2e-${randomBytes(16).toString("hex")}`;
 process.env.SINTR_E2E_STRIPE_URL ??= `http://127.0.0.1:${port + 99}`;
 process.env.SINTR_E2E_WEBHOOK_SECRET ??= `whsec_${randomBytes(16).toString("hex")}`;
 
@@ -43,6 +47,10 @@ const WITHOUT_HOUSE = {
   SINTR_HOUSE_MODEL: "",
   SINTR_HOUSE_KEY: "",
   SINTR_HOUSE_NAME: "",
+  SINTR_HOUSE_STT_MODEL: "",
+  SINTR_HOUSE_STT_BASE_URL: "",
+  SINTR_HOUSE_STT_KEY: "",
+  SINTR_HOUSE_STT_LANGUAGE: "",
   SINTR_STRIPE_SECRET_KEY: "",
   SINTR_STRIPE_WEBHOOK_SECRET: "",
   SINTR_STRIPE_PRICE_PERSONAL: "",
@@ -74,7 +82,12 @@ export default defineConfig({
   workers: 1,
   forbidOnly: Boolean(process.env.CI),
   reporter: process.env.CI ? [["list"], ["html", { open: "never" }]] : "list",
-  use: { baseURL: url, trace: "retain-on-failure" },
+  use: {
+    baseURL: url,
+    trace: "retain-on-failure",
+    // A microphone that plays a tone, and no prompt to allow it: speaking can be tested without a person.
+    launchOptions: { args: ["--use-fake-ui-for-media-stream", "--use-fake-device-for-media-stream"] },
+  },
   projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],
   webServer: [
     {
@@ -102,6 +115,8 @@ export default defineConfig({
         SINTR_HOUSE_MODEL: "claude-house-e2e",
         SINTR_HOUSE_KEY: process.env.SINTR_E2E_HOUSE_KEY,
         SINTR_HOUSE_NAME: "Anthropic",
+        SINTR_HOUSE_STT_BASE_URL: "https://openrouter.ai/api/v1",
+        SINTR_HOUSE_STT_KEY: process.env.SINTR_E2E_HOUSE_VOICE_KEY,
         SINTR_STRIPE_SECRET_KEY: "sk_test_e2e",
         SINTR_STRIPE_WEBHOOK_SECRET: process.env.SINTR_E2E_WEBHOOK_SECRET,
         SINTR_STRIPE_PRICE_PERSONAL: "price_e2epersonal",

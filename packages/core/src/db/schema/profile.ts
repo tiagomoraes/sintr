@@ -17,10 +17,14 @@ export const profiles = pgTable("profiles", {
   userId: text("user_id")
     .primaryKey()
     .references(() => users.id, { onDelete: "cascade" }),
-  /** sealed */
+  /** sealed: the name printed on the person's reports, chosen in Therapy */
   displayName: bytea("display_name"),
+  /** sealed: how the person wants to be called in the app; never sent to a model, never on a report */
+  preferredName: bytea("preferred_name"),
   language: text("language").notNull().default("en"),
   timezone: text("timezone").notNull().default("UTC"),
+  /** When the person finished (or set aside) the welcome after signing up; null until then. */
+  onboardedAt: timestamp("onboarded_at", { withTimezone: true }),
   createdAt: createdAt(),
   updatedAt: updatedAt(),
 });

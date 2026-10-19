@@ -36,7 +36,7 @@ export default async function SignUpPage({
       <p className="mt-10 text-[0.9375rem] text-ink-3">
         Already keeping one?{" "}
         <Link
-          href={next === "/entries" ? "/sign-in" : `/sign-in?next=${encodeURIComponent(next)}`}
+          href={next === "/home" ? "/sign-in" : `/sign-in?next=${encodeURIComponent(next)}`}
           className={linkStyles}
         >
           Sign in

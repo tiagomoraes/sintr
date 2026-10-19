@@ -40,6 +40,7 @@ const Language = z.string().refine((value) => {
 export const ProfilePatch = z
   .object({
     displayName: z.string().min(1).max(200).nullable(),
+    preferredName: z.string().min(1).max(80).nullable(),
     language: Language,
     timezone: TimeZone,
   })
@@ -47,9 +48,14 @@ export const ProfilePatch = z
 export type ProfilePatch = z.input<typeof ProfilePatch>;
 
 export interface Profile {
+  /** The name printed on reports, chosen in Therapy. */
   displayName: string | null;
+  /** How the person wants to be called in the app. Never sent to a model, never printed on a report. */
+  preferredName: string | null;
   language: string;
   timezone: string;
+  /** When the welcome after signing up was finished or set aside; null until then. */
+  onboardedAt: Date | null;
 }
 
 export const DeliveryChannel = z.enum(["download", "email"]);
@@ -582,6 +588,24 @@ export interface ProviderCredentials {
 export interface HouseAssistant extends ProviderCredentials {
   /** Who people are told receives their conversations, such as "Anthropic". */
   name: string;
+  /** How the house turns speech into text. */
+  voice: HouseVoice;
+}
+
+/**
+ * How the house transcribes what a person says (SINTR_HOUSE_STT_*): by
+ * default through the house assistant's own provider and key, when that
+ * provider transcribes; or through an OpenAI-compatible endpoint of its own.
+ */
+export interface HouseVoice {
+  /** SINTR_HOUSE_STT_MODEL=off: the house offers no speaking. */
+  off: boolean;
+  /** A transcription endpoint of its own, for a house whose provider has none (Anthropic). */
+  endpoint: { baseUrl: string; apiKey: string | null } | null;
+  /** The transcription model; null for the provider's default. */
+  model: string | null;
+  /** The language to expect when the person's own writing says nothing (ISO 639-1). */
+  language: string | null;
 }
 
 /* Plans: how much of the house assistant a person may use each month */
@@ -595,7 +619,7 @@ export interface Allowance {
   assistantMessages: number | null;
   /** Reports the assistant wrote. */
   reports: number | null;
-  /** Spoken minutes. A placeholder: audio arrives in the next milestone, and nothing counts it yet. */
+  /** Minutes of speech the house transcribes, counted to the second. */
   audioMinutes: number | null;
 }
 export type Meter = keyof Allowance;
@@ -677,6 +701,24 @@ export interface Entitlements {
   subscription: Subscription | null;
   period: UsagePeriod;
   used: Record<Meter, number>;
+  /** Speech transcribed by the house this month, to the second (`used.audioMinutes` rounds it up). */
+  spokenSeconds: number;
+}
+
+/**
+ * Seconds of speech taken from the month before the house transcribes a
+ * recording: refused once the month's minutes are used, never halfway
+ * through a recording that started with time left.
+ */
+export interface TakenAudio {
+  ok: boolean;
+  /** Seconds used this month, these included when they were taken. */
+  usedSeconds: number;
+  /** The month's allowance in seconds; null for no limit. */
+  limitSeconds: number | null;
+  /** What was taken, to settle against what the provider counted. */
+  seconds: number;
+  period: UsagePeriod;
 }
 
 /** The result of taking one unit of a meter: refused when the month's allowance is used. */

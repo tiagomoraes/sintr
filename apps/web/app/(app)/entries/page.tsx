@@ -31,7 +31,7 @@ export default async function EntriesPage({
         lede="The moments you choose to write down: what happened, what went through your mind, how strong it felt."
       />
       <div className="-mt-4 mb-10 flex flex-wrap items-center gap-x-7 gap-y-3 md:-mt-6">
-        <Link href="/talk" className={buttonVariants({ size: "sm" })}>
+        <Link href="/home" className={buttonVariants({ size: "sm" })}>
           Talk it through
         </Link>
         <p className="text-[0.9375rem] text-ink-3">The assistant drafts the entry; you confirm it.</p>

@@ -111,8 +111,41 @@ describe("settings", () => {
       language: "pt-BR",
       timezone: "America/Sao_Paulo",
     });
-    expect(profile).toEqual({ displayName: "Ana", language: "pt-BR", timezone: "America/Sao_Paulo" });
+    expect(profile).toEqual({
+      displayName: "Ana",
+      preferredName: null,
+      language: "pt-BR",
+      timezone: "America/Sao_Paulo",
+      onboardedAt: null,
+    });
     await expect(scope.profile.update({ timezone: "Mars/Olympus" })).rejects.toBeInstanceOf(ValidationError);
+  });
+
+  it("keeps the name the person goes by apart from the name on their reports", async () => {
+    const id = await createUser(handle.db, "called");
+    await repositories.provision(id);
+    const person = await repositories.forUser(id);
+    expect(await person.profile.get()).toMatchObject({ preferredName: null, onboardedAt: null });
+    const called = await person.profile.update({ preferredName: "Bia" });
+    expect(called).toMatchObject({ preferredName: "Bia", displayName: null });
+    // Changing one leaves the other as it was.
+    await person.profile.update({ displayName: "Beatriz Souza" });
+    expect(await person.profile.get()).toMatchObject({ preferredName: "Bia", displayName: "Beatriz Souza" });
+    await expect(person.profile.update({ preferredName: "x".repeat(81) })).rejects.toBeInstanceOf(
+      ValidationError,
+    );
+  });
+
+  it("marks the welcome as behind the person once, and keeps the first moment", async () => {
+    const id = await createUser(handle.db, "welcomed");
+    await repositories.provision(id);
+    const person = await repositories.forUser(id);
+    const first = new Date("2026-10-19T12:00:00Z");
+    expect((await person.profile.markOnboarded(first)).onboardedAt).toEqual(first);
+    expect((await person.profile.markOnboarded(new Date("2026-10-20T12:00:00Z"))).onboardedAt).toEqual(first);
+    // Updating the profile afterwards does not reopen it.
+    await person.profile.update({ preferredName: "Caio" });
+    expect((await person.profile.get()).onboardedAt).toEqual(first);
   });
 
   it("keeps approval mandatory, in code and in the database", async () => {

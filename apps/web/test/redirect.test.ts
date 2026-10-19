@@ -16,7 +16,7 @@ describe("safeNext", () => {
       "",
       undefined,
     ]) {
-      expect(safeNext(value)).toBe("/entries");
+      expect(safeNext(value)).toBe("/home");
     }
   });
 });

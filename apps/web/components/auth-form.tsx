@@ -70,7 +70,10 @@ export function AuthForm({ mode, next }: { mode: Mode; next: string }) {
       setPending(false);
       return;
     }
-    router.replace(next);
+    // A new diary opens on the welcome, which carries on to where the person was going.
+    router.replace(
+      mode === "sign-up" ? `/welcome${next === "/home" ? "" : `?next=${encodeURIComponent(next)}`}` : next,
+    );
     router.refresh();
   }
 

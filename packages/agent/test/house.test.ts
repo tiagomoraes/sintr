@@ -25,6 +25,7 @@ const HOUSE: HouseAssistant = {
   model: "house-model",
   apiKey: "sk-house-0123456789abcdef",
   name: "Example",
+  voice: { off: false, endpoint: null, model: null, language: null },
 };
 const OWN: ProviderCredentials = {
   provider: "openai_compatible",

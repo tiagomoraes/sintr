@@ -72,8 +72,7 @@ test.describe("the house assistant", () => {
     await signUp(page, newEmail("house-first"));
     const userId = await currentUserId(page);
 
-    // From the diary straight to Talk: no provider, no key, nothing to set up.
-    await page.getByRole("link", { name: "Talk it through" }).click();
+    // The home is the question: no provider, no key, nothing to set up.
     await expect(page.getByRole("heading", { level: 1, name: "Tell me what happened." })).toBeVisible();
     await expect(page.getByText("The assistant is included in your plan.")).toBeVisible();
     await expect(page.getByRole("link", { name: "Call CVV, 188" })).toBeVisible();

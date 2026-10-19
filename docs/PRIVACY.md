@@ -96,11 +96,22 @@ The embedded assistant talks to one of two providers, and Settings always says w
 - **At the plan's limit** the house assistant does not run, so nothing is sent; the person's message is kept, sealed, as always, and offered back as a draft entry in their own words.
 - **For the weekly report** (F2), the assistant receives the digest of the period: every entry of the period in full (title, situation, thoughts, emotions with intensities, body, behaviour, context, tags, notes and the working of a thought), the check-in values and notes of those days, the averages, and the person's open "things to bring up" and tasks. That is what it needs to write the report; nothing outside the period, and nothing else from the diary. What it writes is checked before it is kept (quotes against the diary, no causes, no clinical labels), and a report is never sent by it. The worker prepares reports only for people whose consent to process their health data is granted in its current wording. Without an assistant, or past the plan's reports for the month, sintr prepares the parts it can alone and sends nothing to any model.
 
+## Speaking instead of typing
+
+On the home a person can speak instead of typing (F6). What happens to the voice:
+
+- **Who hears it**: the same provider that answers them. On the house, the house's own provider and key (OpenRouter's Whisper by default) or the transcription endpoint its operator configured (`SINTR_HOUSE_STT_*`); on a person's own key, that provider, with their key. Never the house for someone on their own key. Settings names who writes it down, and so does a line under the box while they speak. Where the provider takes no audio (Anthropic), there is no microphone, only a line that says so.
+- **The recording** is made in the browser only after the person taps Speak (the browser asks for the microphone; the page is the only one allowed to, `microphone=(self)`). It goes to sintr's server in one request, is held in memory for the one call to the transcriber, and is dropped: never written to disk, to the database or to a log, and nothing is kept on the device. Cancel keeps nothing and sends nothing.
+- **The words** come back to the box, for the person to read and change; speaking creates no conversation, no message and no draft. Once they send them, they are a message like a typed one, sealed as always. The crisis screen runs on the words as soon as they come back, and again before any model when they are sent.
+- **What is logged**: a code and the number of seconds, never a word.
+- **The plan** counts the seconds the house wrote down that month (numbers only, in `usage_counters.audio_seconds`); a person's own key is never counted.
+- **The language hint** given to the transcriber comes from the person's own messages, a language they chose, or the installation's default; it is a two-letter code.
+
 ## Plans and payments
 
 Plans (F5) decide how much of the house assistant a person can use each month; the diary itself is the same on every plan.
 
-- **What is stored**: in `subscriptions`, a person's plan and a practice's (the plan, its status, whether it was granted by the operator or paid, its period, the seats), and for a paid one the payment provider's customer and subscription ids; in `usage_counters`, per person and month, how many messages the house assistant answered and reports it wrote. No content, no card data. Changes of plan are in the audit log.
+- **What is stored**: in `subscriptions`, a person's plan and a practice's (the plan, its status, whether it was granted by the operator or paid, its period, the seats), and for a paid one the payment provider's customer and subscription ids; in `usage_counters`, per person and month, how many messages the house assistant answered, reports it wrote and seconds of speech it wrote down. No content, no card data. Changes of plan are in the audit log.
 - **Payments** go through Stripe, and only when the operator configured it. A person subscribes on Stripe's own page and manages the subscription on Stripe's billing page; the card never reaches sintr. What sintr sends Stripe: the account's id and email (for the receipt), the plan and the number of seats. Never a word of the diary, the therapy settings, or anything about a practice's patients. What Stripe keeps is governed by Stripe's terms.
 - **The webhook** is accepted only with Stripe's signature over its exact body, at most five minutes old; sintr then reads the subscription back from Stripe and applies its current state. It is logged as a code and the account's id, never an email.
 - **Practices**: a practice's plan covers its seats and the professional's own use of the assistant. It never covers or shows a patient's use, and a person's plan never depends on sharing with a practice.
@@ -149,6 +160,10 @@ What this means: email is not end-to-end encrypted. The SMTP provider the operat
 
 A report's PDF is printed inside the app by headless Chromium from a page sintr builds itself: every font and image is inline, JavaScript is off and every network request is refused, so printing reaches nothing outside. A draft's PDF is printed on demand from its current words and is marked as a draft; when the person approves the report, the final PDF is printed once and stored sealed, and that stored file is exactly what is sent and what stays available afterwards. A quoted span gets the peach highlighter ("the person's exact words") only when sintr found it in the diary word for word.
 
+## The name you go by
+
+The welcome after signing up asks how the person wants to be called. That name is sealed like the diary, used only to greet them on the home, never sent to the assistant and never printed on a report; the name on reports is a separate choice in Therapy.
+
 ## Retention, export and deletion
 
 - Expired sessions and verification tokens are removed every hour by the worker.
@@ -183,6 +198,8 @@ Recorded here so they are not mistaken for features:
 - At the plan's limit the house assistant does not run, so only the fixed crisis screen looks at a message (as without any provider); the help lines stay on every page.
 - On the house assistant, what the provider keeps is governed by the operator's agreement with it; this document does not name the hosted offer's provider and its retention yet, and will before it opens.
 - Monthly usage counts are kept while the account exists; they hold numbers only.
+- Speaking sends the recording to the transcriber the person's route names; what that provider keeps is governed by its terms (and, on the house, the operator's agreement and account settings with it), as for the conversation. sintr cannot prove a provider dropped it.
+- The length of a recording is measured by the browser before it is counted, never below what its size makes it (and exactly, for WAV); the provider's own count settles it afterwards where it gives one (OpenRouter does), and otherwise that measure stands.
 - Stripe keeps the email, the payment details and the invoices of a person who subscribed, under its own terms; deleting a sintr account does not delete the Stripe customer (the operator does that in Stripe).
 
 This is a description of the software, not legal advice or a compliance claim.

@@ -90,6 +90,7 @@ describe("configuration", () => {
       model: "claude-haiku-5-5",
       apiKey: "sk-ant-house-secret-value",
       name: "Anthropic",
+      voice: { off: false, endpoint: null, model: null, language: null },
     });
     // An OpenAI-compatible gateway is named after its host unless SINTR_HOUSE_NAME says otherwise.
     const gateway = {
@@ -145,6 +146,81 @@ describe("configuration", () => {
       },
     ];
     for (const env of leaky) expect(problem(env)).not.toContain(secret);
+  });
+
+  it("transcribes through the house's own provider unless SINTR_HOUSE_STT_* says otherwise", () => {
+    const house = {
+      ...valid(),
+      SINTR_HOUSE_PROVIDER: "openai_compatible",
+      SINTR_HOUSE_BASE_URL: "https://openrouter.ai/api/v1",
+      SINTR_HOUSE_MODEL: "anthropic/claude-haiku-5.5",
+      SINTR_HOUSE_KEY: "sk-or-house",
+    };
+    expect(loadConfig(house).house?.voice).toEqual({
+      off: false,
+      endpoint: null,
+      model: null,
+      language: null,
+    });
+    expect(
+      loadConfig({
+        ...house,
+        SINTR_HOUSE_STT_MODEL: "openai/whisper-large-v3",
+        SINTR_HOUSE_STT_LANGUAGE: "pt",
+      }).house?.voice,
+    ).toEqual({ off: false, endpoint: null, model: "openai/whisper-large-v3", language: "pt" });
+    expect(loadConfig({ ...house, SINTR_HOUSE_STT_MODEL: "off" }).house?.voice).toMatchObject({ off: true });
+    // An Anthropic house can transcribe through an endpoint of its own.
+    const anthropic = {
+      ...valid(),
+      SINTR_HOUSE_PROVIDER: "anthropic",
+      SINTR_HOUSE_MODEL: "claude-haiku-5-5",
+      SINTR_HOUSE_KEY: "sk-ant-house",
+      SINTR_HOUSE_STT_BASE_URL: "https://openrouter.ai/api/v1",
+      SINTR_HOUSE_STT_KEY: "sk-or-voice",
+    };
+    expect(loadConfig(anthropic).house?.voice).toEqual({
+      off: false,
+      endpoint: { baseUrl: "https://openrouter.ai/api/v1", apiKey: "sk-or-voice" },
+      model: null,
+      language: null,
+    });
+  });
+
+  it("names what is wrong with the house's transcription, never its key", () => {
+    const secret = "sk-or-never-echo-this";
+    const house = {
+      ...valid(),
+      SINTR_HOUSE_PROVIDER: "anthropic",
+      SINTR_HOUSE_MODEL: "claude-haiku-5-5",
+      SINTR_HOUSE_KEY: "sk-ant-house",
+    };
+    const problem = (env: Record<string, string>) => {
+      try {
+        loadConfig({ ...env });
+      } catch (error) {
+        expect(error).toBeInstanceOf(ConfigError);
+        return (error as Error).message;
+      }
+      return "";
+    };
+    // Without a house there is nothing to transcribe for.
+    expect(problem({ ...valid(), SINTR_HOUSE_STT_KEY: secret })).toMatch(/SINTR_HOUSE_PROVIDER/);
+    expect(problem({ ...house, SINTR_HOUSE_STT_KEY: secret })).toMatch(/SINTR_HOUSE_STT_BASE_URL/);
+    expect(problem({ ...house, SINTR_HOUSE_STT_BASE_URL: `https://u:${secret}@voice.example/v1` })).toMatch(
+      /SINTR_HOUSE_STT_BASE_URL/,
+    );
+    expect(
+      problem({ ...house, SINTR_MODE: "saas", SINTR_HOUSE_STT_BASE_URL: "https://voice.example/v1" }),
+    ).toMatch(/SINTR_HOUSE_STT_KEY/);
+    expect(problem({ ...house, SINTR_HOUSE_STT_LANGUAGE: "Portuguese" })).toMatch(/SINTR_HOUSE_STT_LANGUAGE/);
+    for (const env of [
+      { ...valid(), SINTR_HOUSE_STT_KEY: secret },
+      { ...house, SINTR_HOUSE_STT_KEY: secret },
+      { ...house, SINTR_HOUSE_STT_BASE_URL: `https://u:${secret}@voice.example/v1` },
+    ]) {
+      expect(problem(env)).not.toContain(secret);
+    }
   });
 
   it("asks a gateway on the hosted offer for a key and a name people are told", () => {

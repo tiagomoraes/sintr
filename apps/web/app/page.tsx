@@ -13,7 +13,7 @@ export default async function Home() {
       <WindowLight className="right-[-9vw] top-[-6vh] h-[min(105vh,980px)] w-[clamp(460px,62vw,980px)] max-[720px]:right-[-40vw] max-[720px]:opacity-70" />
       <SiteHeader>
         {session ? (
-          <Link href="/entries" className={buttonVariants({ size: "sm" })}>
+          <Link href="/home" className={buttonVariants({ size: "sm" })}>
             Open your diary
           </Link>
         ) : (
@@ -38,7 +38,7 @@ export default async function Home() {
             <div className="mt-[clamp(32px,3.4vw,44px)] flex flex-wrap items-center gap-x-7 gap-y-4">
               {session ? (
                 <Button asChild>
-                  <Link href="/entries">Open your diary</Link>
+                  <Link href="/home">Open your diary</Link>
                 </Button>
               ) : (
                 <>

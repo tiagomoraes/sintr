@@ -35,13 +35,27 @@ The unit of trust is one **link between one person and one practice**: accepted 
 
 The owner's decision: nobody should have to paste an API key to use sintr. The installation runs on its own key, the house assistant, and the subscription pays for it. Bringing your own key stays possible as a small door for whoever wants it (free here, private to their provider, at their own risk); it is never the main path. A self-host without a house key works as before, on the person's own key.
 
-**What a person does in their first five minutes.** They sign up with an email, a password and the consent, and land in their diary, which offers one thing: "Talk it through". Talk opens on "Tell me what happened." with one line under the box: the assistant is included in their plan. They write what happened; the assistant answers, asks a narrow question or two and drafts an entry in their own words; they confirm it. If they tell Therapy when their sessions are, the report is prepared before each one; otherwise "Prepare this week's report" makes one now. Nothing in those five minutes asks for a provider, a key or a card, and nothing needs Settings.
+**What a person does in their first five minutes.** They sign up with an email, a password and the consent, and (since F6, below) are welcomed with a few questions and land on the home, which opens on "Tell me what happened." with one line under the box: the assistant is included in their plan. They write what happened; the assistant answers, asks a narrow question or two and drafts an entry in their own words; they confirm it. If they tell Therapy when their sessions are, the report is prepared before each one; otherwise "Prepare this week's report" makes one now. Nothing in those five minutes asks for a provider, a key or a card, and nothing needs Settings.
 
 **What the plan screen says to someone who never pays.** That their diary is the same on every plan, and a plan is only about how much of the assistant they can use. "You are on Free. 100 messages with the assistant and 4 reports written by it, each month." Then this month in two plain lines (23 of 100, 1 of 4) and what happens when they run out: nothing is lost; they can still write in Talk, and what they write is kept as a draft entry in their own words; check-ins and the report keep working, made from what they wrote; the count starts again on the first of the month. Then, once: Personal, its numbers and its price, and the other way on, their own key. No feature matrix, no countdown, no colour, no email. Someone who never pays keeps a diary for as long as they want, with a little of the assistant every month, and nothing they wrote is ever behind the plan.
 
 **What the therapist's plan means.** Seats: one for each patient linked to the practice, or invite waiting for an answer, as F4 counted them. A hosted practice starts with one free seat, to try sintr with one patient. The Practice plan is as many seats as the therapist chooses, paid per seat, and it includes the assistant for the therapist's own diary, as Personal does. It does not pay for the patients' plans and shows nobody's use: what a person has never depends on sharing with their therapist, so stopping sharing never costs them anything.
 
 The numbers, and why, are in DECISIONS 72; the limit's behaviour in 76 to 78; the practice plan in 79.
+
+## The first five minutes (F6)
+
+The owner's decision: sintr was complete and read as too technical for the person it is for. The first minutes become a guided, narrative experience, calm and in motion, without long forms; the home becomes the input; and everything that exists stays reachable without jargon.
+
+**What a person who has never seen sintr does.** They sign up with an email, a password and the consent. A calm screen says what this is: a diary for the week between sessions, kept in their own words, a page before each session for them to read first. Then a few questions, one a screen, any of them able to wait: what to call them ("only to greet you here"), who their therapist is, when the sessions are (a day, a time, their phone's time zone). If a therapist's practice invited them, that invite is one of the questions, with the same consent as its own page. The window light moves across the wall from question to question. "You are set, Bia. Your sessions are on Tuesdays at 18:00. An hour before each one, your week will be waiting on one page." Then the home.
+
+**The home is the input.** "Good evening, Bia. Tell me what happened." Beside it, a small pool of light breathes. They tap Speak (where the thumb rests on a phone) or write. While they speak the pool follows their voice; on Done it gathers while their words are written down, by the same provider that answers them, and the words come back into the box: "Here is what I heard. Change anything, then send it." Nothing is kept or sent until they send it, and the recording itself is never kept. From there it is the conversation F1 built: a question or two, a draft in their words, Confirm. The pool pulses while the assistant answers, warms while a draft waits, and goes still if the diary stops for help. Under the question, one sentence leads to everything else: a quick check-in, this week's report, what they kept. Nothing in these minutes asks for a provider, a key or a card.
+
+**Less form everywhere else.** A check-in is a few taps, one question a screen. Therapy reads as three sentences (the sessions, the therapist, the report), each opening to change it. An entry's form puts what happened, the thoughts and the feelings first. Settings and Connect speak of your assistant, your other assistants and your therapist; on a phone, the sections live in one Menu that says what each is for.
+
+**What stays as it was.** The crisis lines are on every new screen, and the screen for risk runs before any model, on typed and spoken words alike. The diary is never held by any limit: at the month's end of speaking time the box stays. The person's words stay theirs: a transcript is theirs to correct before it becomes anything, and nothing becomes an entry without their yes. The consents are unchanged.
+
+The reasons are in DECISIONS 84 to 97.
 
 ## Voice and users
 
@@ -80,14 +94,14 @@ sintr-app/
 ## Data model (multi-tenant)
 
 - **Auth**: `users`, `sessions`, `accounts`, `verification_tokens`
-- **Profile**: `profiles` (name, language, timezone)
+- **Profile**: `profiles` (the name on reports, the name the person goes by, language, timezone, when the welcome was done)
 - **Therapy**: `therapy_settings` (therapist, contact, `session_day`, `session_time`, `report_lead`, `require_approval`, delivery channel)
 - **Ledger**: `entries` (full CBT), `checkins`, `therapy_notes`, `insights`
 - **Reports**: `reports` (period, `status` draft/reviewed/sent, recipient, `sent_at`, content + PDF)
 - **Agent**: `conversations`, `messages` (configurable retention)
 - **Integration**: `api_tokens` (MCP, scoped and revocable), `audit_log`
 - **Sharing (F4)**: `practices` (the professional's names, plan and seats), `invites` (codes both ways, expiring), `links` (one person and one practice, with its own key), `shared_reports` (sealed copies of approved reports), `notifications` (kinds and ids)
-- **Commercial**: `consents` (versioned consent log); seats live on `practices` (from configuration, a grant or a subscription); `subscriptions` (a person's plan and a practice's, granted or paid, with the payment provider's ids); `usage_counters` (the house assistant's messages, reports and audio minutes, per person and month)
+- **Commercial**: `consents` (versioned consent log); seats live on `practices` (from configuration, a grant or a subscription); `subscriptions` (a person's plan and a practice's, granted or paid, with the payment provider's ids); `usage_counters` (the house assistant's messages, reports and seconds of speech written down, per person and month)
 
 Columns holding sensitive content are flagged for **application-layer encryption**. Every table carries an indexed, mandatory `user_id` scope.
 
@@ -138,7 +152,8 @@ Columns holding sensitive content are flagged for **application-layer encryption
 - **F3 MCP**: MCP server + tokens + connection docs (Claude Desktop, ChatGPT, Gemini).
 - **F4 The therapist**: practices on one account kind, invites both ways with double opt-in, the link with its consent and revocation, sharing approved reports, the therapist's dashboard, seats by configuration, notifications, audit in both accounts.
 - **F5 The house model and the plan**: the house assistant configured on the server and used by default, bring your own key behind a small door, plans and entitlements for both sides with a monthly meter, the plan screen, the subscription modelled with Stripe behind configuration, limits that never hold the diary hostage.
-- **F6 The narrative home** (next): the narrative onboarding and the agentic home, built on F5.
+- **F6 The first five minutes**: the narrative welcome, the home as the input (voice and text, the pool of light), the light that follows the person's time of day, less form on the secondary screens, mobile first, and the app's strings in one catalog.
+- **F7 Languages** (next): the app in several languages through configuration, as the site is, from the catalog F6 started.
 - **Later**: the public landing page, multi-tenant hardening, app on the domain and the deploy, LGPD export and delete in the UI, the audit view, MFA.
 
 Each milestone is delivered by an Orca/Claude Code session (`claude-opus-5-5 --effort xhigh`) with its own brief, branch, PR, and verification.

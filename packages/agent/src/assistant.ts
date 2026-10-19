@@ -74,7 +74,11 @@ export interface Metered {
   giveBack(): Promise<void>;
 }
 
-export function metered(scope: UserScope, meter: Meter, now: () => Date = () => new Date()): Metered {
+export function metered(
+  scope: UserScope,
+  meter: Exclude<Meter, "audioMinutes">,
+  now: () => Date = () => new Date(),
+): Metered {
   let taken: Taken | null = null;
   return {
     async take() {

@@ -188,6 +188,9 @@ export function checkinInputFromDraft(draft: CheckinDraft): CheckinInput {
   return out;
 }
 
+/** Why speaking is not on offer (see voice.ts): no assistant yet, turned off, a provider without audio, or one sintr does not know. */
+export type VoiceUnavailable = "not_configured" | "off" | "provider_has_no_audio" | "provider_unknown";
+
 /** The crisis lines named in the brief and the pack, in the order to call. */
 export const CRISIS_LINES = [
   { name: "CVV", number: "188", where: "Brazil", note: "free, 24 hours" },

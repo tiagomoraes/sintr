@@ -9,9 +9,13 @@ import { PreferencesForm } from "@/components/settings/preferences-form";
 import { assistantState } from "@/lib/server/assistant";
 import { workingKeys } from "@/lib/server/keys";
 import { requireScope, runtime } from "@/lib/server/runtime";
+import { voiceView } from "@/lib/server/voice";
+import { t } from "@/messages";
 import { returnToIncludedAssistant, saveAssistant, savePreferences, testAssistant } from "./actions";
 
-export const metadata: Metadata = { title: "Settings" };
+export const metadata: Metadata = { title: t.settings.title };
+
+const S = t.settings;
 
 const TIMEZONES = Intl.supportedValuesOf("timeZone");
 
@@ -22,7 +26,7 @@ export default async function SettingsPage({
 }) {
   const { scope } = await requireScope();
   // Only what may be shown: the key is reduced to a hint on the server.
-  const [settings, assistant, profile, account, params, keys, practice] = await Promise.all([
+  const [settings, assistant, profile, account, params, keys, practice, voice] = await Promise.all([
     scope.agentSettings.get(),
     assistantState(scope),
     scope.profile.get(),
@@ -30,17 +34,19 @@ export default async function SettingsPage({
     searchParams,
     workingKeys(scope),
     scope.practice.get(),
+    voiceView(scope),
   ]);
   const timezones = TIMEZONES.includes(profile.timezone) ? TIMEZONES : [profile.timezone, ...TIMEZONES];
 
   return (
     <>
-      <PageHeading title="Settings" />
+      <PageHeading title={S.title} lede={S.lede} />
       <section aria-labelledby="assistant-title" className="max-w-[40rem]">
         <h2 id="assistant-title" className="font-serif text-title-small font-normal text-ink">
-          The assistant
+          {S.assistant.title}
         </h2>
         <AssistantSection
+          voice={voice}
           state={assistant}
           settings={settings}
           openDoor={params.key === "own"}
@@ -52,25 +58,25 @@ export default async function SettingsPage({
       </section>
       <section aria-labelledby="keys-title" className="mt-16 max-w-[40rem] border-t border-rule pt-12">
         <h2 id="keys-title" className="font-serif text-title-small font-normal text-ink">
-          Assistants you connected
+          {S.others.title}
         </h2>
         <p className="mt-3 text-ink-2">
-          Claude, ChatGPT, Gemini or Hermes can keep entries here for you, each with its own key.{" "}
+          {S.others.body}{" "}
           <Link href="/connect" className={linkStyles}>
-            {keys.length ? "Connect another" : "Connect one"}
+            {keys.length ? S.others.more : S.others.first}
           </Link>
         </p>
         <div className="mt-6">
           {keys.length ? (
             <KeyList keys={keys} />
           ) : (
-            <p className="text-[0.9375rem] text-ink-3">No assistant is connected.</p>
+            <p className="text-[0.9375rem] text-ink-3">{S.others.none}</p>
           )}
         </div>
       </section>
       <section aria-labelledby="email-title" className="mt-16 max-w-[40rem] border-t border-rule pt-12">
         <h2 id="email-title" className="font-serif text-title-small font-normal text-ink">
-          Your email
+          {S.email.title}
         </h2>
         <div className="mt-6">
           <EmailStatus
@@ -83,22 +89,21 @@ export default async function SettingsPage({
       </section>
       <section aria-labelledby="practice-title" className="mt-16 max-w-[40rem] border-t border-rule pt-12">
         <h2 id="practice-title" className="font-serif text-title-small font-normal text-ink">
-          {practice ? "Your practice" : "Are you a therapist?"}
+          {practice ? S.practice.titleOwn : S.practice.titleNew}
         </h2>
         <p className="mt-3 text-ink-2">
           {practice ? (
             <>
-              Your practice, {practice.professionalName}, receives the reports your patients share with you.{" "}
+              {S.practice.own(practice.professionalName)}{" "}
               <Link href="/practice" className={linkStyles}>
-                Open the dashboard
+                {S.practice.ownLink}
               </Link>
             </>
           ) : (
             <>
-              Open a practice on this account to receive the reports your patients choose to share with you.
-              Your own diary stays as it is.{" "}
+              {S.practice.open}{" "}
               <Link href="/practice" className={linkStyles}>
-                Open a practice
+                {S.practice.openLink}
               </Link>
             </>
           )}
@@ -106,7 +111,7 @@ export default async function SettingsPage({
       </section>
       <section aria-labelledby="preferences-title" className="mt-16 max-w-[40rem] border-t border-rule pt-12">
         <h2 id="preferences-title" className="font-serif text-title-small font-normal text-ink">
-          Time and conversations
+          {S.time.title}
         </h2>
         <div className="mt-8">
           <PreferencesForm

@@ -60,7 +60,10 @@ describe("encryption at rest", () => {
     await repositories.provision(userId);
     scope = await repositories.forUser(userId);
 
-    await scope.profile.update({ displayName: remember("display name") });
+    await scope.profile.update({
+      displayName: remember("display name"),
+      preferredName: remember("preferred"),
+    });
     await scope.therapySettings.update({
       therapistName: remember("therapist name"),
       therapistContact: remember("therapist contact"),
@@ -193,8 +196,9 @@ describe("encryption at rest", () => {
     // message, then F1: the API key, a proposal payload, a correction's previous values and note,
     // then F2: the report's previous words in its revision, then F4: the practice (3), two invites
     // (each a code, plus the note or the name), the link's name, two more consents (the link and the
-    // share name the practice), the second report (content and PDF) and its shared copy (page and PDF)
-    expect(checked).toBe(32 + 3 + 4 + 1 + 2 + 2 + 2);
+    // share name the practice), the second report (content and PDF) and its shared copy (page and PDF),
+    // then F6: the name the person goes by
+    expect(checked).toBe(32 + 3 + 4 + 1 + 2 + 2 + 2 + 1);
   });
 
   it("leaves no trace of the content in a text dump of the whole database", async () => {
@@ -228,6 +232,7 @@ describe("encryption at rest", () => {
     expect(entry?.emotions).toEqual([{ name: words.emotion, intensity: 80 }]);
     expect(entry?.peakIntensity).toBe(80);
     expect((await scope.profile.get()).displayName).toBe(words["display name"]);
+    expect((await scope.profile.get()).preferredName).toBe(words.preferred);
   });
 
   it("stores the data key only wrapped by the master key", async () => {

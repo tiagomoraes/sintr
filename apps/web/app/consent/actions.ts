@@ -20,5 +20,5 @@ export async function grantConsent(formData: FormData): Promise<void> {
     targetId: consent.id,
     metadata: { purpose: "health_data_processing", version: HEALTH_DATA_CONSENT_VERSION },
   });
-  redirect("/entries");
+  redirect("/home");
 }

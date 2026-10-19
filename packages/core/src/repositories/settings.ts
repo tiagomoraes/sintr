@@ -1,11 +1,17 @@
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { SEALED, openValues, sealValues } from "../db/sealed";
 import { profiles, therapySettings, users } from "../db/schema";
 import { ProfilePatch, TherapySettingsPatch, type Profile, type TherapySettings } from "../domain";
 import { parseInput } from "../errors";
 import type { ScopeContext } from "./context";
 
-const DEFAULT_PROFILE: Profile = { displayName: null, language: "en", timezone: "UTC" };
+const DEFAULT_PROFILE: Profile = {
+  displayName: null,
+  preferredName: null,
+  language: "en",
+  timezone: "UTC",
+  onboardedAt: null,
+};
 
 export function profileRepository({ db, userId, cipher }: ScopeContext) {
   const spec = SEALED.profiles;
@@ -13,8 +19,10 @@ export function profileRepository({ db, userId, cipher }: ScopeContext) {
     const sealed = openValues(cipher, spec, row);
     return {
       displayName: sealed.displayName as string | null,
+      preferredName: sealed.preferredName as string | null,
       language: row.language,
       timezone: row.timezone,
+      onboardedAt: row.onboardedAt,
     };
   };
 
@@ -34,12 +42,28 @@ export function profileRepository({ db, userId, cipher }: ScopeContext) {
     },
 
     async update(patch: ProfilePatch): Promise<Profile> {
-      const { displayName, ...clear } = parseInput(ProfilePatch, patch);
-      const values = { ...clear, ...sealValues(cipher, spec, { displayName }) };
+      const { displayName, preferredName, ...clear } = parseInput(ProfilePatch, patch);
+      const values = { ...clear, ...sealValues(cipher, spec, { displayName, preferredName }) };
       const [row] = await db
         .insert(profiles)
         .values({ userId, ...values })
         .onConflictDoUpdate({ target: profiles.userId, set: { ...values, updatedAt: new Date() } })
+        .returning();
+      return decode(row!);
+    },
+
+    /** The welcome after signing up is behind the person, finished or set aside. Kept once set. */
+    async markOnboarded(now: Date = new Date()): Promise<Profile> {
+      const [row] = await db
+        .insert(profiles)
+        .values({ userId, onboardedAt: now })
+        .onConflictDoUpdate({
+          target: profiles.userId,
+          set: {
+            onboardedAt: sql`coalesce(${profiles.onboardedAt}, excluded.onboarded_at)`,
+            updatedAt: new Date(),
+          },
+        })
         .returning();
       return decode(row!);
     },
