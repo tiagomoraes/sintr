@@ -1,7 +1,7 @@
 import { z } from "zod";
 import type { BillingConfig } from "./billing/stripe";
 import { parseMasterKey, type MasterKey } from "./crypto/keys";
-import { PlanId, ProviderKind, type HouseAssistant, type PracticePlan } from "./domain";
+import { PlanId, ProviderKind, type HouseAssistant, type HouseVoice, type PracticePlan } from "./domain";
 import type { EmailConfig } from "./email/transport";
 import type { LogLevel } from "./log";
 
@@ -58,6 +58,18 @@ const EnvSchema = z.object({
   SINTR_HOUSE_MODEL: z.string().min(1).max(200).optional(),
   SINTR_HOUSE_KEY: z.string().min(1).max(2_000).optional(),
   SINTR_HOUSE_NAME: z.string().min(1).max(60).optional(),
+  // How the house transcribes speech: its provider's own transcription by
+  // default, or an OpenAI-compatible endpoint of its own; "off" for none.
+  SINTR_HOUSE_STT_MODEL: z.string().min(1).max(200).optional(),
+  SINTR_HOUSE_STT_BASE_URL: z
+    .url({ protocol: /^https?$/ })
+    .max(500)
+    .optional(),
+  SINTR_HOUSE_STT_KEY: z.string().min(1).max(2_000).optional(),
+  SINTR_HOUSE_STT_LANGUAGE: z
+    .string()
+    .regex(/^[a-z]{2,3}$/, "must be a language code such as pt or en")
+    .optional(),
   // The plan of a person without a subscription or a grant of their own.
   SINTR_PERSON_PLAN: PlanId.default("free"),
   // Payments (optional): Stripe. Without them, plans come from grants only.
@@ -198,7 +210,16 @@ const HOUSE_NAMES: Record<Exclude<ProviderKind, "openai_compatible">, string> = 
 
 /** The house assistant from SINTR_HOUSE_*, all or nothing. */
 function houseFrom(e: Env): HouseAssistant | null {
-  const given = [e.SINTR_HOUSE_BASE_URL, e.SINTR_HOUSE_MODEL, e.SINTR_HOUSE_KEY, e.SINTR_HOUSE_NAME];
+  const given = [
+    e.SINTR_HOUSE_BASE_URL,
+    e.SINTR_HOUSE_MODEL,
+    e.SINTR_HOUSE_KEY,
+    e.SINTR_HOUSE_NAME,
+    e.SINTR_HOUSE_STT_MODEL,
+    e.SINTR_HOUSE_STT_BASE_URL,
+    e.SINTR_HOUSE_STT_KEY,
+    e.SINTR_HOUSE_STT_LANGUAGE,
+  ];
   const provider = e.SINTR_HOUSE_PROVIDER;
   if (!provider) {
     if (given.some((value) => value !== undefined)) {
@@ -244,6 +265,37 @@ function houseFrom(e: Env): HouseAssistant | null {
     apiKey: e.SINTR_HOUSE_KEY ?? null,
     name:
       e.SINTR_HOUSE_NAME ?? (provider === "openai_compatible" ? baseUrl!.hostname : HOUSE_NAMES[provider]),
+    voice: houseVoiceFrom(e),
+  };
+}
+
+/** The house's transcription from SINTR_HOUSE_STT_*: its provider's by default, an endpoint of its own, or off. */
+function houseVoiceFrom(e: Env): HouseVoice {
+  const off = e.SINTR_HOUSE_STT_MODEL?.toLowerCase() === "off";
+  if (e.SINTR_HOUSE_STT_KEY && !e.SINTR_HOUSE_STT_BASE_URL) {
+    throw new ConfigError(
+      "invalid configuration: SINTR_HOUSE_STT_BASE_URL: is required with SINTR_HOUSE_STT_KEY",
+    );
+  }
+  let endpoint: HouseVoice["endpoint"] = null;
+  if (e.SINTR_HOUSE_STT_BASE_URL) {
+    const url = new URL(e.SINTR_HOUSE_STT_BASE_URL);
+    if (url.username || url.password) {
+      throw new ConfigError(
+        "invalid configuration: SINTR_HOUSE_STT_BASE_URL: must not hold credentials; the key goes in SINTR_HOUSE_STT_KEY",
+      );
+    }
+    // Like the house's own gateway: on the hosted offer an endpoint answers only with a key.
+    if (e.SINTR_MODE === "saas" && !e.SINTR_HOUSE_STT_KEY) {
+      throw new ConfigError("invalid configuration: SINTR_HOUSE_STT_KEY: is required in saas mode");
+    }
+    endpoint = { baseUrl: e.SINTR_HOUSE_STT_BASE_URL, apiKey: e.SINTR_HOUSE_STT_KEY ?? null };
+  }
+  return {
+    off,
+    endpoint: off ? null : endpoint,
+    model: off ? null : (e.SINTR_HOUSE_STT_MODEL ?? null),
+    language: e.SINTR_HOUSE_STT_LANGUAGE ?? null,
   };
 }
 

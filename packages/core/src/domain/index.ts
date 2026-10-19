@@ -588,6 +588,24 @@ export interface ProviderCredentials {
 export interface HouseAssistant extends ProviderCredentials {
   /** Who people are told receives their conversations, such as "Anthropic". */
   name: string;
+  /** How the house turns speech into text. */
+  voice: HouseVoice;
+}
+
+/**
+ * How the house transcribes what a person says (SINTR_HOUSE_STT_*): by
+ * default through the house assistant's own provider and key, when that
+ * provider transcribes; or through an OpenAI-compatible endpoint of its own.
+ */
+export interface HouseVoice {
+  /** SINTR_HOUSE_STT_MODEL=off: the house offers no speaking. */
+  off: boolean;
+  /** A transcription endpoint of its own, for a house whose provider has none (Anthropic). */
+  endpoint: { baseUrl: string; apiKey: string | null } | null;
+  /** The transcription model; null for the provider's default. */
+  model: string | null;
+  /** The language to expect when the person's own writing says nothing (ISO 639-1). */
+  language: string | null;
 }
 
 /* Plans: how much of the house assistant a person may use each month */

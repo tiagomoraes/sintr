@@ -50,4 +50,23 @@ export {
 } from "./providers";
 export * from "./report";
 export * from "./shapes";
+export {
+  MAX_AUDIO_BYTES,
+  MAX_AUDIO_SECONDS,
+  REHEARSAL_TRANSCRIPT,
+  audioFormat,
+  geminiInstruction,
+  languageHint,
+  rehearsalTranscription,
+  transcribe,
+  voiceRouteFor,
+  writingLanguage,
+  type AudioFormat,
+  type Recording,
+  type Transcription,
+  type TranscriptionProblem,
+  type VoiceRoute,
+  type VoiceSource,
+  type VoiceUnavailable,
+} from "./voice";
 export { findVerbatim, isSaveCommand, wasStated } from "./words";
