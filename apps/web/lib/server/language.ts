@@ -1,4 +1,5 @@
 import "server-only";
+import type { Profile } from "@sintr/core";
 import { headers } from "next/headers";
 import { cache } from "react";
 import {
@@ -26,15 +27,26 @@ export interface PageLanguage extends Language {
  * is in the language they read it in.
  */
 export const currentLanguage = cache(async (): Promise<PageLanguage> => {
-  const [scope, requestHeaders] = await Promise.all([sessionScope(), headers()]);
-  const profile = scope ? await scope.profile.get() : null;
+  const requestHeaders = await headers();
+  // The language must never be why a page fails: without the profile, the browser's choice and the rest decide.
+  let scope: Awaited<ReturnType<typeof sessionScope>> = null;
+  let profile: Profile | null = null;
+  try {
+    scope = await sessionScope();
+    profile = scope ? await scope.profile.get() : null;
+  } catch (error) {
+    runtime().log.warn("language.profile_unavailable", { error });
+  }
   const resolved = resolveLanguage({
     chosen: profile?.locale ?? chosenInCookie(requestHeaders.get("cookie")),
     installation: runtime().config.language,
     accept: requestHeaders.get("accept-language"),
   });
   if (scope && profile && profile.seenLocale !== resolved.code) {
-    await scope.profile.update({ seenLocale: resolved.code });
+    // Remembered for what is written while the person is away; a failure only delays it to the next page.
+    await scope.profile.update({ seenLocale: resolved.code }).catch((error: unknown) => {
+      runtime().log.warn("language.seen_failed", { error });
+    });
   }
   return { ...languageOf(resolved.code), source: resolved.source };
 });

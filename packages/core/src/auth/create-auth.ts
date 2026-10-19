@@ -82,9 +82,10 @@ export function createAuth({ db, config, logger, email = emailOff, languageFor }
       );
   };
   // The language of an email about the account: as the request is read, else as the profile says.
+  // A language that cannot be found never costs the email: it goes out in the installation's language.
   const languageOf = async (userId: string, request: Request | undefined): Promise<string | null> => {
-    if (request && languageFor) return (await languageFor(request.headers, userId)).code;
     try {
+      if (request && languageFor) return (await languageFor(request.headers, userId)).code;
       return personLanguage(await (await repositories.forUser(userId)).profile.get(), config.language);
     } catch {
       return config.language;
@@ -205,10 +206,9 @@ export function createAuth({ db, config, logger, email = emailOff, languageFor }
             const headers = ctx?.headers ?? ctx?.request?.headers;
             if (languageFor && headers) {
               const language = await languageFor(headers, null);
-              await scope.profile.update({
-                seenLocale: language.code,
-                ...(language.chosen ? { locale: language.code } : {}),
-              });
+              await scope.profile
+                .update({ seenLocale: language.code, ...(language.chosen ? { locale: language.code } : {}) })
+                .catch((error: unknown) => log.warn("auth.language_not_kept", { error }));
             }
             if (ctx?.path === "/sign-up/email") {
               const consent = await scope.consents.record({

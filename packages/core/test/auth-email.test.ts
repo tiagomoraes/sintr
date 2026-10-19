@@ -140,6 +140,39 @@ describe("email verification", () => {
   });
 });
 
+describe("an email whose language cannot be found", () => {
+  it("still goes, in the installation's language", async () => {
+    const lost = createAuth({
+      db: handle.db,
+      config,
+      logger,
+      email,
+      languageFor: async () => {
+        throw new Error("the profile could not be read");
+      },
+    });
+    const to = address();
+    const signedUp = email.sent.length;
+    await signUp(to);
+    await sentAfter(signedUp);
+    const before = email.sent.length;
+    const response = await lost.handler(
+      new Request(`${config.url.origin}/api/auth/request-password-reset`, {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          origin: config.url.origin,
+          "accept-language": "pt-BR",
+        },
+        body: JSON.stringify({ email: to, redirectTo: "/reset-password" }),
+      }),
+    );
+    expect(response.status).toBe(200);
+    await sentAfter(before);
+    expect(email.sent.at(-1)!.subject).toBe("Set a new password for your sintr diary");
+  });
+});
+
 describe("password reset", () => {
   it("emails a link whose token sets a new password, and the old one stops working", async () => {
     const to = address();
