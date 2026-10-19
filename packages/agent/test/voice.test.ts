@@ -399,11 +399,13 @@ describe("the language of the person's own writing", () => {
 
   it("gives the transcriber its hint: the writing, then a chosen language, then the installation's", () => {
     const portuguese = ["Ontem eu achei que ia dar tudo errado, mas não deu."];
-    expect(languageHint({ writing: portuguese, profileLanguage: "en", houseDefault: "es" })).toBe("pt");
-    expect(languageHint({ writing: [], profileLanguage: "pt-BR", houseDefault: "en" })).toBe("pt");
-    expect(languageHint({ writing: [], profileLanguage: "es", houseDefault: null })).toBe("es");
-    // English is the default everyone starts with, so it says nothing of what they speak.
-    expect(languageHint({ writing: [], profileLanguage: "en", houseDefault: "pt" })).toBe("pt");
-    expect(languageHint({ writing: [], profileLanguage: "en", houseDefault: null })).toBeNull();
+    expect(languageHint({ writing: portuguese, personLanguage: "en", houseDefault: "es" })).toBe("pt");
+    // F7: the language the person reads sintr in, when something set it, as a language code.
+    expect(languageHint({ writing: [], personLanguage: "pt-BR", houseDefault: "en" })).toBe("pt");
+    expect(languageHint({ writing: [], personLanguage: "es", houseDefault: null })).toBe("es");
+    expect(languageHint({ writing: [], personLanguage: "en", houseDefault: "pt" })).toBe("en");
+    // English only because nothing else set it says nothing of what they speak.
+    expect(languageHint({ writing: [], personLanguage: null, houseDefault: "pt" })).toBe("pt");
+    expect(languageHint({ writing: [], personLanguage: null, houseDefault: null })).toBeNull();
   });
 });

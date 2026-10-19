@@ -443,18 +443,19 @@ export function writingLanguage(texts: readonly string[]): "pt" | "es" | "en" | 
 
 /**
  * The hint given to the transcriber, in order: the person's own writing,
- * the report language they chose (anything but the default, English, is a
- * choice they made), then the installation's default. Null lets the
- * provider tell from the audio.
+ * then the language they read sintr in when something set it (their
+ * choice, the installation, their browser; not English only because
+ * nothing else did), then the installation's default for speech. Null lets
+ * the provider tell from the audio.
  */
 export function languageHint(input: {
   writing: readonly string[];
-  profileLanguage: string;
+  personLanguage: string | null;
   houseDefault: string | null;
 }): string | null {
   const written = writingLanguage(input.writing);
   if (written) return written;
-  const chosen = input.profileLanguage.toLowerCase().slice(0, 2);
-  if (chosen === "pt" || chosen === "es") return chosen;
+  const person = input.personLanguage?.toLowerCase().split(/[-_]/u)[0];
+  if (person) return person;
   return input.houseDefault;
 }

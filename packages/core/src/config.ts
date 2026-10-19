@@ -20,6 +20,18 @@ const EnvSchema = z.object({
   SINTR_MASTER_KEY: z.string().min(1, "is required"),
   SINTR_MASTER_KEY_ID: z.string().default("k1"),
   SINTR_LOG_LEVEL: z.enum(["debug", "info", "warn", "error"]).default("info"),
+  // The language of this installation, for everyone who has not chosen one (docs/LANGUAGES.md).
+  SINTR_LANGUAGE: z
+    .string()
+    .max(35)
+    .refine((value) => {
+      try {
+        return Intl.getCanonicalLocales(value).length === 1;
+      } catch {
+        return false;
+      }
+    }, "must be a language tag such as en or pt-BR")
+    .optional(),
   // Tests only (commented out in .env.example): see `fakeAgent` below.
   SINTR_FAKE_AGENT: z.enum(["0", "1"]).default("0"),
   // Email (optional): an SMTP server for the report send, notices, password
@@ -101,6 +113,12 @@ export interface Config {
   authSecret: string;
   masterKey: MasterKey;
   logLevel: LogLevel;
+  /**
+   * The installation's language (a tag such as pt-BR), or null: then each
+   * person's browser decides, and English when it names none sintr speaks.
+   * A person's own choice always comes first.
+   */
+  language: string | null;
   /**
    * Replace every assistant provider with a scripted, offline one, so the
    * end-to-end tests never reach a real model. The app says so on screen.
@@ -191,6 +209,7 @@ export function loadConfig(env: Record<string, string | undefined> = process.env
     authSecret: e.SINTR_AUTH_SECRET,
     masterKey,
     logLevel: e.SINTR_LOG_LEVEL,
+    language: e.SINTR_LANGUAGE ? Intl.getCanonicalLocales(e.SINTR_LANGUAGE)[0]! : null,
     fakeAgent: e.SINTR_FAKE_AGENT === "1",
     email,
     chromiumPath: e.SINTR_CHROMIUM_PATH ?? null,

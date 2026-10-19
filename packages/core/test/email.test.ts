@@ -12,6 +12,7 @@ import {
   memoryTransport,
   outboxTransport,
   passwordResetEmail,
+  practiceReportEmail,
   reportEmail,
   reportReadyEmail,
   smtpTransport,
@@ -182,6 +183,18 @@ describe("the messages", () => {
     }),
     passwordResetEmail({ to: "p@example.test", url: "http://localhost:3000/api/auth/reset-password/abc" }),
     verificationEmail({ to: "p@example.test", url: "http://localhost:3000/api/auth/verify-email?token=abc" }),
+    // F7: the same messages in the person's language.
+    reportReadyEmail({
+      to: "p@example.test",
+      url: "http://localhost:3000/reports/1",
+      session: "segunda-feira, 19 de outubro",
+      language: "pt-BR",
+    }),
+    passwordResetEmail({ to: "p@example.test", url: "http://x.test/r", language: "pt-BR" }),
+    verificationEmail({ to: "p@example.test", url: "http://x.test/v", language: "pt" }),
+    practiceReportEmail({ to: "t@example.test", url: "http://x.test/practice", count: 1, language: "pt-BR" }),
+    practiceReportEmail({ to: "t@example.test", url: "http://x.test/practice", count: 3, language: "en" }),
+    passwordResetEmail({ to: "p@example.test", url: "http://x.test/r", language: "es" }),
   ];
 
   it("carry no dashes and no emoji", () => {
@@ -197,6 +210,17 @@ describe("the messages", () => {
     expect(ready.attachments).toBeUndefined();
     expect(ready.text).toContain("http://localhost:3000/reports/1");
     expect(ready.text).toContain("Nothing has been sent to anyone.");
+  });
+
+  it("speak the person's language, and English for one sintr does not write emails in", () => {
+    expect(all[6]!.subject).toBe("Seu relatório está pronto para ler");
+    expect(all[6]!.text).toContain("Seu relatório para a sessão de segunda-feira, 19 de outubro está pronto");
+    expect(all[6]!.html).toContain("Ler o relatório");
+    expect(all[7]!.subject).toBe("Crie uma nova senha para o seu diário no sintr");
+    expect(all[8]!.subject).toBe("Confirme seu e-mail no sintr");
+    expect(all[9]!.subject).toBe("Um relatório foi compartilhado com você");
+    expect(all[10]!.subject).toBe("3 reports were shared with you");
+    expect(all[11]!.subject).toBe("Set a new password for your sintr diary");
   });
 
   it("name the person to the therapist, and fall back gracefully without a name", () => {

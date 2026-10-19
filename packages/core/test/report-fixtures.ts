@@ -145,7 +145,7 @@ export const DEMO_TO_BRING = ["A conversa com a coordenadora."];
 
 /** Write the demo diary into a person's scope. */
 export async function seedDemoDiary(scope: UserScope): Promise<void> {
-  await scope.profile.update({ displayName: "Pessoa Exemplo", timezone: DEMO_TZ, language: "pt-BR" });
+  await scope.profile.update({ displayName: "Pessoa Exemplo", timezone: DEMO_TZ, locale: "pt-BR" });
   await scope.therapySettings.update({ therapistName: "Dra. Exemplo", ...DEMO_SCHEDULE });
   for (const entry of DEMO_ENTRIES) await scope.entries.create(entry);
   for (const checkin of DEMO_CHECKINS) await scope.checkins.create(checkin);

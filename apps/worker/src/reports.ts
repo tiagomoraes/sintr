@@ -5,7 +5,7 @@ import type { LanguageModel } from "ai";
 
 /** What the report job needs from the runtime. */
 export type ReportRuntime = Pick<BaseRuntime, "reportSchedules" | "repositories" | "email" | "log"> & {
-  config: Pick<BaseRuntime["config"], "mode" | "fakeAgent" | "url" | "house">;
+  config: Pick<BaseRuntime["config"], "mode" | "fakeAgent" | "url" | "house" | "language">;
 };
 
 type ModelFor = (
@@ -47,6 +47,7 @@ export async function prepareDueReports(
         model,
         modelProblem: problem,
         metered: metered ?? null,
+        installationLanguage: runtime.config.language,
         log,
       });
       if (!result) continue;
@@ -56,6 +57,7 @@ export async function prepareDueReports(
         email: runtime.email,
         report: result.report,
         origin: runtime.config.url.origin,
+        language: runtime.config.language,
         log,
       });
     } catch (error) {

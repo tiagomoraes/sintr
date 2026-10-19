@@ -1,4 +1,5 @@
 export {
+  accountCopy,
   passwordResetEmail,
   practiceReportEmail,
   reportEmail,

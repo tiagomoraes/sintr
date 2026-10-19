@@ -18,6 +18,7 @@ export {
   ValidationError,
   sanitizeError,
 } from "./errors";
+export { personLanguage, reportLanguageFor } from "./language";
 export { REDACTED, createLogger, redact, type LogFields, type LogLevel, type Logger } from "./log";
 export * from "./report";
 export { formatInviteCode, normalizeInviteCode } from "./practice/code";

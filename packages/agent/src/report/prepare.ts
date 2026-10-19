@@ -2,7 +2,7 @@ import {
   DataAccessError,
   collectDigest,
   draftContent,
-  reportLanguage,
+  reportLanguageFor,
   reportLedger,
   serializeContent,
   type Logger,
@@ -49,6 +49,8 @@ export interface PrepareReport {
   modelProblem?: string | null;
   /** The house assistant's meter of reports; absent for a person's own key. */
   metered?: Metered | null;
+  /** The installation's language (SINTR_LANGUAGE), for a person whose own says nothing. */
+  installationLanguage?: string | null;
   log: Logger;
   abortSignal?: AbortSignal;
 }
@@ -95,7 +97,7 @@ async function prepareCounted(input: PrepareReport, charge: () => void): Promise
   const { scope, period, log } = input;
   const [profile, notes] = await Promise.all([scope.profile.get(), scope.therapyNotes.list()]);
   const timeZone = profile.timezone;
-  const language = reportLanguage(profile.language);
+  const language = reportLanguageFor(profile, input.installationLanguage ?? null);
   const digest = await collectDigest(scope, period, timeZone);
   const open = (kind: "to_bring" | "task") =>
     notes

@@ -46,6 +46,8 @@ export interface RuntimeOptions {
   email?: EmailTransport;
   /** Replace the payment provider's fetch (tests): nothing reaches the network. */
   paymentsFetch?: typeof fetch;
+  /** How the web reads a request's language, for the emails about an account (web only). */
+  languageFor?: (headers: Headers, userId: string | null) => Promise<{ code: string; chosen: boolean }>;
 }
 
 /** @internal Shared by createBaseRuntime and createRuntime. */
@@ -88,6 +90,7 @@ export function openBaseRuntime(
         email: emailTransport,
         origin: config.url.origin,
         log,
+        language: config.language,
         ...(now ? { now } : {}),
       }),
     async ping() {
