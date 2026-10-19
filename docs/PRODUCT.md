@@ -83,6 +83,16 @@ The owner's decision: the home already was the simplest way to talk to the assis
 
 The reasons are in DECISIONS 106 to 112.
 
+## Nothing leaves the page unsaved (F9)
+
+The owner's decision: leaving Settings with something not saved should warn first. A person changed their time zone, went to Entries, and the change was gone without a word; they believed it was saved.
+
+**Leaving asks first.** With a change not saved on Settings (the time zone, how long to keep conversations, the assistant, the language), every way out asks first: a link on the page, a section of the diary, the menu on a phone, the browser's back button, signing out. One sentence says what would be lost, in the person's language, and offers two ways on: stay, which is the default, or leave without saving. Reloading or closing the tab gets the browser's own question.
+
+**A saved page leaves quietly.** After a save nothing asks, and a person who changed nothing is never interrupted. Without JavaScript the forms save as before.
+
+The reasons are in DECISIONS 113 to 115.
+
 ## Voice and users
 
 People in regular therapy who want their self-observations documented between sessions but do not want another app to open, or who already live inside an AI assistant. They value privacy and plain language. Typical moment of use: right after a difficult situation ("preciso falar do que aconteceu"), or right before a session ("gera o report da semana"). They already have a therapist; they are not looking for an AI therapist.
@@ -181,6 +191,7 @@ Columns holding sensitive content are flagged for **application-layer encryption
 - **F6 The first five minutes**: the narrative welcome, the home as the input (voice and text, the pool of light), the light that follows the person's time of day, less form on the secondary screens, mobile first, and the app's strings in one catalog.
 - **F7 Languages**: the app in English and Brazilian Portuguese through configuration, as the site is: one catalog folder per language, the person's choice, then the installation's, then the browser's, then English; the help lines, the emails and the report in the same language; parity enforced by a test.
 - **F8 The assistant everywhere**: the home as the assistant's room with the pool of light in the middle; the same conversation on every page of the person's diary, opened beside the page from a corner (a panel, or a sheet on a phone), by voice or in writing, as far as a confirmed entry; one pool that travels between the room and the corner; the welcome again from Settings; and Therapy without the moved session.
+- **F9 Nothing leaves the page unsaved**: a question before leaving Settings with a change not saved, by any way out, in the person's language, with staying as the default; silence after a save and when nothing changed.
 - **Later**: the public landing page, multi-tenant hardening, app on the domain and the deploy, LGPD export and delete in the UI, the audit view, MFA.
 
 Each milestone is delivered by an Orca/Claude Code session (`claude-opus-5-5 --effort xhigh`) with its own brief, branch, PR, and verification.
