@@ -5,6 +5,7 @@ import { confirmLink, declineLink, renameLink, setShareMode, stopSharing } from 
 import { ConfirmButton } from "@/components/confirm-button";
 import { formatDay } from "@/lib/format";
 import { reportTitle } from "@/lib/reports";
+import { practiceLine } from "@sintr/core";
 import { NEVER_SHARED, SCOPE_SENTENCE, patientLabel, practiceDetails, practiceWho } from "@/lib/sharing";
 import { ConfirmForm, ModeForm, NameForm } from "./link-parts";
 
@@ -43,6 +44,7 @@ export function PendingLinkCard({ link }: { link: PersonLink }) {
         <div className="border-t border-rule pt-5">
           <ConfirmForm
             who={who}
+            shown={practiceLine(link.practice)}
             confirm={confirmLink.bind(null, link.id)}
             decline={declineLink.bind(null, link.id)}
           />
@@ -53,7 +55,16 @@ export function PendingLinkCard({ link }: { link: PersonLink }) {
 }
 
 /** An active link: what the therapist can see, how reports go, the name they see, what was shared. */
-export function ActiveLinkCard({ link, locale }: { link: PersonLink; locale: Locale }) {
+export function ActiveLinkCard({
+  link,
+  locale,
+  reportName,
+}: {
+  link: PersonLink;
+  locale: Locale;
+  /** The name the person put on their reports in Therapy, if any. */
+  reportName: string | null;
+}) {
   const neutral = patientLabel({ personName: null, number: link.number });
   return (
     <article
@@ -69,7 +80,12 @@ export function ActiveLinkCard({ link, locale }: { link: PersonLink; locale: Loc
           </p>
         </div>
         <ModeForm mode={link.shareMode} save={setShareMode.bind(null, link.id)} />
-        <NameForm name={link.personName} neutral={neutral} save={renameLink.bind(null, link.id)} />
+        <NameForm
+          name={link.personName}
+          neutral={neutral}
+          reportName={reportName}
+          save={renameLink.bind(null, link.id)}
+        />
         <section aria-label={`Reports shared with ${link.practice.professionalName}`}>
           <h4 className="text-label font-medium text-ink">What you shared with them</h4>
           {link.shares.length ? (

@@ -37,6 +37,7 @@ import {
   practiceCard,
   practiceLine,
   requireSeat,
+  requireShown,
   seatUse,
   type SharingContext,
 } from "./links";
@@ -50,6 +51,8 @@ export interface AcceptInvite {
   shareMode?: ShareMode;
   /** The person's explicit yes to share approved reports with this practice. */
   consent: true;
+  /** The practice as the page showed it (`practiceLine`); refused if it changed since. */
+  shownPractice?: string;
 }
 
 /**
@@ -282,6 +285,7 @@ export function sharingRepository(ctx: SharingContext) {
         // The invite held a seat; that seat becomes the link's.
         requireSeat(await seatUse(tx, practice, practiceDefaults, now, invite.id));
         const card = await practiceCard(tx, kek, practice);
+        requireShown(card, input.shownPractice);
         const key = newLinkKey(kek);
         const consentId = await recordLinkConsent(tx, key.id, card);
         await tx.insert(links).values({
@@ -322,13 +326,19 @@ export function sharingRepository(ctx: SharingContext) {
      * Confirm a practice that accepted the person's invite: their yes, with
      * the consent naming this practice. Until then nothing can be shared.
      */
-    async confirm(linkId: string, input: { consent: true }, now: Date = new Date()): Promise<PersonLink> {
+    async confirm(
+      linkId: string,
+      input: { consent: true; shownPractice?: string },
+      now: Date = new Date(),
+    ): Promise<PersonLink> {
       if (input.consent !== true) throw new InvalidStateError("the consent is required");
       await inTransaction(db, async (tx) => {
         const row = await ownLink(tx, linkId, "pending");
         if (!row) throw new NotFoundError("link");
         const practice = await practiceOf(tx, row.practiceId);
-        const consentId = await recordLinkConsent(tx, row.id, await practiceCard(tx, kek, practice));
+        const card = await practiceCard(tx, kek, practice);
+        requireShown(card, input.shownPractice);
+        const consentId = await recordLinkConsent(tx, row.id, card);
         await tx
           .update(links)
           .set({ status: "active", personAcceptedAt: now, consentId, updatedAt: now })
@@ -407,7 +417,14 @@ export function sharingRepository(ctx: SharingContext) {
      * key. The report's words are final from then on.
      */
     async deliver(
-      input: { reportId: string; linkId: string; snapshot: SharedReportSnapshot; pdf: Uint8Array },
+      input: {
+        reportId: string;
+        linkId: string;
+        snapshot: SharedReportSnapshot;
+        pdf: Uint8Array;
+        /** The practice as the page showed it; refused if it changed since. */
+        shownPractice?: string;
+      },
       now: Date = new Date(),
     ): Promise<ShareSummary> {
       if (!isId(input.reportId)) throw new NotFoundError("report");
@@ -433,6 +450,8 @@ export function sharingRepository(ctx: SharingContext) {
           .where(and(eq(sharedReports.linkId, link.id), eq(sharedReports.reportId, report.id)));
         if (already) throw new InvalidStateError("already shared with this practice");
         const practice = await practiceOf(tx, link.practiceId);
+        const card = await practiceCard(tx, kek, practice);
+        requireShown(card, input.shownPractice);
         const [consent] = await tx
           .insert(consents)
           .values({
@@ -442,10 +461,7 @@ export function sharingRepository(ctx: SharingContext) {
             granted: true,
             reportId: report.id,
             linkId: link.id,
-            recipient: cipher.sealText(
-              SEALED.consents.columns.recipient,
-              practiceLine(await practiceCard(tx, kek, practice)),
-            ),
+            recipient: cipher.sealText(SEALED.consents.columns.recipient, practiceLine(card)),
           })
           .returning({ id: consents.id });
         await auditAccounts(tx, [userId], {

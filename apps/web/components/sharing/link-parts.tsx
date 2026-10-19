@@ -45,10 +45,13 @@ export function ModeForm({ mode, save }: { mode: ShareMode; save: (form: FormDat
 export function NameForm({
   name,
   neutral,
+  reportName,
   save,
 }: {
   name: string | null;
   neutral: string;
+  /** The name the person put on their reports in Therapy: printed on every report, shared ones included. */
+  reportName: string | null;
   save: (state: NameState, form: FormData) => Promise<NameState>;
 }) {
   const [editing, setEditing] = useState(false);
@@ -59,12 +62,13 @@ export function NameForm({
       <p className="text-[0.9375rem] text-ink-2">
         {name ? (
           <>
-            They see you as <span className="font-serif text-[1.0625rem] text-ink">{name}</span>.
+            In their list they see you as <span className="font-serif text-[1.0625rem] text-ink">{name}</span>
+            .
           </>
         ) : (
           <>
-            They see you as <span className="font-serif text-[1.0625rem] text-ink">{neutral}</span>, a neutral
-            label.
+            In their list they see you as{" "}
+            <span className="font-serif text-[1.0625rem] text-ink">{neutral}</span>, a neutral label.
           </>
         )}{" "}
         <Button
@@ -76,6 +80,11 @@ export function NameForm({
         >
           Change it
         </Button>
+        {reportName ? (
+          <span className="mt-1 block text-caption text-ink-3">
+            Your reports show the name you set in Therapy, {reportName}, as their PDF does.
+          </span>
+        ) : null}
       </p>
     );
   }
@@ -106,10 +115,13 @@ export function NameForm({
 /** The person's yes to a practice that accepted their invite: the consent, then the link is active. */
 export function ConfirmForm({
   who,
+  shown,
   confirm,
   decline,
 }: {
   who: string;
+  /** The practice as this page shows it; the consent names exactly that. */
+  shown: string;
   confirm: (state: ConfirmState, form: FormData) => Promise<ConfirmState>;
   decline: () => Promise<void>;
 }) {
@@ -119,6 +131,7 @@ export function ConfirmForm({
   return (
     <div>
       <form onSubmit={submitWith(action)} aria-label="Confirm the link" className="space-y-5">
+        <input type="hidden" name="shown" value={shown} />
         <div className="flex items-start gap-3">
           <Checkbox id={id} name="consent" />
           <label htmlFor={id} className="text-[0.9688rem] leading-[1.55] text-ink-2">

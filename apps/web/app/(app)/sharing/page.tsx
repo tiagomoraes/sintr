@@ -69,7 +69,7 @@ export default async function SharingPage() {
             <PendingLinkCard key={link.id} link={link} />
           ))}
           {active.map((link) => (
-            <ActiveLinkCard key={link.id} link={link} locale={locale} />
+            <ActiveLinkCard key={link.id} link={link} locale={locale} reportName={profile.displayName} />
           ))}
         </div>
       ) : null}

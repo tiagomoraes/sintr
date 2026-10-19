@@ -1,4 +1,4 @@
-import { isEmailAddress, reportView } from "@sintr/core";
+import { isEmailAddress, practiceLine, reportView } from "@sintr/core";
 import { linkStyles } from "@sintr/ui";
 import type { Metadata } from "next";
 import Link from "next/link";
@@ -34,6 +34,7 @@ export default async function ReportPage({ params }: { params: Promise<{ id: str
         linkId: link.id,
         who: practiceWho(link.practice),
         name: link.practice.professionalName,
+        line: practiceLine(link.practice),
         automatic: link.shareMode === "auto",
         shared: share
           ? `Shared with ${link.practice.professionalName} on ${formatDay(share.sharedAt, locale)}. ${

@@ -86,8 +86,21 @@ export async function practiceCard(db: Executor, kek: MasterKey, row: PracticeRo
 }
 
 /** One line naming the practice, as a consent records whom it was given to. */
-export function practiceLine(card: PracticeCard): string {
+export function practiceLine(
+  card: Pick<PracticeCard, "professionalName" | "practiceName" | "registration">,
+): string {
   return [card.professionalName, card.practiceName, card.registration].filter(Boolean).join(", ");
+}
+
+/**
+ * A consent names the practice as the person saw it. When the page sends
+ * back what it showed, refuse if the practice changed its names since, so
+ * the person is asked again rather than consenting to names they never read.
+ */
+export function requireShown(card: PracticeCard, shown: string | undefined): void {
+  if (shown !== undefined && shown !== practiceLine(card)) {
+    throw new InvalidStateError("the practice changed since it was shown");
+  }
 }
 
 /** The name a person chose for their own invite, opened with their key for the professional who holds the code. */

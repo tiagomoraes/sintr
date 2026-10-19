@@ -8,6 +8,8 @@ import { useId, useState } from "react";
 
 const FAILURES: Record<string, string> = {
   pdf_unavailable: "The PDF could not be printed just now. Nothing changed; try again in a moment.",
+  practice_changed:
+    "The practice changed its name or details since this page opened. Nothing was shared; reload the page and read them again.",
   sharing_changed:
     "Who receives what you approve changed since this page opened. Nothing was approved; reload the page and look again.",
   not_found: "That link is no longer active, so nothing was shared. Reload the page.",
@@ -43,6 +45,8 @@ export interface PracticeChoice {
   who: string;
   /** "Dr. Marina Costa". */
   name: string;
+  /** The practice as the consent will record it (`practiceLine`), sent back with the yes. */
+  line: string;
   /** Everything approved goes to them. */
   automatic: boolean;
   /** "Shared with them on 20 October. They opened it on 20 October.", or null when not shared. */
@@ -156,6 +160,7 @@ export function ReportActions({
                 void act(`share-${practice.linkId}`, {
                   action: "share",
                   linkId: practice.linkId,
+                  shown: practice.line,
                   confirmed: true,
                 })
               }

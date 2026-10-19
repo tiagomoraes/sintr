@@ -18,6 +18,7 @@ import { noticesRepository, previewInvite, sharingRepository } from "./sharing";
 export { API_TOKEN_PREFIX, hashApiToken } from "./integration";
 export type { ListRange } from "./ledger";
 export type { AcceptInvite } from "./sharing";
+export { practiceLine } from "./links";
 
 /**
  * Data access for one user. Every repository below is bound to `userId` at

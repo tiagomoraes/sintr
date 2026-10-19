@@ -163,9 +163,9 @@ export function practiceRepository(ctx: SharingContext) {
       .select({ share: sharedReports, link: links })
       .from(sharedReports)
       .innerJoin(links, eq(links.id, sharedReports.linkId))
-      .where(
-        and(eq(sharedReports.id, shareId), eq(links.practiceId, practiceId), eq(links.status, "active")),
-      );
+      .where(and(eq(sharedReports.id, shareId), eq(links.practiceId, practiceId), eq(links.status, "active")))
+      // Wait for an end of the link being committed, then find nothing: no reading lands after it.
+      .for("share");
     return row;
   };
 

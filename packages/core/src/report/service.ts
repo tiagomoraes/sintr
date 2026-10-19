@@ -63,7 +63,10 @@ export async function reportView(scope: UserScope, report: Report): Promise<Repo
     report.status !== "draft" && content.numbers
       ? content.numbers
       : digestNumbers(await collectDigest(scope, period, profile.timezone));
-  const check = checkReport(content, await reportLedger(scope, period, content));
+  const live = checkReport(content, await reportLedger(scope, period, content));
+  // Once approved, the highlighter is the one the person approved, like the numbers.
+  const check =
+    report.status !== "draft" && content.verified ? { ...live, verified: new Set(content.verified) } : live;
   return {
     report,
     content,
@@ -113,7 +116,11 @@ export async function approveReport(
   if (report.status !== "draft") throw new InvalidStateError("only a draft can be approved");
   const view = await reportView(scope, report);
   if (!view) throw new InvalidStateError("the report has no content");
-  const content: ReportContent = { ...view.content, numbers: view.numbers };
+  const content: ReportContent = {
+    ...view.content,
+    numbers: view.numbers,
+    verified: [...view.check.verified],
+  };
   const pdf = await render(reportHtml({ ...view, content, report: { ...report, status: "reviewed" } }));
   // Refused if the draft changed while the PDF was printing: what is approved is what was read.
   const reviewed = await scope.reports.markReviewed(reportId, {
@@ -164,6 +171,7 @@ export async function editReport(scope: UserScope, reportId: string, edited: unk
     author: stored.author,
     problem: stored.problem,
     numbers: null,
+    verified: null,
   };
   const updated = await scope.reports.edit(reportId, serializeContent(content));
   await scope.auditLog.record({ action: "report.edited", targetType: "report", targetId: reportId });

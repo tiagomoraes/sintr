@@ -16,6 +16,7 @@ const WINDOW_MS = 10 * 60 * 1000;
 export async function tooManyLookups(): Promise<boolean> {
   holder.__sintrJoinLimit ??= new RateLimiter(LOOKUPS, WINDOW_MS);
   const h = await headers();
-  const address = h.get("x-forwarded-for")?.split(",")[0]?.trim() || h.get("x-real-ip") || "direct";
+  // The entry the proxy in front added (the last one), never one a client could have written.
+  const address = h.get("x-forwarded-for")?.split(",").at(-1)?.trim() || h.get("x-real-ip") || "direct";
   return holder.__sintrJoinLimit.hit(address) > 0;
 }

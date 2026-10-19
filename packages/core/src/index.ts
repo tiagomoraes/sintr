@@ -18,6 +18,7 @@ export {
   SELF_HOST_PLAN,
   createRepositories,
   hashApiToken,
+  practiceLine,
   type AcceptInvite,
   type ListRange,
   type Repositories,

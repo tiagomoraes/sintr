@@ -11,7 +11,7 @@ import { formatInviteCode, generateInviteCode, normalizeInviteCode } from "../sr
 import { sendPracticeNotices } from "../src/practice/notices";
 import { setPracticePlan } from "../src/practice/plan";
 import { collectDigest } from "../src/report/collect";
-import { serializeContent } from "../src/report/content";
+import { parseContent, serializeContent } from "../src/report/content";
 import { draftContent } from "../src/report/draft";
 import { approveReport, editReport } from "../src/report/service";
 import { approveAndShare, shareReport, sharedPaper } from "../src/report/share";
@@ -525,6 +525,82 @@ describe("sharing an approved report", () => {
     // Each report is told once.
     expect(await sendPracticeNotices({ db: handle.db, email, origin, log })).toEqual({ sent: 0 });
     await practice.practice.update({ notifyEmail: false });
+  });
+});
+
+describe("what the person was shown, and what they approved", () => {
+  it("refuses a consent when the practice changed its names since the page showed them", async () => {
+    const practice = await therapist("renamed", "Dr. Before");
+    const person = await account("shown");
+    const invite = await practice.practice.createInvite();
+    const shown = "Dr. Before, renamed clinic, CRP 06/0001";
+    await practice.practice.update({ professionalName: "Dr. After" });
+    await expect(
+      person.sharing.acceptInvite(invite.code, { consent: true, shownPractice: shown }),
+    ).rejects.toThrow("the practice changed since it was shown");
+    expect(await person.sharing.links()).toEqual([]);
+    expect((await person.consents.list()).filter((c) => c.purpose === "practice_link")).toEqual([]);
+    const link = await person.sharing.acceptInvite(invite.code, {
+      consent: true,
+      shownPractice: "Dr. After, renamed clinic, CRP 06/0001",
+    });
+    expect((await person.consents.list()).find((c) => c.purpose === "practice_link")?.recipient).toBe(
+      "Dr. After, renamed clinic, CRP 06/0001",
+    );
+
+    // The same for each report: the share names the practice as the report page showed it.
+    const { scope: sharer, reportId } = await personWithReport("shown-sharer");
+    const other = await linkThroughInvite(practice, sharer);
+    await expect(
+      shareReport(sharer, { reportId, linkId: other.id, shownPractice: "Dr. Before" }),
+    ).rejects.toThrow("the practice changed since it was shown");
+    expect(await practice.practice.reports()).toEqual([]);
+    expect(link.status).toBe("active");
+  });
+
+  it("refuses a confirmation when the practice changed its names since the page showed them", async () => {
+    const person = await account("confirm-shown");
+    const invite = await person.sharing.createInvite();
+    const professional = await therapist("confirm-renamed", "Dr. First");
+    const pending = await professional.practice.acceptInvite(invite.code);
+    await professional.practice.update({ registration: null });
+    await expect(
+      person.sharing.confirm(pending.id, {
+        consent: true,
+        shownPractice: "Dr. First, confirm-renamed clinic, CRP 06/0001",
+      }),
+    ).rejects.toThrow("the practice changed since it was shown");
+    expect((await person.sharing.links())[0]?.status).toBe("pending");
+  });
+
+  it("gives the practice the highlighter of the approved report, even if the diary changed since", async () => {
+    const practice = await therapist("highlight");
+    const scope = await account("highlighter");
+    await seedDemoDiary(scope);
+    const digest = await collectDigest(scope, DEMO_PERIOD, DEMO_TZ);
+    const quote = "eu sempre deixo a desejar";
+    const content = {
+      ...draftContent({ digest, language: "pt", toBring: DEMO_TO_BRING }),
+      week: `Uma semana puxada: “${quote}”.`,
+    };
+    const draft = await scope.reports.createDraft({
+      periodStart: DEMO_PERIOD.start,
+      periodEnd: DEMO_PERIOD.end,
+      sessionAt: DEMO_PERIOD.session,
+      content: serializeContent(content),
+    });
+    const approved = await approveReport(scope, draft.id, fakePdf);
+    const frozen = parseContent(approved.content)!.verified!;
+    expect(frozen.length).toBeGreaterThan(0);
+
+    // The person changes the entry the quote came from, after approving.
+    const entry = (await scope.entries.list()).find((e) => e.thoughts?.includes(quote))!;
+    await scope.entries.correct(entry.id, { thoughts: ["outra coisa"] });
+    const link = await linkThroughInvite(practice, scope);
+    const shared = await shareReport(scope, { reportId: draft.id, linkId: link.id });
+    const read = (await practice.practice.readReport(shared.id))!;
+    expect(read.snapshot.verified).toEqual(frozen);
+    expect(sharedPaper(read.snapshot)!.check.verified.size).toBe(frozen.length);
   });
 });
 

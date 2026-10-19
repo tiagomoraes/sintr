@@ -24,13 +24,21 @@ const Action = z.discriminatedUnion("action", [
   // `recipient`: the address the person saw when they said yes.
   z.object({ action: z.literal("send"), recipient: z.string().min(3).max(320), confirmed: z.literal(true) }),
   // The person's yes to share this report with the practice of one of their links.
-  z.object({ action: z.literal("share"), linkId: z.uuid(), confirmed: z.literal(true) }),
+  // `shown`: the practice as the page named it; refused if it changed since.
+  z.object({
+    action: z.literal("share"),
+    linkId: z.uuid(),
+    shown: z.string().min(1).max(600),
+    confirmed: z.literal(true),
+  }),
 ]);
 
 function failure(error: unknown, route: string): Response {
   if (error instanceof NotFoundError) return apiError(404, "not_found");
   if (error instanceof InvalidStateError && error.message.startsWith("the practices"))
     return apiError(409, "sharing_changed");
+  if (error instanceof InvalidStateError && error.message.startsWith("the practice changed"))
+    return apiError(409, "practice_changed");
   if (error instanceof InvalidStateError) return apiError(409, "invalid_state");
   if (error instanceof ValidationError) return apiError(400, "invalid", { fields: error.fields });
   if (error instanceof EmailError) return apiError(503, error.code);
@@ -84,7 +92,11 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
         await sendReport({ scope, email, reportId: id, recipient: parsed.data.recipient, log });
         break;
       case "share":
-        await shareReport(scope, { reportId: id, linkId: parsed.data.linkId });
+        await shareReport(scope, {
+          reportId: id,
+          linkId: parsed.data.linkId,
+          shownPractice: parsed.data.shown,
+        });
         break;
     }
   } catch (error) {

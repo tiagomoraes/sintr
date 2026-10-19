@@ -1,4 +1,4 @@
-import type { InvitePreview } from "@sintr/core";
+import { practiceLine, type InvitePreview } from "@sintr/core";
 import { buttonVariants, linkStyles } from "@sintr/ui";
 import type { Metadata } from "next";
 import Link from "next/link";
@@ -128,7 +128,9 @@ export default async function JoinPage({ params }: { params: Promise<{ code: str
           <div className="mt-10">
             <AcceptAsPersonForm
               who={practiceWho(practice)}
+              shown={practiceLine(practice)}
               defaultName={profile?.displayName ?? ""}
+              reportName={profile?.displayName ?? null}
               accept={acceptAsPerson.bind(null, code)}
             />
             <p className="mt-6 text-[0.9375rem] text-ink-3">

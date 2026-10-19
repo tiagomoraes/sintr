@@ -13,11 +13,17 @@ const MODES = (["ask", "auto"] as const).map((value) => ({ value, label: MODE_CO
 /** The person's acceptance: the name the practice sees, how reports go, and the consent. */
 export function AcceptAsPersonForm({
   who,
+  shown,
   defaultName,
+  reportName,
   accept,
 }: {
   who: string;
+  /** The practice as this page shows it; the consent names exactly that. */
+  shown: string;
   defaultName: string;
+  /** The name the person put on their reports in Therapy, printed on every report. */
+  reportName: string | null;
   accept: (state: JoinState, form: FormData) => Promise<JoinState>;
 }) {
   const hydrated = useHydrated();
@@ -26,6 +32,7 @@ export function AcceptAsPersonForm({
   const ids = { name: useId(), consent: useId() };
   return (
     <form onSubmit={submitWith(action)} className="space-y-8" aria-label="Accept the invite">
+      <input type="hidden" name="shown" value={shown} />
       <div>
         <Label htmlFor={ids.name}>How they will see you</Label>
         <Input
@@ -37,7 +44,8 @@ export function AcceptAsPersonForm({
           className="mt-2 max-w-md"
         />
         <FieldHint>
-          Optional. The name they know you by. Left empty, they see a neutral label instead.
+          Optional. The name they know you by, in their list. Left empty, they see a neutral label instead.
+          {reportName ? ` Your reports themselves show the name you set in Therapy, ${reportName}.` : ""}
         </FieldHint>
       </div>
       <fieldset className="min-w-0 border-0 p-0">

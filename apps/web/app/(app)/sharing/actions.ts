@@ -84,11 +84,22 @@ export async function confirmLink(
 ): Promise<ConfirmState> {
   const { scope } = await requireScope();
   if (form.get("consent") !== "on") return { problem: "Tick the box to give your consent, or decline." };
+  // The practice as the page showed it: the consent names exactly that.
+  const shown = form.get("shown");
   try {
-    await scope.sharing.confirm(linkId, { consent: true });
+    await scope.sharing.confirm(linkId, {
+      consent: true,
+      shownPractice: typeof shown === "string" ? shown : "",
+    });
   } catch (error) {
     if (error instanceof NotFoundError)
       return { problem: "This link is no longer waiting. Reload the page." };
+    if (error instanceof InvalidStateError) {
+      return {
+        problem:
+          "The practice changed its name or details since this page opened. Reload the page and read them again.",
+      };
+    }
     throw error;
   }
   revalidatePath("/", "layout");

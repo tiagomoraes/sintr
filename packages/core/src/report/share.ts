@@ -68,7 +68,7 @@ export function sharedPaper(snapshot: SharedReportSnapshot): PaperView | null {
 /** Share one approved report with the practice of one of the person's active links. */
 export async function shareReport(
   scope: UserScope,
-  input: { reportId: string; linkId: string },
+  input: { reportId: string; linkId: string; shownPractice?: string },
 ): Promise<ShareSummary> {
   const report = await scope.reports.get(input.reportId);
   if (!report) throw new NotFoundError("report");
@@ -79,6 +79,7 @@ export async function shareReport(
     reportId: report.id,
     linkId: input.linkId,
     snapshot: snapshotOf(view),
+    ...(input.shownPractice !== undefined ? { shownPractice: input.shownPractice } : {}),
     pdf,
   });
 }

@@ -311,7 +311,7 @@ test.describe("the practice routes are scoped to their owner", () => {
     expect(
       (
         await other.page.request.post(`/api/reports/${reportId}`, {
-          data: { action: "share", linkId: link.id, confirmed: true },
+          data: { action: "share", linkId: link.id, shown: "Dr. A, CRP 06/123456", confirmed: true },
         })
       ).status(),
     ).toBe(404);
@@ -323,7 +323,7 @@ test.describe("the practice routes are scoped to their owner", () => {
     expect(
       (
         await stranger.page.request.post(`/api/reports/${own}`, {
-          data: { action: "share", linkId: link.id, confirmed: true },
+          data: { action: "share", linkId: link.id, shown: "Dr. A, CRP 06/123456", confirmed: true },
         })
       ).status(),
     ).toBe(404);
@@ -338,7 +338,7 @@ test.describe("the practice routes are scoped to their owner", () => {
     expect(
       (
         await person.page.request.post(`/api/reports/${draft.id}`, {
-          data: { action: "share", linkId: link.id, confirmed: true },
+          data: { action: "share", linkId: link.id, shown: "Dr. A, CRP 06/123456", confirmed: true },
         })
       ).status(),
     ).toBe(409);
@@ -365,7 +365,7 @@ test.describe("the practice routes are scoped to their owner", () => {
       (
         await person.page.request.post(`/api/reports/${reportId}`, {
           headers: { origin: "https://elsewhere.example" },
-          data: { action: "share", linkId: link.id, confirmed: true },
+          data: { action: "share", linkId: link.id, shown: "Dr. A, CRP 06/123456", confirmed: true },
         })
       ).status(),
     ).toBe(403);
