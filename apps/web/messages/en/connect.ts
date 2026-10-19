@@ -16,7 +16,7 @@ export const connect = {
     label: "How it works",
     make: {
       title: "Make a key",
-      text: "A private key that lets one assistant reach your diary. You can switch it off at any time.",
+      text: "Say which assistant it is for and what it may do. It is a private key, and you can switch it off at any time.",
     },
     give: {
       title: "Give it to your assistant",
@@ -32,34 +32,41 @@ export const connect = {
     another: "Connect another assistant",
     first: "Connect an assistant",
   },
+  /** The form, in the order of the decisions: the name, what it may do, then the button. */
   make: {
-    button: "Make a key",
-    making: "Making your key",
-    more: "Name it, or choose what it may do",
-    name: "Name",
-    optional: "(optional)",
-    placeholder: "For example, Claude on my laptop",
-    hint: "So you can tell your keys apart later.",
-    access: "What it may do",
+    name: "Which assistant is it for?",
+    placeholder: "For example, Claude on my phone",
+    hint: "This is its name in your list, so you can tell your keys apart later.",
+    access: "What may it do?",
+    accessHint: "To change this later, make a new key and switch this one off.",
+    button: "Make the key",
+    making: "Making the key",
+    once: "sintr shows the key once, right after you make it.",
   },
-  /** What a key may do, by its access in the core (API_TOKEN_ACCESS). */
+  /**
+   * What a key may do, by its access in the core (API_TOKEN_ACCESS): what it
+   * does, said again wherever the key is shown, and when to choose it, said
+   * only in the form.
+   */
   access: {
-    read_write: {
-      label: "Read and save",
-      hint: "It can look back at your recent days and save new entries and check-ins.",
-    },
     write: {
       label: "Save only",
-      hint: "It can save new entries and check-ins, and never reads your diary back.",
+      does: "It saves the entries and check-ins you say yes to, and never reads your diary back.",
+      when: "Choose it if you only want help writing things down.",
+    },
+    read_write: {
+      label: "Read and save",
+      does: "It saves what you say yes to, and can also read your recent days, your entries and your therapy notes.",
+      when: "Choose it if you want it to remember what you wrote before.",
     },
     read: {
       label: "Read only",
-      hint: "It can read your recent days and your therapy notes, and saves nothing.",
+      does: "It can read your recent days, your entries and your therapy notes, and saves nothing.",
+      when: "Choose it to talk over what you wrote, and go on writing here yourself.",
     },
   },
-  /** A key made without a name is called this, then "My assistant 2", and is kept so. */
-  defaultName: "My assistant",
   problems: {
+    name: "Write which assistant it is for, so you can find it in your list later.",
     access: "Choose what your assistant may do.",
     tooMany: (max: number) =>
       `You already have ${max} keys. Disconnect one you no longer use, then make a new one.`,
@@ -75,7 +82,12 @@ export const connect = {
     connected: (last: string) => `Connected. ${last}`,
     waiting:
       "Waiting for your assistant. Once you finish the steps below, ask it something, and this line changes when it reaches sintr.",
+    /** The same, on a page without JavaScript, which cannot look again by itself. */
+    waitingStill:
+      "Waiting for your assistant. Once you finish the steps below, ask it something, then open this page again to see it connected.",
     hide: "I saved it, hide the key",
+    /** Once it is connected, the key is in the assistant and nothing is left to save. */
+    done: "Done",
   },
   setup: {
     title: "Give it to your assistant",
@@ -162,11 +174,12 @@ export const connect = {
   /** The keys that still work, here and in Settings. */
   keys: {
     label: "Connected assistants",
-    /** `access` is one of the access labels, `made` a day, `prefix` the key's first characters. */
-    meta: (access: string, made: string, prefix: string) =>
-      `${access}. Made on ${made}. Starts with ${prefix}.`,
+    /** `made` is a day, `prefix` the key's first characters. */
+    meta: (made: string, prefix: string) => `Made on ${made}. Starts with ${prefix}.`,
+    /** Under a key that has not talked to sintr for a long while (QUIET_AFTER_DAYS). */
+    quiet: "Quiet for over two months. If you no longer use it, disconnect it.",
     after:
-      "Disconnecting switches a key off at once. What the assistant already saved stays in your diary, and you can connect it again with a new key.",
+      "Disconnecting switches a key off at once, and what its assistant already saved stays in your diary. To change what an assistant may do, give it a new key and disconnect the old one.",
     disconnect: "Disconnect",
     disconnecting: "Disconnecting",
     /** The button's accessible name, with the key's name. */

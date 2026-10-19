@@ -6,7 +6,6 @@ import {
   InvalidStateError,
   MAX_ACTIVE_API_TOKENS,
   type ApiTokenScope,
-  type UserScope,
 } from "@sintr/core";
 import { revalidatePath } from "next/cache";
 import { getMessages } from "@/lib/server/language";
@@ -14,39 +13,33 @@ import { requireScope } from "@/lib/server/runtime";
 
 export interface MakeKeyState {
   /** The key itself: in this answer only, never stored, never shown again. */
-  key: { id: string; token: string; name: string } | null;
-  problem: string | null;
+  key: { id: string; token: string; name: string; access: ApiTokenAccess } | null;
+  /** What is missing, by field. */
+  problems: { name?: string; access?: string };
+  /** What went wrong with the key as a whole (too many keys). */
+  failure: string | null;
+  /** What was sent, so a form that comes back with a problem keeps it (without JavaScript too). */
+  values: { name: string; access: ApiTokenAccess | null };
 }
 
 /**
- * "My assistant", then "My assistant 2", so keys made without a name stay
- * tellable apart. Written in the page's language, then kept as the key's name.
- */
-async function defaultName(scope: UserScope, base: string): Promise<string> {
-  const taken = new Set(
-    (await scope.apiTokens.list()).filter((key) => !key.revokedAt).map((key) => key.name),
-  );
-  for (let n = 1; ; n += 1) {
-    const name = n === 1 ? base : `${base} ${n}`;
-    if (!taken.has(name)) return name;
-  }
-}
-
-/**
- * Make a connection key in one step: a name and an access are optional
- * (read and save by default). Only a hash is stored; the key goes back to
- * the person in this answer and nowhere else. The audit records that a key
- * was made and what it may do, never the key.
+ * Make a connection key from what the person decided: a name and what it
+ * may do, both asked for, neither chosen for them. Only a hash is stored;
+ * the key goes back to the person in this answer and nowhere else. The
+ * audit records that a key was made and what it may do, never the key.
  */
 export async function makeKey(_state: MakeKeyState, form: FormData): Promise<MakeKeyState> {
   const { scope } = await requireScope();
   const t = await getMessages();
   const rawName = form.get("name");
-  const name =
-    (typeof rawName === "string" ? rawName.trim() : "").slice(0, 80) ||
-    (await defaultName(scope, t.connect.defaultName));
-  const access = ApiTokenAccess.safeParse(form.get("access") ?? "read_write");
-  if (!access.success) return { key: null, problem: t.connect.problems.access };
+  const name = (typeof rawName === "string" ? rawName.trim() : "").slice(0, 80);
+  const access = ApiTokenAccess.safeParse(form.get("access"));
+  const values = { name, access: access.success ? access.data : null };
+  const problems = {
+    ...(name ? {} : { name: t.connect.problems.name }),
+    ...(access.success ? {} : { access: t.connect.problems.access }),
+  };
+  if (!access.success || !name) return { key: null, problems, failure: null, values };
   try {
     const made = await scope.transaction(async (tx) => {
       const created = await tx.apiTokens.create({
@@ -63,10 +56,16 @@ export async function makeKey(_state: MakeKeyState, form: FormData): Promise<Mak
     });
     revalidatePath("/connect");
     revalidatePath("/settings");
-    return { key: { id: made.apiToken.id, token: made.token, name: made.apiToken.name }, problem: null };
+    return {
+      key: { id: made.apiToken.id, token: made.token, name: made.apiToken.name, access: access.data },
+      problems: {},
+      failure: null,
+      // The next key starts from nothing: no name, and no access chosen for the person.
+      values: { name: "", access: null },
+    };
   } catch (error) {
     if (error instanceof InvalidStateError) {
-      return { key: null, problem: t.connect.problems.tooMany(MAX_ACTIVE_API_TOKENS) };
+      return { key: null, problems: {}, failure: t.connect.problems.tooMany(MAX_ACTIVE_API_TOKENS), values };
     }
     throw error;
   }

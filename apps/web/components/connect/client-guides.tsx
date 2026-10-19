@@ -86,23 +86,33 @@ function Guide({
 
 /**
  * One assistant at a time: a choice of client, then its steps with the
- * address and key filled in, ready to copy.
+ * address and key filled in, ready to copy. Every client's steps are on the
+ * page and the checked radio shows one (`.sintr-guides`), so the choice
+ * works before the page is alive and without JavaScript. `prefer` opens an
+ * assistant's steps first, and again whenever it changes (a new key named
+ * after it).
  */
 export function ClientGuides({
   appUrl,
   keyText,
   reachableHere,
+  prefer = null,
 }: {
   appUrl: string;
   keyText: string;
   reachableHere: boolean;
+  prefer?: ClientId | null;
 }) {
   const t = useMessages();
   const guides = clientGuides({ appUrl, key: keyText }, t);
-  const [chosen, setChosen] = useState<ClientId>("claude");
-  const guide = guides.find((g) => g.id === chosen) ?? guides[0]!;
+  const [chosen, setChosen] = useState<ClientId>(prefer ?? "claude");
+  const [preferred, setPreferred] = useState(prefer);
+  if (prefer !== preferred) {
+    setPreferred(prefer);
+    if (prefer) setChosen(prefer);
+  }
   return (
-    <div>
+    <div className="sintr-guides">
       <fieldset className="min-w-0 border-0 p-0">
         <legend className="p-0 text-label font-medium text-ink">{t.connect.setup.choose}</legend>
         <div className="mt-3 inline-flex max-w-full flex-wrap gap-1 rounded-[26px] border border-rule bg-paper p-1">
@@ -122,7 +132,11 @@ export function ClientGuides({
         </div>
       </fieldset>
       <div className="mt-8">
-        <Guide guide={guide} reachableHere={reachableHere} appUrl={appUrl} />
+        {guides.map((guide) => (
+          <div key={guide.id} data-guide={guide.id}>
+            <Guide guide={guide} reachableHere={reachableHere} appUrl={appUrl} />
+          </div>
+        ))}
       </div>
     </div>
   );

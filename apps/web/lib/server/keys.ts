@@ -1,7 +1,7 @@
 import "server-only";
 import { accessOf, type UserScope } from "@sintr/core";
 import type { KeyView } from "@/components/connect/key-list";
-import { lastTalkedText } from "@/lib/connect";
+import { isQuiet, lastTalkedText } from "@/lib/connect";
 import { formatDay } from "@/lib/format";
 import { currentLanguage, getMessages } from "@/lib/server/language";
 
@@ -22,10 +22,12 @@ export async function workingKeys(scope: UserScope, now: Date = new Date()): Pro
         id: key.id,
         name: key.name,
         access: access ? t.connect.access[access].label : t.connect.keys.canUse(key.scopes.join(", ")),
+        accessKnown: access !== null,
         lastTalked: lastTalkedText(key, now, locale, t),
         used: key.lastUsedAt !== null,
         made: formatDay(key.createdAt, locale),
         prefix: key.tokenPrefix,
+        quiet: isQuiet(key, now),
       };
     });
 }
