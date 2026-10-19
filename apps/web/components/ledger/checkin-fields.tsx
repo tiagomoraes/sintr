@@ -1,6 +1,8 @@
+"use client";
+
 import { FieldError, FieldHint, Input, Textarea } from "@sintr/ui";
+import { useLanguage, useMessages } from "@/components/language";
 import type { FormProblems } from "@/lib/forms";
-import { CHECKIN_LABELS } from "@/lib/labels";
 import { toLocalInput } from "@/lib/time";
 import type { CheckinView } from "./checkin-values";
 
@@ -28,6 +30,7 @@ function Scale({
   value: number | null | undefined;
   problem?: string | undefined;
 }) {
+  const { notGiven } = useMessages().checkin.form;
   const current = typeof value === "number" ? String(value) : "none";
   return (
     <fieldset className="min-w-0 border-0 p-0">
@@ -44,7 +47,7 @@ function Scale({
               className="peer absolute inset-0 cursor-pointer opacity-0"
             />
             <span className="pointer-events-none flex min-h-10 min-w-11 items-center justify-center rounded-pill px-3.5 text-[0.9375rem] font-medium tabular-nums text-ink-2 transition-colors duration-300 peer-hover:bg-wash peer-checked:bg-ink peer-checked:text-paper peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-ink">
-              {option === "none" ? "Not given" : option}
+              {option === "none" ? notGiven : option}
             </span>
           </label>
         ))}
@@ -54,7 +57,10 @@ function Scale({
   );
 }
 
-/** The quick check-in: every value optional, nothing preselected. */
+/**
+ * Every question of a check-in at once, to change one or a draft: every
+ * value optional, nothing preselected.
+ */
 export function CheckinFields({
   defaults = {},
   timezone,
@@ -66,41 +72,43 @@ export function CheckinFields({
   problems?: FormProblems;
   correctionNote?: boolean;
 }) {
+  const t = useMessages();
+  const { labels: L, form: F, sleep: S } = t.checkin;
+  const { intl } = useLanguage();
   const when = defaults.occurredAt ? toLocalInput(new Date(defaults.occurredAt), timezone) : "";
+  // Hours as the page writes a number ("7.5", "7,5"); the form reads either.
+  const hours =
+    typeof defaults.sleepHours === "number"
+      ? new Intl.NumberFormat(intl, { useGrouping: false }).format(defaults.sleepHours)
+      : "";
   return (
     <div className="space-y-8">
-      <Scale
-        name="mood"
-        label={CHECKIN_LABELS.mood}
-        hint="0 is the lowest, 5 the best."
-        value={defaults.mood}
-        problem={problems.mood}
-      />
+      <Scale name="mood" label={L.mood} hint={F.hints.mood} value={defaults.mood} problem={problems.mood} />
       <Scale
         name="energy"
-        label={CHECKIN_LABELS.energy}
-        hint="0 is none at all, 5 plenty."
+        label={L.energy}
+        hint={F.hints.energy}
         value={defaults.energy}
         problem={problems.energy}
       />
       <Scale
         name="anxiety"
-        label={CHECKIN_LABELS.anxiety}
-        hint="0 is none, 5 the most."
+        label={L.anxiety}
+        hint={F.hints.anxiety}
         value={defaults.anxiety}
         problem={problems.anxiety}
       />
       <div className="grid gap-6 sm:grid-cols-[10rem_minmax(0,1fr)]">
         <div>
           <label htmlFor="checkin-sleep" className="block text-label font-medium text-ink">
-            Hours of sleep
+            {S.hours}
           </label>
           <Input
             id="checkin-sleep"
             name="sleepHours"
             inputMode="decimal"
-            placeholder="7.5"
-            defaultValue={typeof defaults.sleepHours === "number" ? String(defaults.sleepHours) : ""}
+            placeholder={S.hoursPlaceholder}
+            defaultValue={hours}
             className="mt-2 tabular-nums"
             aria-invalid={problems.sleepHours ? true : undefined}
           />
@@ -108,12 +116,12 @@ export function CheckinFields({
         </div>
         <div>
           <label htmlFor="checkin-quality" className="block text-label font-medium text-ink">
-            {CHECKIN_LABELS.sleepQuality}
+            {L.sleepQuality}
           </label>
           <Input
             id="checkin-quality"
             name="sleepQuality"
-            placeholder="In your words"
+            placeholder={S.qualityPlaceholder}
             defaultValue={defaults.sleepQuality ?? ""}
             className="mt-2"
           />
@@ -121,7 +129,7 @@ export function CheckinFields({
       </div>
       <div>
         <label htmlFor="checkin-note" className="block text-label font-medium text-ink">
-          {CHECKIN_LABELS.note}
+          {L.note}
         </label>
         <Textarea
           id="checkin-note"
@@ -130,11 +138,11 @@ export function CheckinFields({
           defaultValue={defaults.note ?? ""}
           className="mt-2"
         />
-        <FieldHint>Optional. A line about the day is plenty.</FieldHint>
+        <FieldHint>{F.noteHint}</FieldHint>
       </div>
       <div>
         <label htmlFor="checkin-when" className="block text-label font-medium text-ink">
-          {CHECKIN_LABELS.occurredAt}
+          {L.occurredAt}
         </label>
         <input type="hidden" name="occurredAtShown" value={when} />
         <Input
@@ -144,16 +152,16 @@ export function CheckinFields({
           defaultValue={when}
           className="mt-2 max-w-xs"
         />
-        <FieldHint>In your time zone. Leave it empty for right now.</FieldHint>
+        <FieldHint>{F.whenHint}</FieldHint>
         {problems.occurredAt ? <FieldError>{problems.occurredAt}</FieldError> : null}
       </div>
       {correctionNote ? (
         <div className="border-t border-rule pt-6">
           <label htmlFor="checkin-correction" className="block text-label font-medium text-ink">
-            What changed, in your words
+            {t.entry.corrections.note}
           </label>
           <Textarea id="checkin-correction" name="correctionNote" rows={2} className="mt-2" />
-          <FieldHint>Optional. It is kept with the date of this change.</FieldHint>
+          <FieldHint>{t.entry.corrections.noteHint}</FieldHint>
         </div>
       ) : null}
     </div>

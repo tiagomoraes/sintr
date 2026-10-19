@@ -5,7 +5,9 @@ import { requireScope } from "@/lib/server/runtime";
 import { getMessages } from "@/lib/server/language";
 import { createCheckin } from "../actions";
 
-export const metadata: Metadata = { title: "New check-in" };
+export async function generateMetadata(): Promise<Metadata> {
+  return { title: (await getMessages()).checkin.newTitle };
+}
 
 export default async function NewCheckinPage() {
   const t = await getMessages();

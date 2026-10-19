@@ -1,5 +1,7 @@
+"use client";
+
 import { NotebookRow } from "@sintr/ui";
-import { CHECKIN_LABELS } from "@/lib/labels";
+import { useLanguage, useMessages } from "@/components/language";
 
 export interface CheckinView {
   mood?: number | null;
@@ -23,24 +25,30 @@ function Value({ label, value, unit }: { label: string; value: number | null | u
   );
 }
 
-/** The check-in card's values: the scales inline, then sleep and the note. Only what was given. */
+/**
+ * The check-in card's values: the scales inline, then sleep and the note.
+ * Only what was given. A client component: the draft card in the
+ * conversation shows it too.
+ */
 export function CheckinValues({ checkin }: { checkin: CheckinView }) {
+  const { labels: L, of5, hours } = useMessages().checkin;
+  const { intl } = useLanguage();
   const scales = [checkin.mood, checkin.energy, checkin.anxiety].some((v) => typeof v === "number");
   return (
     <>
       {scales ? (
         <div className="flex flex-wrap gap-x-7 gap-y-3 border-b border-notebook-rule py-4 pl-11 pr-5 last:border-b-0">
-          <Value label={CHECKIN_LABELS.mood} value={checkin.mood} unit="of 5" />
-          <Value label={CHECKIN_LABELS.energy} value={checkin.energy} unit="of 5" />
-          <Value label={CHECKIN_LABELS.anxiety} value={checkin.anxiety} unit="of 5" />
+          <Value label={L.mood} value={checkin.mood} unit={of5} />
+          <Value label={L.energy} value={checkin.energy} unit={of5} />
+          <Value label={L.anxiety} value={checkin.anxiety} unit={of5} />
         </div>
       ) : null}
       <dl className="m-0">
         {typeof checkin.sleepHours === "number" || checkin.sleepQuality ? (
-          <NotebookRow label={CHECKIN_LABELS.sleepHours}>
+          <NotebookRow label={L.sleepHours}>
             {typeof checkin.sleepHours === "number" ? (
               <span className="tabular-nums">
-                {checkin.sleepHours} {checkin.sleepHours === 1 ? "hour" : "hours"}
+                {new Intl.NumberFormat(intl).format(checkin.sleepHours)} {hours(checkin.sleepHours)}
               </span>
             ) : null}
             {typeof checkin.sleepHours === "number" && checkin.sleepQuality ? ", " : null}
@@ -50,7 +58,7 @@ export function CheckinValues({ checkin }: { checkin: CheckinView }) {
           </NotebookRow>
         ) : null}
         {checkin.note ? (
-          <NotebookRow label={CHECKIN_LABELS.note}>
+          <NotebookRow label={L.note}>
             <span className="whitespace-pre-line">{checkin.note}</span>
           </NotebookRow>
         ) : null}

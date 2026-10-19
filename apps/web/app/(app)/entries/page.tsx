@@ -4,9 +4,11 @@ import Link from "next/link";
 import { EmptyState, PageHeading } from "@/components/empty-state";
 import { formatMoment } from "@/lib/format";
 import { requireScope } from "@/lib/server/runtime";
-import { currentLanguage } from "@/lib/server/language";
+import { currentLanguage, getMessages } from "@/lib/server/language";
 
-export const metadata: Metadata = { title: "Entries" };
+export async function generateMetadata(): Promise<Metadata> {
+  return { title: (await getMessages()).entry.list.title };
+}
 
 const PAGE = 30;
 
@@ -19,6 +21,8 @@ export default async function EntriesPage({
   const before = (await searchParams).before;
   const to = typeof before === "string" && !Number.isNaN(Date.parse(before)) ? new Date(before) : undefined;
   const language = await currentLanguage();
+  const E = (await getMessages()).entry;
+  const L = E.list;
   const [entries, profile] = await Promise.all([
     scope.entries.list({ limit: PAGE + 1, ...(to ? { to } : {}) }),
     scope.profile.get(),
@@ -28,31 +32,25 @@ export default async function EntriesPage({
 
   return (
     <>
-      <PageHeading
-        title="Entries"
-        lede="The moments you choose to write down: what happened, what went through your mind, how strong it felt."
-      />
+      <PageHeading title={L.title} lede={L.lede} />
       <div className="-mt-4 mb-10 flex flex-wrap items-center gap-x-7 gap-y-3 md:-mt-6">
         <Link href="/home" className={buttonVariants({ size: "sm" })}>
-          Talk it through
+          {L.talk}
         </Link>
-        <p className="text-[0.9375rem] text-ink-3">The assistant drafts the entry; you confirm it.</p>
+        <p className="text-[0.9375rem] text-ink-3">{L.talkHint}</p>
       </div>
       {shown.length === 0 ? (
         to ? (
-          <EmptyState title="Nothing earlier than this.">
+          <EmptyState title={L.earlierNone}>
             <p>
               <Link href="/entries" className={linkStyles}>
-                Back to the latest entries
+                {L.latest}
               </Link>
             </p>
           </EmptyState>
         ) : (
-          <EmptyState title="Nothing written yet.">
-            <p>
-              When something happens, tell it in your own words and the assistant will help you keep it, as
-              much or as little as you want. A partial entry is a real entry; it can grow later.
-            </p>
+          <EmptyState title={L.empty}>
+            <p>{L.emptyHint}</p>
           </EmptyState>
         )
       ) : (
@@ -70,9 +68,7 @@ export default async function EntriesPage({
                       {words}
                     </span>
                   ) : (
-                    <span className="mt-1 block text-[0.9375rem] text-ink-3">
-                      An entry without words yet.
-                    </span>
+                    <span className="mt-1 block text-[0.9375rem] text-ink-3">{L.noWords}</span>
                   )}
                   {entry.emotions?.length ? (
                     <span className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-caption text-ink-3">
@@ -80,7 +76,7 @@ export default async function EntriesPage({
                         <span key={index}>
                           {emotion.name}
                           {emotion.intensity !== null ? (
-                            <span className="tabular-nums">, {emotion.intensity} of 100</span>
+                            <span className="tabular-nums">, {E.intensity(emotion.intensity)}</span>
                           ) : null}
                         </span>
                       ))}
@@ -98,7 +94,7 @@ export default async function EntriesPage({
             href={`/entries?before=${encodeURIComponent(more.occurredAt.toISOString())}`}
             className={linkStyles}
           >
-            Earlier entries
+            {L.earlier}
           </Link>
         </p>
       ) : null}

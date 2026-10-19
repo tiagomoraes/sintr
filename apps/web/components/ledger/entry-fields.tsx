@@ -3,7 +3,6 @@
 import { FieldError, FieldHint, Input, Textarea, cn } from "@sintr/ui";
 import { useId, useState, type ReactNode } from "react";
 import type { FormProblems } from "@/lib/forms";
-import { ENTRY_LABELS } from "@/lib/labels";
 import { toLocalInput } from "@/lib/time";
 import { useMessages } from "@/components/language";
 import type { EntryView } from "./entry-rows";
@@ -89,12 +88,14 @@ function EmotionList({
   rows,
   setRows,
 }: {
-  label: string;
+  /** A screen reader's name for the nth emotion's box. */
+  label: (n: number) => string;
   names: string;
   intensities: string;
   rows: EmotionRow[];
   setRows: (rows: EmotionRow[]) => void;
 }) {
+  const F = useMessages().entry.form;
   const update = (key: string, patch: Partial<EmotionRow>) =>
     setRows(rows.map((row) => (row.key === key ? { ...row, ...patch } : row)));
   return (
@@ -105,16 +106,16 @@ function EmotionList({
             name={names}
             value={row.name}
             onChange={(event) => update(row.key, { name: event.target.value })}
-            aria-label={`${label} ${index + 1}, in your own word`}
-            placeholder="In your own word"
+            aria-label={label(index + 1)}
+            placeholder={F.emotionPlaceholder}
             className="min-w-0 flex-1"
           />
           <Input
             name={intensities}
             value={row.intensity}
             onChange={(event) => update(row.key, { intensity: event.target.value })}
-            aria-label={`How strong, from 0 to 100`}
-            placeholder="0 to 100"
+            aria-label={F.strength}
+            placeholder={F.strengthPlaceholder}
             inputMode="numeric"
             pattern="[0-9]{0,3}"
             className="w-28 shrink-0 tabular-nums"
@@ -125,7 +126,7 @@ function EmotionList({
               className={removeButton}
               onClick={() => setRows(rows.filter((r) => r.key !== row.key))}
             >
-              Remove
+              {F.remove}
             </button>
           ) : null}
         </div>
@@ -135,7 +136,7 @@ function EmotionList({
         className={smallButton}
         onClick={() => setRows([...rows, { key: rowKey(), name: "", intensity: "" }])}
       >
-        Add an emotion
+        {F.addEmotion}
       </button>
     </>
   );
@@ -156,7 +157,7 @@ export function EntryFields({
   problems?: FormProblems;
   correctionNote?: boolean;
 }) {
-  const { entry: copy } = useMessages();
+  const { labels: L, form: F, corrections: C } = useMessages().entry;
   const id = useId();
   const [thoughts, setThoughts] = useState(() => {
     const rows = (defaults.thoughts ?? []).map((text) => ({ key: rowKey(), text }));
@@ -186,13 +187,9 @@ export function EntryFields({
   return (
     <div className="space-y-7">
       <Field
-        label={ENTRY_LABELS.occurredAt}
+        label={L.occurredAt}
         htmlFor={`${id}-when`}
-        hint={
-          when
-            ? "In your time zone. Leave it as it is if the time is right."
-            : "Leave it empty if it was just now."
-        }
+        hint={when ? F.whenHint : F.whenEmptyHint}
         problem={problems.occurredAt}
       >
         <input type="hidden" name="occurredAtShown" value={when} />
@@ -204,10 +201,10 @@ export function EntryFields({
           className="max-w-xs"
         />
       </Field>
-      <Field label={ENTRY_LABELS.situation} htmlFor={`${id}-situation`} hint="When, where, who, what.">
+      <Field label={L.situation} htmlFor={`${id}-situation`} hint={F.situationHint}>
         <Textarea id={`${id}-situation`} name="situation" rows={4} defaultValue={defaults.situation ?? ""} />
       </Field>
-      <Group legend={ENTRY_LABELS.thoughts} hint="The thoughts as you heard them, word for word.">
+      <Group legend={L.thoughts} hint={F.thoughtsHint}>
         {thoughts.map((thought, index) => (
           <div key={thought.key} className="flex items-start gap-3">
             <Textarea
@@ -219,7 +216,7 @@ export function EntryFields({
                   thoughts.map((t) => (t.key === thought.key ? { ...t, text: event.target.value } : t)),
                 )
               }
-              aria-label={`Thought ${index + 1}`}
+              aria-label={F.thought(index + 1)}
               className="min-w-0 flex-1"
             />
             {thoughts.length > 1 ? (
@@ -228,7 +225,7 @@ export function EntryFields({
                 className={removeButton}
                 onClick={() => setThoughts(thoughts.filter((t) => t.key !== thought.key))}
               >
-                Remove
+                {F.remove}
               </button>
             ) : null}
           </div>
@@ -238,16 +235,12 @@ export function EntryFields({
           className={smallButton}
           onClick={() => setThoughts([...thoughts, { key: rowKey(), text: "" }])}
         >
-          Add a thought
+          {F.addThought}
         </button>
       </Group>
-      <Group
-        legend={ENTRY_LABELS.emotions}
-        hint="Your word for each emotion, and how strong it was at the time, from 0 to 100."
-        problem={problems.emotions}
-      >
+      <Group legend={L.emotions} hint={F.emotionsHint} problem={problems.emotions}>
         <EmotionList
-          label="Emotion"
+          label={F.emotion}
           names="emotionName"
           intensities="emotionIntensity"
           rows={emotions}
@@ -260,42 +253,26 @@ export function EntryFields({
             aria-hidden="true"
             className="mr-2.5 inline-block size-[7px] -translate-y-px rotate-[-45deg] border-b-[1.5px] border-r-[1.5px] border-current transition-transform duration-[400ms] group-open:rotate-45"
           />
-          {copy.more}
+          {F.more}
         </summary>
-        <p className="mt-2 max-w-[36em] text-caption text-ink-3">{copy.moreHint}</p>
+        <p className="mt-2 max-w-[36em] text-caption text-ink-3">{F.moreHint}</p>
         <div className="mt-6 space-y-7">
-          <Field label={ENTRY_LABELS.body} htmlFor={`${id}-body`}>
+          <Field label={L.body} htmlFor={`${id}-body`}>
             <Textarea id={`${id}-body`} name="body" rows={2} defaultValue={defaults.body ?? ""} />
           </Field>
-          <Field
-            label={ENTRY_LABELS.behavior}
-            htmlFor={`${id}-behavior`}
-            hint="Nothing at all is a real answer too."
-          >
+          <Field label={L.behavior} htmlFor={`${id}-behavior`} hint={F.behaviorHint}>
             <Textarea id={`${id}-behavior`} name="behavior" rows={2} defaultValue={defaults.behavior ?? ""} />
           </Field>
-          <Field
-            label={ENTRY_LABELS.context}
-            htmlFor={`${id}-context`}
-            hint="Sleep, food, work, health: only if it matters."
-          >
+          <Field label={L.context} htmlFor={`${id}-context`} hint={F.contextHint}>
             <Textarea id={`${id}-context`} name="context" rows={2} defaultValue={defaults.context ?? ""} />
           </Field>
-          <Field
-            label={ENTRY_LABELS.tags}
-            htmlFor={`${id}-tags`}
-            hint="Separated by commas, such as work, family."
-          >
+          <Field label={L.tags} htmlFor={`${id}-tags`} hint={F.tagsHint}>
             <Input id={`${id}-tags`} name="tags" defaultValue={(defaults.tags ?? []).join(", ")} />
           </Field>
-          <Field label={ENTRY_LABELS.notes} htmlFor={`${id}-notes`}>
+          <Field label={L.notes} htmlFor={`${id}-notes`}>
             <Textarea id={`${id}-notes`} name="notes" rows={3} defaultValue={defaults.notes ?? ""} />
           </Field>
-          <Field
-            label={ENTRY_LABELS.title}
-            htmlFor={`${id}-title`}
-            hint="A few words to find it again, if you want."
-          >
+          <Field label={L.title} htmlFor={`${id}-title`} hint={F.titleHint}>
             <Input id={`${id}-title`} name="title" defaultValue={defaults.title ?? ""} />
           </Field>
         </div>
@@ -307,16 +284,14 @@ export function EntryFields({
             aria-hidden="true"
             className="mr-2.5 inline-block size-[7px] -translate-y-px rotate-[-45deg] border-b-[1.5px] border-r-[1.5px] border-current transition-transform duration-[400ms] group-open:rotate-45"
           />
-          Working the thought, if you want to
+          {F.deeper}
         </summary>
-        <p className="mt-2 max-w-[36em] text-caption text-ink-3">
-          Optional, and fine to leave for the session. The other view should come from you.
-        </p>
+        <p className="mt-2 max-w-[36em] text-caption text-ink-3">{F.deeperHint}</p>
         <div className="mt-6 space-y-7">
-          <Field label={ENTRY_LABELS.hotThought} htmlFor={`${id}-hot`}>
+          <Field label={L.hotThought} htmlFor={`${id}-hot`}>
             <Textarea id={`${id}-hot`} name="hotThought" rows={2} defaultValue={defaults.hotThought ?? ""} />
           </Field>
-          <Field label={ENTRY_LABELS.evidenceFor} htmlFor={`${id}-for`} hint="Facts you can point to.">
+          <Field label={L.evidenceFor} htmlFor={`${id}-for`} hint={F.evidenceForHint}>
             <Textarea
               id={`${id}-for`}
               name="evidenceFor"
@@ -324,7 +299,7 @@ export function EntryFields({
               defaultValue={defaults.evidenceFor ?? ""}
             />
           </Field>
-          <Field label={ENTRY_LABELS.evidenceAgainst} htmlFor={`${id}-against`}>
+          <Field label={L.evidenceAgainst} htmlFor={`${id}-against`}>
             <Textarea
               id={`${id}-against`}
               name="evidenceAgainst"
@@ -332,7 +307,7 @@ export function EntryFields({
               defaultValue={defaults.evidenceAgainst ?? ""}
             />
           </Field>
-          <Field label={ENTRY_LABELS.alternative} htmlFor={`${id}-alt`}>
+          <Field label={L.alternative} htmlFor={`${id}-alt`}>
             <Textarea
               id={`${id}-alt`}
               name="alternative"
@@ -341,9 +316,9 @@ export function EntryFields({
             />
           </Field>
           <Field
-            label={ENTRY_LABELS.alternativeBelief}
+            label={L.alternativeBelief}
             htmlFor={`${id}-belief`}
-            hint="From 0 to 100."
+            hint={F.beliefHint}
             problem={problems.alternativeBelief}
           >
             <Input
@@ -357,13 +332,9 @@ export function EntryFields({
               className="w-28 tabular-nums"
             />
           </Field>
-          <Group
-            legend={ENTRY_LABELS.emotionsAfter}
-            hint="The same emotions, rated again."
-            problem={problems.emotionsAfter}
-          >
+          <Group legend={L.emotionsAfter} hint={F.afterHint} problem={problems.emotionsAfter}>
             <EmotionList
-              label="Emotion after"
+              label={F.emotionAfter}
               names="afterName"
               intensities="afterIntensity"
               rows={after}
@@ -375,11 +346,7 @@ export function EntryFields({
 
       {correctionNote ? (
         <div className="border-t border-rule pt-6">
-          <Field
-            label="What changed, in your words"
-            htmlFor={`${id}-note`}
-            hint="Optional. It is kept with the date of this change."
-          >
+          <Field label={C.note} htmlFor={`${id}-note`} hint={C.noteHint}>
             <Textarea id={`${id}-note`} name="correctionNote" rows={2} />
           </Field>
         </div>

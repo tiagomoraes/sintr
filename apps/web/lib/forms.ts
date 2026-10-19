@@ -1,10 +1,13 @@
 import type { CheckinInput, EntryInput } from "@sintr/core";
+import type { Messages } from "@/messages";
 import { fromLocalInput } from "./time";
 
 /**
  * Reading the entry and check-in forms. The person's words are kept as
  * typed; an empty field means "nothing here" (null), never a guess. Shared
- * by the server actions and the draft card in the conversation.
+ * by the server actions and the draft card in the conversation; each takes
+ * its feature's `problems` from the page's catalog, so a problem reads in the
+ * page's language.
  */
 
 export type FormProblems = Record<string, string>;
@@ -48,6 +51,7 @@ function emotionsFrom(
   intensities: string,
   field: string,
   problems: FormProblems,
+  copy: Messages["entry"]["problems"],
 ) {
   const nameValues = all(form, names);
   const intensityValues = all(form, intensities);
@@ -56,11 +60,11 @@ function emotionsFrom(
     const raw = intensityValues[index] ?? "";
     const intensity = score(raw, 100);
     if (name.trim() === "") {
-      if (raw.trim() !== "") problems[field] = "Name each emotion, in your own word.";
+      if (raw.trim() !== "") problems[field] = copy.emotionName;
       return;
     }
     if (intensity === "invalid") {
-      problems[field] = "Use a whole number from 0 to 100, or leave it empty.";
+      problems[field] = copy.intensity;
       return;
     }
     emotions.push({ name, intensity });
@@ -73,12 +77,17 @@ function emotionsFrom(
  * value equal to what the form showed (`occurredAtShown`) means "unchanged",
  * not "moved to the start of that minute".
  */
-function occurredAt(form: Source, timezone: string, problems: FormProblems): Date | undefined {
+function occurredAt(
+  form: Source,
+  timezone: string,
+  problems: FormProblems,
+  problem: string,
+): Date | undefined {
   const value = form.get("occurredAt");
   if (typeof value !== "string" || value.trim() === "") return undefined;
   if (value === form.get("occurredAtShown")) return undefined;
   const date = fromLocalInput(value, timezone);
-  if (!date) problems.occurredAt = "Check the date and time.";
+  if (!date) problems.occurredAt = problem;
   return date ?? undefined;
 }
 
@@ -86,7 +95,11 @@ function correctionNote(form: Source): string | null {
   return words(form, "correctionNote");
 }
 
-export function entryFromForm(form: Source, timezone: string): Parsed<EntryInput> {
+export function entryFromForm(
+  form: Source,
+  timezone: string,
+  copy: Messages["entry"]["problems"],
+): Parsed<EntryInput> {
   const problems: FormProblems = {};
   const thoughts = all(form, "thought").filter((t) => t.trim().length > 0);
   const tags = (words(form, "tags") ?? "")
@@ -94,15 +107,14 @@ export function entryFromForm(form: Source, timezone: string): Parsed<EntryInput
     .map((tag) => tag.trim())
     .filter((tag) => tag.length > 0);
   const belief = score(raw(form, "alternativeBelief"), 100);
-  if (belief === "invalid")
-    problems.alternativeBelief = "Use a whole number from 0 to 100, or leave it empty.";
-  const when = occurredAt(form, timezone, problems);
+  if (belief === "invalid") problems.alternativeBelief = copy.intensity;
+  const when = occurredAt(form, timezone, problems, copy.when);
   const values: EntryInput = {
     ...(when ? { occurredAt: when } : {}),
     title: words(form, "title"),
     situation: words(form, "situation"),
     thoughts: thoughts.length > 0 ? thoughts : null,
-    emotions: emotionsFrom(form, "emotionName", "emotionIntensity", "emotions", problems),
+    emotions: emotionsFrom(form, "emotionName", "emotionIntensity", "emotions", problems, copy),
     body: words(form, "body"),
     behavior: words(form, "behavior"),
     context: words(form, "context"),
@@ -113,27 +125,31 @@ export function entryFromForm(form: Source, timezone: string): Parsed<EntryInput
     evidenceAgainst: words(form, "evidenceAgainst"),
     alternative: words(form, "alternative"),
     alternativeBelief: belief === "invalid" ? null : belief,
-    emotionsAfter: emotionsFrom(form, "afterName", "afterIntensity", "emotionsAfter", problems),
+    emotionsAfter: emotionsFrom(form, "afterName", "afterIntensity", "emotionsAfter", problems, copy),
   };
   if (Object.keys(problems).length > 0) return { ok: false, problems };
   return { ok: true, values, note: correctionNote(form) };
 }
 
-export function checkinFromForm(form: Source, timezone: string): Parsed<CheckinInput> {
+export function checkinFromForm(
+  form: Source,
+  timezone: string,
+  copy: Messages["checkin"]["problems"],
+): Parsed<CheckinInput> {
   const problems: FormProblems = {};
   const scale = (name: "mood" | "energy" | "anxiety") => {
     const value = score(raw(form, name), 5);
-    if (value === "invalid") problems[name] = "Choose a value from 0 to 5.";
+    if (value === "invalid") problems[name] = copy.scale;
     return value === "invalid" ? null : value;
   };
   const sleepRaw = (words(form, "sleepHours") ?? "").trim().replace(",", ".");
   let sleepHours: number | null = null;
   if (sleepRaw !== "") {
     const n = Number(sleepRaw);
-    if (!Number.isFinite(n) || n < 0 || n > 24) problems.sleepHours = "Use a number of hours from 0 to 24.";
+    if (!Number.isFinite(n) || n < 0 || n > 24) problems.sleepHours = copy.sleepHours;
     else sleepHours = Math.round(n * 10) / 10;
   }
-  const when = occurredAt(form, timezone, problems);
+  const when = occurredAt(form, timezone, problems, copy.when);
   const values: CheckinInput = {
     ...(when ? { occurredAt: when } : {}),
     mood: scale("mood"),

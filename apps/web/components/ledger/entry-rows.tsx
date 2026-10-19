@@ -1,5 +1,7 @@
+"use client";
+
 import { IntensityChip, NotebookRow, Verbatim } from "@sintr/ui";
-import { ENTRY_LABELS } from "@/lib/labels";
+import { useMessages } from "@/components/language";
 
 interface EmotionView {
   name: string;
@@ -26,12 +28,15 @@ export interface EntryView {
 }
 
 function Emotions({ emotions }: { emotions: EmotionView[] }) {
+  const { entry } = useMessages();
   return (
     <ul className="m-0 flex list-none flex-wrap gap-x-5 gap-y-1.5 p-0">
       {emotions.map((emotion, index) => (
         <li key={`${emotion.name}-${index}`}>
           {emotion.name}
-          {typeof emotion.intensity === "number" ? <IntensityChip value={emotion.intensity} /> : null}
+          {typeof emotion.intensity === "number" ? (
+            <IntensityChip value={emotion.intensity}>{entry.intensity(emotion.intensity)}</IntensityChip>
+          ) : null}
         </li>
       ))}
     </ul>
@@ -46,9 +51,11 @@ function Words({ children }: { children: string }) {
 /**
  * The rows of a thought record inside a notebook card: Tier 1 first, then
  * the working of the thought if there is any. Quoted thoughts carry the
- * peach highlighter, because they are the person's own words.
+ * peach highlighter, because they are the person's own words. A client
+ * component: the draft card in the conversation shows it too.
  */
 export function EntryRows({ entry }: { entry: EntryView }) {
+  const { labels: L, record: R, intensity } = useMessages().entry;
   const tier2 =
     entry.hotThought ||
     entry.evidenceFor ||
@@ -77,12 +84,12 @@ export function EntryRows({ entry }: { entry: EntryView }) {
       ) : null}
       <dl className="m-0">
         {entry.situation ? (
-          <NotebookRow label={ENTRY_LABELS.situation}>
+          <NotebookRow label={L.situation}>
             <Words>{entry.situation}</Words>
           </NotebookRow>
         ) : null}
         {entry.thoughts?.length ? (
-          <NotebookRow label={ENTRY_LABELS.thoughts}>
+          <NotebookRow label={L.thoughts}>
             <ul className="m-0 list-none space-y-1.5 p-0">
               {entry.thoughts.map((thought, index) => (
                 <li key={index}>
@@ -93,71 +100,71 @@ export function EntryRows({ entry }: { entry: EntryView }) {
           </NotebookRow>
         ) : null}
         {entry.emotions?.length ? (
-          <NotebookRow label={ENTRY_LABELS.emotions}>
+          <NotebookRow label={L.emotions}>
             <Emotions emotions={entry.emotions} />
           </NotebookRow>
         ) : null}
         {entry.body ? (
-          <NotebookRow label={ENTRY_LABELS.body}>
+          <NotebookRow label={L.body}>
             <Words>{entry.body}</Words>
           </NotebookRow>
         ) : null}
         {entry.behavior ? (
-          <NotebookRow label={ENTRY_LABELS.behavior}>
+          <NotebookRow label={L.behavior}>
             <Words>{entry.behavior}</Words>
           </NotebookRow>
         ) : null}
         {entry.context ? (
-          <NotebookRow label={ENTRY_LABELS.context}>
+          <NotebookRow label={L.context}>
             <Words>{entry.context}</Words>
           </NotebookRow>
         ) : null}
         {entry.tags?.length ? (
-          <NotebookRow label={ENTRY_LABELS.tags}>
+          <NotebookRow label={L.tags}>
             <span className="font-sans text-[0.9375rem] text-ink-2">{entry.tags.join(", ")}</span>
           </NotebookRow>
         ) : null}
         {entry.notes ? (
-          <NotebookRow label={ENTRY_LABELS.notes}>
+          <NotebookRow label={L.notes}>
             <Words>{entry.notes}</Words>
           </NotebookRow>
         ) : null}
         {entry.hotThought ? (
-          <NotebookRow label={ENTRY_LABELS.hotThought}>
+          <NotebookRow label={L.hotThought}>
             <Verbatim>{entry.hotThought}</Verbatim>
           </NotebookRow>
         ) : null}
         {entry.evidenceFor ? (
-          <NotebookRow label={ENTRY_LABELS.evidenceFor}>
+          <NotebookRow label={L.evidenceFor}>
             <Words>{entry.evidenceFor}</Words>
           </NotebookRow>
         ) : null}
         {entry.evidenceAgainst ? (
-          <NotebookRow label={ENTRY_LABELS.evidenceAgainst}>
+          <NotebookRow label={L.evidenceAgainst}>
             <Words>{entry.evidenceAgainst}</Words>
           </NotebookRow>
         ) : null}
         {entry.alternative || typeof entry.alternativeBelief === "number" ? (
-          <NotebookRow label={ENTRY_LABELS.alternative}>
+          <NotebookRow label={L.alternative}>
             {entry.alternative ? <Verbatim>{entry.alternative}</Verbatim> : null}
             {typeof entry.alternativeBelief === "number" ? (
               <span className="text-[0.9375rem]">
                 {entry.alternative ? " " : ""}
-                <span className="font-sans text-caption text-ink-3">believable</span>
-                <IntensityChip value={entry.alternativeBelief} />
+                <span className="font-sans text-caption text-ink-3">{R.believable}</span>
+                <IntensityChip value={entry.alternativeBelief}>
+                  {intensity(entry.alternativeBelief)}
+                </IntensityChip>
               </span>
             ) : null}
           </NotebookRow>
         ) : null}
         {entry.emotionsAfter?.length ? (
-          <NotebookRow label={ENTRY_LABELS.emotionsAfter}>
+          <NotebookRow label={L.emotionsAfter}>
             <Emotions emotions={entry.emotionsAfter} />
           </NotebookRow>
         ) : null}
       </dl>
-      {empty ? (
-        <p className="py-4 pl-11 pr-5 text-[0.9375rem] text-ink-3">Nothing written in it yet.</p>
-      ) : null}
+      {empty ? <p className="py-4 pl-11 pr-5 text-[0.9375rem] text-ink-3">{R.empty}</p> : null}
     </>
   );
 }

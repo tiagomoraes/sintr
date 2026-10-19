@@ -1,42 +1,47 @@
 import type { Correction } from "@sintr/core";
 import { formatMoment } from "@/lib/format";
 import { fieldsInWords, valueInWords } from "@/lib/labels";
+import { getMessages } from "@/lib/server/language";
 
 /**
  * The dated corrections of a record (the pack's correction rule): when it
  * changed, what changed, the person's note, and what it said before. A
  * change that only filled empty fields reads as completing the record.
+ * Rendered on the server only, by an entry's or a check-in's page.
  */
-export function Corrections({
+export async function Corrections({
   corrections,
   locale,
-  labels,
+  kind,
 }: {
   corrections: Correction[];
   locale: { language: string; timezone: string };
-  labels: Record<string, string>;
+  kind: "entry" | "checkin";
 }) {
   if (corrections.length === 0) return null;
+  const t = await getMessages();
+  const C = t.entry.corrections;
+  const labels: Readonly<Record<string, string>> = t[kind].labels;
+  const names: Readonly<Record<string, string>> = t[kind].inASentence;
   return (
     <section aria-labelledby="corrections-title" className="mt-12">
       <h2 id="corrections-title" className="font-serif text-title-small font-normal text-ink">
-        Changes since it was written
+        {C.title}
       </h2>
-      <p className="mt-2 max-w-[36em] text-[0.9375rem] text-ink-3">
-        Each change is kept with its date and what it replaced, so nothing here was rewritten silently.
-      </p>
+      <p className="mt-2 max-w-[36em] text-[0.9375rem] text-ink-3">{C.lede}</p>
       <ol className="mt-5 border-t border-rule">
         {corrections.map((correction) => {
           const completed = Object.values(correction.previous).every(
             (value) => value === null || (Array.isArray(value) && value.length === 0),
           );
+          const fields = fieldsInWords(correction.fields, names, locale.language);
           return (
             <li key={correction.id} className="border-b border-rule py-5">
               <p className="text-ink">
                 <span className="font-serif italic text-ink-3">
                   {formatMoment(correction.createdAt, locale)}.
                 </span>{" "}
-                {completed ? "Completed with" : "Corrected"} {fieldsInWords(correction.fields)}.
+                {completed ? C.completed(fields) : C.corrected(fields)}
               </p>
               {correction.note ? (
                 <p className="mt-2 whitespace-pre-line font-serif text-ink-2">{correction.note}</p>
@@ -48,7 +53,7 @@ export function Corrections({
                       aria-hidden="true"
                       className="mr-2 inline-block size-[7px] -translate-y-px rotate-[-45deg] border-b-[1.5px] border-r-[1.5px] border-current transition-transform duration-[400ms] group-open:rotate-45"
                     />
-                    What it said before
+                    {C.before}
                   </summary>
                   <dl className="mt-3 space-y-2 border-l border-rule pl-4">
                     {correction.fields.map((field) => (
@@ -57,9 +62,11 @@ export function Corrections({
                         <dd className="m-0 whitespace-pre-line font-serif text-ink-2">
                           {field === "occurredAt" && typeof correction.previous[field] === "string"
                             ? formatMoment(new Date(correction.previous[field]), locale)
-                            : (valueInWords(correction.previous[field]) ?? (
-                                <span className="font-sans text-caption text-ink-3">Empty</span>
-                              ))}
+                            : (valueInWords(
+                                correction.previous[field],
+                                t.entry.intensity,
+                                locale.language,
+                              ) ?? <span className="font-sans text-caption text-ink-3">{C.empty}</span>)}
                         </dd>
                       </div>
                     ))}
