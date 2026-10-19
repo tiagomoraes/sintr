@@ -10,7 +10,7 @@ import { voice } from "./en/voice";
 import { welcome } from "./en/welcome";
 
 /**
- * The app's words, one file per screen or feature (DECISIONS 93). Every
+ * The app's words, one file per screen or feature (DECISIONS 94). Every
  * string written or rewritten since F6 lives here, not in components, so
  * the languages milestone adds a catalog beside `en` instead of hunting
  * through the code. A sentence that carries a value is a function of it.
