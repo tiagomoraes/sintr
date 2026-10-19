@@ -73,6 +73,7 @@ describe("the words of sharing", () => {
     const lines = [
       noticeText(notice({ side: "person", kind: "link_pending", practice })),
       noticeText(notice({ side: "person", kind: "link_ended", practice })),
+      noticeText(notice({ side: "person", kind: "link_declined", practice })),
       noticeText(notice({ kind: "link_active", personName: "Ana" })),
       noticeText(notice({ kind: "report_shared", number: 4 })),
       noticeText(notice({ kind: "link_declined" })),
@@ -81,6 +82,7 @@ describe("the words of sharing", () => {
     expect(lines).toEqual([
       "Dr. Bruno Lima accepted your invite. Confirm it to start sharing.",
       "Dr. Bruno Lima ended the link. They no longer see your reports.",
+      "Dr. Bruno Lima withdrew from your invite. Nothing was shared.",
       "Ana linked with your practice.",
       "Patient 4 shared a report with you.",
       "A person you accepted chose not to link. Nothing was shared.",

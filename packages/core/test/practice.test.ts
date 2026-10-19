@@ -383,6 +383,23 @@ describe("a person invites their therapist", () => {
     expect((await person.auditLog.list()).map((e) => e.action)).toContain("link.declined");
   });
 
+  it("can be withdrawn by the practice before the person confirms, and the person is told", async () => {
+    const person = await account("withdrawn-from");
+    const invite = await person.sharing.createInvite();
+    const professional = await therapist("withdrawing", "Dr. Clara Melo");
+    const pending = await professional.practice.acceptInvite(invite.code);
+    expect(await professional.practice.endLink(pending.id)).toBe(true);
+    expect(await person.sharing.links()).toEqual([]);
+    const [notice] = await person.notices.list();
+    expect(notice).toMatchObject({
+      kind: "link_declined",
+      side: "person",
+      practice: { professionalName: "Dr. Clara Melo" },
+    });
+    expect((await professional.auditLog.list()).map((e) => e.action)).toContain("link.declined");
+    expect((await person.consents.list()).filter((c) => c.purpose === "practice_link")).toEqual([]);
+  });
+
   it("is refused by the person's own practice, and limited in number", async () => {
     const both = await therapist("both");
     const invite = await both.sharing.createInvite();

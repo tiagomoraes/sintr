@@ -216,7 +216,8 @@ export async function endLink(
   now: Date,
 ): Promise<void> {
   if (row.status === "ended") throw new InvalidStateError("the link has ended");
-  const declined = by === "person" && row.status === "pending";
+  // A link that never started was declined (by the person) or withdrawn (by the practice): nothing was shared.
+  const declined = row.status === "pending";
   await db.delete(sharedReports).where(eq(sharedReports.linkId, row.id));
   await db.delete(notifications).where(eq(notifications.linkId, row.id));
   await db

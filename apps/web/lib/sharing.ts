@@ -58,6 +58,8 @@ export function noticeText(notice: NoticeView): string {
         return `${who} accepted your invite. Confirm it to start sharing.`;
       case "link_ended":
         return `${who} ended the link. They no longer see your reports.`;
+      case "link_declined":
+        return `${who} withdrew from your invite. Nothing was shared.`;
       default:
         return `${who} updated the link.`;
     }
