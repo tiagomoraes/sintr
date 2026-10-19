@@ -126,7 +126,7 @@ class Journeys {
   #landing: Landing | null = null;
   /** The pool resting now, and where it was just before the page last changed. */
   #resting: HTMLElement | null = null;
-  #remembered: (Departure & { pool: HTMLElement }) | null = null;
+  #remembered: { pool: HTMLElement; box: Box } | null = null;
   #moving: Animation[] = [];
   #waiting: ReturnType<typeof setTimeout> | null = null;
 
@@ -151,12 +151,14 @@ class Journeys {
    * Just before the page changes (React's snapshot before an update): where
    * the resting pool is. When its place goes in the same change, the things
    * around it may already be gone by the time it is told, and the page may
-   * have moved under it; this is where the person last saw it.
+   * have moved under it; this is where the person last saw it. The box
+   * only: it runs before every change of the shell, and the pool's clock
+   * can still be read when it leaves.
    */
   remember() {
     const pool = this.#resting;
     if (!pool?.isConnected || this.#flying || reducedMotion()) return;
-    this.#remembered = { pool, box: boxOf(pool), clock: clockOf(pool), at: performance.now() };
+    this.#remembered = { pool, box: boxOf(pool) };
   }
 
   /** A place the pool rested is going: it rises from there and waits a moment for the next. */
@@ -168,7 +170,7 @@ class Journeys {
     const from = flying ?? pool;
     if (!from.isConnected || reducedMotion()) return this.#rest();
     const box = !flying && remembered ? remembered.box : boxOf(from);
-    const clock = !flying && remembered ? remembered.clock : clockOf(from);
+    const clock = clockOf(from);
     this.#stop();
     this.#landing = null;
     if (!inView(box, viewport())) {
