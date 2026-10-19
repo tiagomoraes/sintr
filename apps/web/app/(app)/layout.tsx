@@ -1,5 +1,8 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
+import { cn } from "@sintr/ui";
+import { AssistantCorner } from "@/components/assistant/corner";
+import { AssistantProvider, type AssistantSetup } from "@/components/assistant/provider";
 import { LanguageOffers } from "@/components/language";
 import { ExceptOn, ShellFooter, ShellMain } from "@/components/shell-frame";
 import { ShellLight } from "@/components/shell-light";
@@ -9,9 +12,11 @@ import { SiteHeader } from "@/components/site-header";
 import { SupportLines } from "@/components/support-lines";
 import { formatMoment } from "@/lib/format";
 import { noticeText } from "@/lib/sharing";
+import { assistantState } from "@/lib/server/assistant";
 import { currentLanguage, getMessages } from "@/lib/server/language";
 import { requireScope, runtime } from "@/lib/server/runtime";
-import { hourIn, timeOfDay } from "@/lib/time-of-day";
+import { voiceView } from "@/lib/server/voice";
+import { hourIn, partOfDay, timeOfDay } from "@/lib/time-of-day";
 
 /** A calm notice, for a report of the last week only: an old draft is not chased. */
 function recent(periodEnd: Date): boolean {
@@ -27,17 +32,30 @@ const NOTICE_LINK =
  * The diary's shell. It stays mounted while the person moves between pages,
  * so nothing here is decided from the path of the first request: what
  * depends on the page (the footer, the width, which notice repeats the
- * page) is chosen on the client from the current path.
+ * page) is chosen on the client from the current path. The assistant lives
+ * here too, so its conversation and its pool of light go with the person
+ * from page to page.
  */
 export default async function ShellLayout({ children }: { children: ReactNode }) {
   const { user, scope } = await requireScope();
   const [t, language] = await Promise.all([getMessages(), currentLanguage()]);
-  const [waiting, profile, unread, practice] = await Promise.all([
+  const [waiting, profile, unread, practice, assistant, voice] = await Promise.all([
     scope.reports.waiting(),
     scope.profile.get(),
     scope.notices.unread(),
     scope.practice.get(),
+    assistantState(scope),
+    voiceView(scope),
   ]);
+  const setup: AssistantSetup = {
+    ready: assistant.kind !== "none",
+    source: assistant.kind === "house" ? "house" : "own",
+    meter: assistant.kind === "house" ? assistant.messages : null,
+    voice,
+    locale: { language: language.code, timezone: profile.timezone },
+    rehearsal: runtime().config.fakeAgent,
+    greeting: t.home.greeting(partOfDay(hourIn(profile.timezone)), profile.preferredName),
+  };
   // One quiet line about the person's links (a practice accepted their invite, or ended a link).
   const sharingNotice =
     unread.person > 0
@@ -51,69 +69,76 @@ export default async function ShellLayout({ children }: { children: ReactNode })
   };
   return (
     <ShellLight time={timeOfDay(hourIn(profile.timezone))}>
-      <SiteHeader home="/home">
-        <span className="hidden text-caption text-ink-3 min-[900px]:inline">{user.email}</span>
-        <span className="hidden min-[900px]:inline-flex">
-          <SignOutButton />
-        </span>
-        <PhoneMenu
-          {...nav}
-          footer={
-            <div className="flex flex-wrap items-center justify-between gap-3 border-t border-rule pt-5">
-              <span className="min-w-0 truncate text-caption text-ink-3">{user.email}</span>
-              <SignOutButton />
-            </div>
-          }
-        />
-      </SiteHeader>
-      <div className="wrap grid grid-cols-12 gap-x-6 gap-y-8 pb-24 pt-2 min-[900px]:pt-12">
-        <aside className="hidden min-[900px]:col-span-3 min-[900px]:block">
-          <div className="min-[900px]:sticky min-[900px]:top-7">
-            <ShellNav {...nav} />
-          </div>
-        </aside>
-        <ShellMain>
-          {sharingNotice ? (
-            <ExceptOn paths={["/sharing"]}>
-              <p className={NOTICE}>
-                <span aria-hidden="true" className="size-[7px] rounded-full bg-ink" />
-                {noticeText(sharingNotice, t)}
-                <Link href="/sharing" className={NOTICE_LINK}>
-                  {t.shell.notice.openSharing}
-                </Link>
-              </p>
-            </ExceptOn>
-          ) : null}
-          {notice ? (
-            <ExceptOn paths={["/reports", "/practice"]}>
-              <p className={NOTICE}>
-                <span
-                  aria-hidden="true"
-                  className="size-[7px] rounded-full bg-draft shadow-[0_0_0_3px_#fbe6da]"
-                />
-                {notice.sessionAt
-                  ? t.shell.notice.reportReady(
-                      formatMoment(notice.sessionAt, { language: language.code, timezone: profile.timezone }),
-                    )
-                  : t.shell.notice.weeklyReady}
-                <Link href={`/reports/${notice.id}`} className={NOTICE_LINK}>
-                  {t.shell.notice.readIt}
-                </Link>
-              </p>
-            </ExceptOn>
-          ) : null}
-          {children}
-        </ShellMain>
-      </div>
-      <footer className="border-t border-rule">
-        <div className="wrap py-14">
-          <ShellFooter
-            person={<SupportLines />}
-            practice={<p className="max-w-[44em] text-[0.9375rem] text-ink-3">{t.shell.practiceNote}</p>}
+      <AssistantProvider setup={setup}>
+        <SiteHeader home="/home">
+          <span className="hidden text-caption text-ink-3 min-[900px]:inline">{user.email}</span>
+          <span className="hidden min-[900px]:inline-flex">
+            <SignOutButton />
+          </span>
+          <PhoneMenu
+            {...nav}
+            footer={
+              <div className="flex flex-wrap items-center justify-between gap-3 border-t border-rule pt-5">
+                <span className="min-w-0 truncate text-caption text-ink-3">{user.email}</span>
+                <SignOutButton />
+              </div>
+            }
           />
-          <LanguageOffers className="mt-10" />
+        </SiteHeader>
+        <div className="wrap grid grid-cols-12 gap-x-6 gap-y-8 pb-24 pt-2 min-[900px]:pt-12">
+          <aside className="hidden min-[900px]:col-span-3 min-[900px]:block">
+            <div className="min-[900px]:sticky min-[900px]:top-7">
+              <ShellNav {...nav} />
+            </div>
+          </aside>
+          <ShellMain>
+            {sharingNotice ? (
+              <ExceptOn paths={["/sharing"]}>
+                <p className={NOTICE}>
+                  <span aria-hidden="true" className="size-[7px] rounded-full bg-ink" />
+                  {noticeText(sharingNotice, t)}
+                  <Link href="/sharing" className={NOTICE_LINK}>
+                    {t.shell.notice.openSharing}
+                  </Link>
+                </p>
+              </ExceptOn>
+            ) : null}
+            {notice ? (
+              <ExceptOn paths={["/reports", "/practice"]}>
+                <p className={NOTICE}>
+                  <span
+                    aria-hidden="true"
+                    className="size-[7px] rounded-full bg-draft shadow-[0_0_0_3px_#fbe6da]"
+                  />
+                  {notice.sessionAt
+                    ? t.shell.notice.reportReady(
+                        formatMoment(notice.sessionAt, {
+                          language: language.code,
+                          timezone: profile.timezone,
+                        }),
+                      )
+                    : t.shell.notice.weeklyReady}
+                  <Link href={`/reports/${notice.id}`} className={NOTICE_LINK}>
+                    {t.shell.notice.readIt}
+                  </Link>
+                </p>
+              </ExceptOn>
+            ) : null}
+            {children}
+          </ShellMain>
         </div>
-      </footer>
+        <footer className="border-t border-rule">
+          {/* On a phone, room under the last line for the assistant's corner. */}
+          <div className={cn("wrap py-14", setup.ready && "max-[719px]:pb-28")}>
+            <ShellFooter
+              person={<SupportLines />}
+              practice={<p className="max-w-[44em] text-[0.9375rem] text-ink-3">{t.shell.practiceNote}</p>}
+            />
+            <LanguageOffers className="mt-10" />
+          </div>
+        </footer>
+        <AssistantCorner />
+      </AssistantProvider>
     </ShellLight>
   );
 }
