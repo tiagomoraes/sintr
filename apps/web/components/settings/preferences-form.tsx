@@ -1,10 +1,11 @@
 "use client";
 
 import { Button, FieldError, FieldHint, Select, cn } from "@sintr/ui";
-import { useActionState, useState, useSyncExternalStore } from "react";
+import { useActionState, useRef, useState, useSyncExternalStore } from "react";
 import type { PreferencesState } from "@/app/(app)/settings/actions";
 import { submitWith } from "@/lib/use-form-action";
 import { useMessages } from "@/components/language";
+import { useUnsaved } from "@/components/unsaved";
 
 /** How long conversations are kept, as the form posts it; each is said in `settings.time.retention`. */
 const RETENTION = ["keep", "30", "90", "365"] as const;
@@ -22,8 +23,10 @@ export function PreferencesForm({
   retentionDays: number | null;
   save: (state: PreferencesState, form: FormData) => Promise<PreferencesState>;
 }) {
-  const T = useMessages().settings.time;
+  const { time: T, unsaved: U } = useMessages().settings;
   const [state, action, pending] = useActionState(save, { saved: false, problems: {} });
+  const form = useRef<HTMLFormElement>(null);
+  useUnsaved(form, { timezone: U.timezone, retention: U.retention }, state.saved ? state : null);
   const [zone, setZone] = useState(timezone);
   // The device's own zone, read in the browser only (null while rendering on the server).
   const detected = useSyncExternalStore(
@@ -35,7 +38,7 @@ export function PreferencesForm({
   const retention = retentionDays === null ? "keep" : String(retentionDays);
 
   return (
-    <form onSubmit={submitWith(action)} className="space-y-10" aria-label={T.label}>
+    <form ref={form} onSubmit={submitWith(action)} className="space-y-10" aria-label={T.label}>
       <div>
         <label htmlFor="settings-timezone" className="block text-label font-medium text-ink">
           {T.zone}
