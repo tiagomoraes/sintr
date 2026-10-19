@@ -341,6 +341,13 @@
         sintr-light-enter 2.8s var(--ease-slow) both,
         sintr-light-breathe 11s ease-in-out 2.8s infinite alternate;
     }
+  }
+  /*
+   * The leaves sway only on a wide screen with a mouse: their blurred shadow is
+   * painted again on every frame, which a phone pays for in dropped frames
+   * (F6 measured 40 fps at four times slower CPU with it, 60 without).
+   */
+  @media (prefers-reduced-motion: no-preference) and (min-width: 900px) and (hover: hover) {
     .sintr-light__branch--a {
       animation: sintr-sway-a 13s ease-in-out infinite alternate;
     }
