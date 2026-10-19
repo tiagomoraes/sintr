@@ -13,15 +13,17 @@ import {
   type Subscription,
   type SubscriptionKind,
   type Taken,
+  type TakenAudio,
   type UsagePeriod,
 } from "../domain";
 import type { ScopeContext } from "./context";
 
+/** The meters counted one unit at a time. Speech is counted in seconds (`takeAudio`). */
 const COLUMNS = {
   assistantMessages: usageCounters.assistantMessages,
   reports: usageCounters.reports,
-  audioMinutes: usageCounters.audioMinutes,
-} as const satisfies Record<Meter, unknown>;
+} as const satisfies Partial<Record<Meter, unknown>>;
+type UnitMeter = keyof typeof COLUMNS;
 
 const pad = (n: number) => String(n).padStart(2, "0");
 
@@ -144,12 +146,22 @@ export function plansRepository({ db, userId, personPlan }: PlansContext) {
       }),
     };
   };
-  const used = async (executor: Executor, period: UsagePeriod) => {
+  const counters = async (executor: Executor, period: UsagePeriod) => {
     const [row] = await executor
       .select()
       .from(usageCounters)
       .where(and(eq(usageCounters.userId, userId), eq(usageCounters.period, period.start)));
-    return Object.fromEntries(METERS.map((meter) => [meter, row?.[meter] ?? 0])) as Record<Meter, number>;
+    return row;
+  };
+  const used = async (executor: Executor, period: UsagePeriod) => {
+    const row = await counters(executor, period);
+    return Object.fromEntries(
+      METERS.map((meter) => [
+        meter,
+        // Speech is kept to the second and shown in started minutes.
+        meter === "audioMinutes" ? Math.ceil((row?.audioSeconds ?? 0) / 60) : (row?.[meter] ?? 0),
+      ]),
+    ) as Record<Meter, number>;
   };
 
   return {
@@ -160,7 +172,7 @@ export function plansRepository({ db, userId, personPlan }: PlansContext) {
     },
 
     /** One unit of a meter, if this month's allowance has one left. */
-    async take(meter: Meter, now: Date = new Date()): Promise<Taken> {
+    async take(meter: UnitMeter, now: Date = new Date()): Promise<Taken> {
       const period = usagePeriod(now, await timeZone(db));
       const { plan: current } = await plan(db);
       const limit = current.allowance[meter];
@@ -180,11 +192,58 @@ export function plansRepository({ db, userId, personPlan }: PlansContext) {
     },
 
     /** Give a unit back to the month it was taken from, after a call that failed. */
-    async giveBack(meter: Meter, period: UsagePeriod): Promise<void> {
+    async giveBack(meter: UnitMeter, period: UsagePeriod): Promise<void> {
       const column = COLUMNS[meter];
       await db
         .update(usageCounters)
         .set({ [meter]: sql`greatest(${column} - 1, 0)`, updatedAt: new Date() })
+        .where(and(eq(usageCounters.userId, userId), eq(usageCounters.period, period.start)));
+    },
+
+    /**
+     * Seconds of speech for one recording, taken before the house transcribes
+     * it, in the same statement that checks the month: refused once the
+     * month's minutes are used. A recording that started with time left is
+     * taken whole, even if it ends past the limit, so words already spoken are
+     * never thrown away halfway; the browser stops recording when the month's
+     * time runs out, so the month is passed by one recording at most.
+     */
+    async takeAudio(seconds: number, now: Date = new Date()): Promise<TakenAudio> {
+      const amount = Math.max(1, Math.ceil(seconds));
+      const period = usagePeriod(now, await timeZone(db));
+      const { plan: current } = await plan(db);
+      const minutes = current.allowance.audioMinutes;
+      const limitSeconds = minutes === null ? null : minutes * 60;
+      if (limitSeconds !== null && limitSeconds < 1) {
+        return { ok: false, usedSeconds: 0, limitSeconds, seconds: 0, period };
+      }
+      const column = usageCounters.audioSeconds;
+      const [row] = await db
+        .insert(usageCounters)
+        .values({ userId, period: period.start, audioSeconds: amount })
+        .onConflictDoUpdate({
+          target: [usageCounters.userId, usageCounters.period],
+          set: { audioSeconds: sql`${column} + ${amount}`, updatedAt: new Date() },
+          ...(limitSeconds === null ? {} : { setWhere: sql`${column} < ${limitSeconds}` }),
+        })
+        .returning({ used: column });
+      if (row) return { ok: true, usedSeconds: row.used, limitSeconds, seconds: amount, period };
+      const month = await counters(db, period);
+      return { ok: false, usedSeconds: month?.audioSeconds ?? 0, limitSeconds, seconds: 0, period };
+    },
+
+    /**
+     * Settle a recording against what was really transcribed: give back what
+     * was taken for a call that failed (`actual` 0), or the difference when
+     * the provider counted less, or add what it counted beyond the estimate.
+     */
+    async settleAudio(period: UsagePeriod, taken: number, actual: number): Promise<void> {
+      const delta = Math.max(0, Math.ceil(actual)) - taken;
+      if (delta === 0) return;
+      const column = usageCounters.audioSeconds;
+      await db
+        .update(usageCounters)
+        .set({ audioSeconds: sql`greatest(${column} + ${delta}, 0)`, updatedAt: new Date() })
         .where(and(eq(usageCounters.userId, userId), eq(usageCounters.period, period.start)));
     },
 

@@ -205,6 +205,81 @@ describe("taking from the meter", () => {
   });
 });
 
+describe("spoken minutes", () => {
+  const FREE = PERSON_PLANS.free.allowance.audioMinutes! * 60;
+
+  async function spoken(scope: UserScope, period: string, audioSeconds: number) {
+    await handle.db
+      .insert(usageCounters)
+      .values({ userId: scope.userId, period, audioSeconds })
+      .onConflictDoUpdate({ target: [usageCounters.userId, usageCounters.period], set: { audioSeconds } });
+  }
+
+  it("are counted to the second, and shown in started minutes", async () => {
+    const ivo = await account("audio-ivo");
+    expect(await ivo.plans.takeAudio(12.2, OCT)).toMatchObject({
+      ok: true,
+      usedSeconds: 13,
+      limitSeconds: FREE,
+      seconds: 13,
+      period: { start: "2026-10-01" },
+    });
+    expect((await ivo.plans.current(OCT)).used.audioMinutes).toBe(1);
+    expect(await ivo.plans.takeAudio(50, OCT)).toMatchObject({ ok: true, usedSeconds: 63 });
+    expect((await ivo.plans.current(OCT)).used.audioMinutes).toBe(2);
+    // Messages are a meter of their own.
+    expect((await ivo.plans.current(OCT)).used.assistantMessages).toBe(0);
+  });
+
+  it("take a recording whole when it starts with time left, and refuse the next one", async () => {
+    const jo = await account("audio-limit");
+    await spoken(jo, "2026-10-01", FREE - 5);
+    // Five seconds were left; the words already spoken are not cut.
+    expect(await jo.plans.takeAudio(40, OCT)).toMatchObject({ ok: true, usedSeconds: FREE + 35 });
+    expect(await jo.plans.takeAudio(3, OCT)).toMatchObject({ ok: false, usedSeconds: FREE + 35, seconds: 0 });
+    // The next month starts again.
+    expect((await jo.plans.takeAudio(3, new Date("2026-11-02T12:00:00Z"))).ok).toBe(true);
+  });
+
+  it("never let parallel recordings start past the limit", async () => {
+    const leo = await account("audio-parallel");
+    await spoken(leo, "2026-10-01", FREE - 1);
+    const results = await Promise.all(Array.from({ length: 10 }, () => leo.plans.takeAudio(30, OCT)));
+    expect(results.filter((r) => r.ok)).toHaveLength(1);
+  });
+
+  it("settle against what the provider counted, and give it all back after a failure", async () => {
+    const mia = await account("audio-settle");
+    const taken = await mia.plans.takeAudio(60, OCT);
+    // The provider heard 41 seconds: the rest goes back.
+    await mia.plans.settleAudio(taken.period, taken.seconds, 41);
+    expect((await mia.plans.current(OCT)).used.audioMinutes).toBe(1);
+    const again = await mia.plans.takeAudio(10, OCT);
+    expect(again.usedSeconds).toBe(51);
+    // The provider heard more than the browser said: it is counted.
+    await mia.plans.settleAudio(again.period, again.seconds, 30);
+    const failed = await mia.plans.takeAudio(20, OCT);
+    expect(failed.usedSeconds).toBe(91);
+    // A failed call gives back what it took, and never goes below zero.
+    await mia.plans.settleAudio(failed.period, failed.seconds, 0);
+    await mia.plans.settleAudio(failed.period, 500, 0);
+    expect((await mia.plans.current(OCT)).used.audioMinutes).toBe(0);
+  });
+
+  it("have no limit on Unlimited, and are still counted", async () => {
+    const generous = createRepositories(handle.db, testMasterKey, { personPlan: "unlimited" });
+    const id = await createUser(handle.db, "audio-unlimited");
+    await generous.provision(id);
+    const scope = await generous.forUser(id);
+    await spoken(scope, "2026-10-01", 100_000);
+    expect(await scope.plans.takeAudio(60, OCT)).toMatchObject({
+      ok: true,
+      limitSeconds: null,
+      usedSeconds: 100_060,
+    });
+  });
+});
+
 describe("the admin path for a person's plan", () => {
   it("grants Personal or Unlimited by email, and returns to the installation's plan", async () => {
     const fia = await account("grant-fia");

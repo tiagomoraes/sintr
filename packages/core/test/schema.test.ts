@@ -1,14 +1,14 @@
 import { execFileSync } from "node:child_process";
-import { cpSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { cpSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { getTableColumns, getTableName, is, sql } from "drizzle-orm";
+import { getTableColumns, getTableName, inArray, is, sql } from "drizzle-orm";
 import { PgTable, getTableConfig } from "drizzle-orm/pg-core";
 import { afterAll, describe, expect, it } from "vitest";
 import { KEY_MATERIAL, SEALED } from "../src/db/sealed";
 import * as schema from "../src/db/schema";
-import { openTestDatabase } from "./support";
+import { createUser, openTestDatabase } from "./support";
 
 const tables = (Object.values(schema) as unknown[]).filter((value): value is PgTable => is(value, PgTable));
 
@@ -164,5 +164,35 @@ describe("migrations", () => {
     );
     const types = new Map(rows.map((r) => [`${r.table_name}.${r.column_name}`, r.data_type]));
     for (const column of sealedColumns) expect(types.get(column), column).toBe("bytea");
+  });
+
+  it("send nobody who already kept a diary through the welcome (0006)", async () => {
+    const root = fileURLToPath(new URL("..", import.meta.url));
+    const backfill = readFileSync(join(root, "drizzle/0006_welcome_and_voice.sql"), "utf8")
+      .split("--> statement-breakpoint")
+      .map((statement) => statement.trim())
+      .find((statement) => statement.includes('INSERT INTO "profiles"'));
+    expect(backfill, "the backfill statement").toBeDefined();
+    const withRow = await createUser(db.db, "before-welcome");
+    const withoutRow = await createUser(db.db, "before-welcome-bare");
+    const done = new Date("2026-10-01T09:00:00Z");
+    await db.db.insert(schema.profiles).values({ userId: withRow, timezone: "America/Sao_Paulo" });
+    const finished = await createUser(db.db, "before-welcome-done");
+    await db.db.insert(schema.profiles).values({ userId: finished, onboardedAt: done });
+    await db.db.execute(sql.raw(backfill!));
+    const rows = await db.db
+      .select({
+        userId: schema.profiles.userId,
+        at: schema.profiles.onboardedAt,
+        zone: schema.profiles.timezone,
+      })
+      .from(schema.profiles)
+      .where(inArray(schema.profiles.userId, [withRow, withoutRow, finished]));
+    const byId = new Map(rows.map((row) => [row.userId, row]));
+    expect(byId.get(withRow)?.at).toBeInstanceOf(Date);
+    // A profile the person set keeps what it held.
+    expect(byId.get(withRow)?.zone).toBe("America/Sao_Paulo");
+    expect(byId.get(withoutRow)?.at).toBeInstanceOf(Date);
+    expect(byId.get(finished)?.at).toEqual(done);
   });
 });
