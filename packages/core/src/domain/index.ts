@@ -701,6 +701,8 @@ export interface Entitlements {
   subscription: Subscription | null;
   period: UsagePeriod;
   used: Record<Meter, number>;
+  /** Speech transcribed by the house this month, to the second (`used.audioMinutes` rounds it up). */
+  spokenSeconds: number;
 }
 
 /**

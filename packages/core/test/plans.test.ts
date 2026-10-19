@@ -106,6 +106,7 @@ describe("the plan a person holds", () => {
       subscription: null,
       period: { start: "2026-10-01", next: "2026-11-01" },
       used: { assistantMessages: 0, reports: 0, audioMinutes: 0 },
+      spokenSeconds: 0,
     });
     await used(ana, "2026-10-01", 12, 1);
     expect((await ana.plans.current(OCT)).used).toEqual({
@@ -225,6 +226,7 @@ describe("spoken minutes", () => {
       period: { start: "2026-10-01" },
     });
     expect((await ivo.plans.current(OCT)).used.audioMinutes).toBe(1);
+    expect((await ivo.plans.current(OCT)).spokenSeconds).toBe(13);
     expect(await ivo.plans.takeAudio(50, OCT)).toMatchObject({ ok: true, usedSeconds: 63 });
     expect((await ivo.plans.current(OCT)).used.audioMinutes).toBe(2);
     // Messages are a meter of their own.

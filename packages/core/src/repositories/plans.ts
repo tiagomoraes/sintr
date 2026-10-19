@@ -167,8 +167,18 @@ export function plansRepository({ db, userId, personPlan }: PlansContext) {
   return {
     async current(now: Date = new Date()): Promise<Entitlements> {
       const period = usagePeriod(now, await timeZone(db));
-      const [{ own, plan: current }, counts] = await Promise.all([plan(db), used(db, period)]);
-      return { plan: current, subscription: own, period, used: counts };
+      const [{ own, plan: current }, counts, row] = await Promise.all([
+        plan(db),
+        used(db, period),
+        counters(db, period),
+      ]);
+      return {
+        plan: current,
+        subscription: own,
+        period,
+        used: counts,
+        spokenSeconds: row?.audioSeconds ?? 0,
+      };
     },
 
     /** One unit of a meter, if this month's allowance has one left. */
