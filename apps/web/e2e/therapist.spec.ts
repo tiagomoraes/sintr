@@ -372,3 +372,40 @@ test.describe("the practice routes are scoped to their owner", () => {
     for (const context of [anonymous, other.context, stranger.context, person.context]) await context.close();
   });
 });
+
+test.describe("the shell follows the page", () => {
+  test("the crisis lines stay on the person's pages, whatever page was opened first", async ({ page }) => {
+    await signUpQuietly(page, newEmail("shell"));
+    await (await scopeOf(page)).practice.open({ professionalName: "Dr. Shell" });
+    const crisis = page.getByRole("heading", { name: /please call someone now/ });
+    const note = page.getByText("Reports arrive when a person approves and shares them", { exact: false });
+    const width = () => page.locator("main").evaluate((main) => getComputedStyle(main).maxWidth);
+    const nav = page.getByRole("navigation", { name: "Your diary" });
+
+    // Opened on the practice first, then into the diary, in the app.
+    await page.goto("/practice");
+    await expect(note).toBeVisible();
+    await expect(crisis).toHaveCount(0);
+    expect(await width()).toBe("none");
+    await nav.getByRole("link", { name: "Entries", exact: true }).click();
+    await expect(page).toHaveURL(/\/entries$/);
+    await expect(crisis).toHaveCount(1);
+    await expect(note).toHaveCount(0);
+    expect(await width()).not.toBe("none");
+    // The crisis lines come after the page, in the footer, never before it.
+    const order = await page.evaluate(() => {
+      const lines = [...document.querySelectorAll("footer h2")].find((h) =>
+        h.textContent?.includes("call someone"),
+      );
+      return lines ? Boolean(document.querySelector("main")!.compareDocumentPosition(lines) & 4) : null;
+    });
+    expect(order).toBe(true);
+
+    // And back to the practice.
+    await nav.getByRole("link", { name: "Dashboard", exact: true }).click();
+    await expect(page).toHaveURL(/\/practice$/);
+    await expect(note).toBeVisible();
+    await expect(crisis).toHaveCount(0);
+    expect(await width()).toBe("none");
+  });
+});
