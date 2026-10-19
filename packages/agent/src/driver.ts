@@ -23,6 +23,9 @@ import { isSaveCommand } from "./words";
 /** Enough for: read context, propose, fix a refused draft, then reply. */
 export const MAX_STEPS = 5;
 
+/** How long a reply waits for the memory before it goes on without it. */
+export const MEMORY_WAIT_MS = 6_000;
+
 export interface CaptureTurn {
   model: LanguageModel;
   /** The stored conversation before this turn, oldest first. */
@@ -44,6 +47,13 @@ export interface CaptureTurn {
    * which is never counted. A message that signals risk never touches it.
    */
   metered?: Metered;
+  /**
+   * The memory's section for this turn (`memorySection`), from the person's
+   * latest words. Asked only once the crisis screen has passed and the
+   * model is about to run, never in a paused conversation, and not waited
+   * for longer than MEMORY_WAIT_MS.
+   */
+  memory?(text: string): Promise<string>;
 }
 
 type Writer = UIMessageStreamWriter<SintrUIMessage>;
@@ -71,6 +81,25 @@ async function keepWords(
   } catch (error) {
     turn.log.warn("agent.keep_failed", { error });
     return null;
+  }
+}
+
+/** The memory's section, or none if it fails or does not come in time: the reply never depends on it. */
+async function memoryFor(turn: CaptureTurn, text: string): Promise<string | undefined> {
+  if (!turn.memory) return undefined;
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    const late = new Promise<undefined>((resolve) => {
+      timer = setTimeout(() => resolve(undefined), MEMORY_WAIT_MS);
+    });
+    const section = await Promise.race([turn.memory(text), late]);
+    if (section === undefined) turn.log.warn("memory.recall_failed", { code: "timeout" });
+    return section;
+  } catch (error) {
+    turn.log.warn("memory.recall_failed", { error });
+    return undefined;
+  } finally {
+    clearTimeout(timer);
   }
 }
 
@@ -202,12 +231,19 @@ export function runCaptureTurn(turn: CaptureTurn): ReadableStream<SintrUIMessage
               },
             });
         const states = inCrisis ? new Map() : await turn.ports.proposalStates();
+        // After the crisis screen and the meter: a memory never comes before either, nor into a paused diary.
+        const memory = inCrisis ? undefined : await memoryFor(turn, text);
 
         const result = streamText({
           model: turn.model,
           instructions: inCrisis
             ? crisisPrompt()
-            : capturePrompt({ ...person, now: turn.now ?? new Date(), ...(turnNote ? { turnNote } : {}) }),
+            : capturePrompt({
+                ...person,
+                now: turn.now ?? new Date(),
+                ...(turnNote ? { turnNote } : {}),
+                ...(memory ? { memory } : {}),
+              }),
           messages: await toModelMessages(messages, {
             states,
             textOnly: inCrisis,

@@ -191,6 +191,9 @@ export function checkinInputFromDraft(draft: CheckinDraft): CheckinInput {
 /** Why speaking is not on offer (see voice.ts): no assistant yet, turned off, a provider without audio, or one sintr does not know. */
 export type VoiceUnavailable = "not_configured" | "off" | "provider_has_no_audio" | "provider_unknown";
 
+/** Why there is no memory to offer: no assistant, the house turned it off, or a provider sintr cannot ask for vectors. */
+export type MemoryUnavailable = "not_configured" | "off" | "provider_has_no_embeddings" | "provider_unknown";
+
 /** The crisis lines named in the brief and the pack, in the order to call. */
 export const CRISIS_LINES = [
   { name: "CVV", number: "188", where: "Brazil", note: "free, 24 hours" },

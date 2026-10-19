@@ -242,13 +242,55 @@ export function rehearsalReport(digestText: string, retry: boolean): Record<stri
 }
 
 /**
+ * The rehearsal's reading of the diary for the memory: from each page, the
+ * first sentence of what happened (or of a check-in's note) as a moment, in
+ * the person's own words, and a sentence about their work, if one says so,
+ * as something about them. The quote is the same words, so the check finds
+ * them.
+ */
+export function rehearsalMemories(text: string): { memories: Record<string, string>[] } {
+  const memories: Record<string, string>[] = [];
+  for (const page of text.matchAll(/<page id="([^"]+)"[^>]*>\n([\s\S]*?)\n<\/page>/gu)) {
+    const [, ref, body] = page;
+    const fields = new Map(
+      body!.split("\n").map((line) => {
+        const at = line.indexOf(": ");
+        return [line.slice(0, at), line.slice(at + 2)] as const;
+      }),
+    );
+    const told = fields.get("what happened") ?? fields.get("note") ?? fields.get("title");
+    const sentence = told ? firstSentence(told).slice(0, 200) : "";
+    if (sentence) memories.push({ page: ref!, kind: "moment", text: sentence, quote: sentence });
+    const work = /\b(?:I work|I am a|trabalho|sou)\b[^.!?\n]{3,120}/iu.exec(body!)?.[0];
+    if (work) memories.push({ page: ref!, kind: "about", text: work, quote: work });
+  }
+  return { memories };
+}
+
+/** What the memory gave a conversation, read back from the instructions. */
+function memoryIn(instructions: string): { name: string | null; related: string | null } | null {
+  if (!instructions.includes("<memory>")) return null;
+  const name = /^They go by: (.+)$/mu.exec(instructions)?.[1]?.trim() ?? null;
+  const related = /Related to what they are telling you now:\n- [^:]+: (.+?)(?: Their words: .*)?$/mu.exec(
+    instructions,
+  )?.[1];
+  return { name, related: related?.trim() ?? null };
+}
+
+/**
  * The scripted assistant behind SINTR_FAKE_AGENT. It follows the capture
  * flow closely enough to exercise the whole app: it acknowledges and asks
  * one question, then drafts the entry from the person's own sentences, and
  * drafts a check-in when the message reads like one. Asked for the weekly
- * report, it writes one from the digest.
+ * report, it writes one from the digest. Asked to read the diary for the
+ * memory, it keeps a moment of each page; given memories, its first reply
+ * calls the person by their name and brings up what is related, so the
+ * tests can see what reached it.
  */
 export const rehearsalScript: Script = (call) => {
+  if (call.tools.includes("remember")) {
+    return { toolCalls: [{ toolName: "remember", input: rehearsalMemories(call.userTexts.join("\n")) }] };
+  }
   if (call.tools.includes("write_report")) {
     const refused = call.toolResults.some((r) => (r.output as { ok?: boolean } | null)?.ok === false);
     return {
@@ -279,9 +321,23 @@ export const rehearsalScript: Script = (call) => {
   const latest = users.at(-1) ?? "";
   const checkin = call.tools.includes("propose_checkin") ? checkinIn(latest) : null;
   if (checkin) return { toolCalls: [{ toolName: "propose_checkin", input: checkin }] };
-  if (users.length <= 1 || !call.tools.includes("propose_entry")) {
+  const memory = memoryIn(call.instructions);
+  if (!memory && /\b(?:remember|lembra)\b/iu.test(latest) && call.instructions.includes("Memory\n")) {
     return {
-      text: "Thank you for telling me. That sounds like a hard moment.\n\nWhat went through your mind right then, in the words you heard it? And how strong was the feeling, from 0 to 100?",
+      text: "I do not have a memory of you right now: sintr's memory is off. You can see why, and turn it on, in Memory.",
+    };
+  }
+  if (users.length <= 1 || !call.tools.includes("propose_entry")) {
+    const remembered = memory
+      ? [
+          memory.name ? `${memory.name}, it is good to hear from you.` : "",
+          memory.related ? `You mentioned this before: ${memory.related}.` : "",
+        ]
+          .filter(Boolean)
+          .join(" ")
+      : "";
+    return {
+      text: `${remembered ? `${remembered}\n\n` : ""}Thank you for telling me. That sounds like a hard moment.\n\nWhat went through your mind right then, in the words you heard it? And how strong was the feeling, from 0 to 100?`,
     };
   }
   const later = users.slice(1).join("\n");
