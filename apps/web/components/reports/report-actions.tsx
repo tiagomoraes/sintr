@@ -5,22 +5,43 @@ import { Button, Checkbox, FieldError, buttonVariants } from "@sintr/ui";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useId, useState } from "react";
+import { useMessages } from "@/components/language";
+import { namesInWords } from "@/lib/reports";
+import type { Messages } from "@/messages";
 
-const FAILURES: Record<string, string> = {
-  pdf_unavailable: "The PDF could not be printed just now. Nothing changed; try again in a moment.",
-  practice_changed:
-    "The practice changed its name or details since this page opened. Nothing was shared; reload the page and read them again.",
-  sharing_changed:
-    "Who receives what you approve changed since this page opened. Nothing was approved; reload the page and look again.",
-  not_found: "That link is no longer active, so nothing was shared. Reload the page.",
-  email_off: "Email is not set up on this sintr, so nothing was sent. Download the PDF to share it yourself.",
-  send_failed: "The email could not be sent, so the report is not marked sent. Try again in a moment.",
-  invalid: "Your therapist's email changed since this page opened. Read the address again before sending.",
-  invalid_state: "The report changed since this page opened. Reload it and look again.",
-  invalid_message: "Your therapist's email does not look right. Check it in Therapy.",
-};
+type Words = Messages["reports"];
 
-async function post(id: string, body: Record<string, unknown>): Promise<string | null> {
+/** What went wrong, by the code the server answered. */
+function failureFor(code: string | undefined, failures: Words["failures"]): string {
+  switch (code) {
+    case "pdf_unavailable":
+      return failures.pdfUnavailable;
+    case "practice_changed":
+      return failures.practiceChanged;
+    case "sharing_changed":
+      return failures.sharingChanged;
+    case "not_found":
+      return failures.notFound;
+    case "email_off":
+      return failures.emailOff;
+    case "send_failed":
+      return failures.sendFailed;
+    case "invalid":
+      return failures.invalid;
+    case "invalid_state":
+      return failures.invalidState;
+    case "invalid_message":
+      return failures.invalidMessage;
+    default:
+      return failures.other;
+  }
+}
+
+async function post(
+  id: string,
+  body: Record<string, unknown>,
+  failures: Words["failures"],
+): Promise<string | null> {
   const response = await fetch(`/api/reports/${id}`, {
     method: "POST",
     headers: { "content-type": "application/json" },
@@ -30,12 +51,8 @@ async function post(id: string, body: Record<string, unknown>): Promise<string |
     code?: string;
     failed?: string[];
   };
-  if (response.ok) {
-    return answer.failed?.length
-      ? "Approved. It could not be shared with every practice just now; share it from below."
-      : null;
-  }
-  return FAILURES[answer.code ?? ""] ?? "Something went wrong. Nothing was sent. Try again in a moment.";
+  if (response.ok) return answer.failed?.length ? failures.notShared : null;
+  return failureFor(answer.code, failures);
 }
 
 /** A practice the person is linked with, as this report concerns it. */
@@ -53,9 +70,11 @@ export interface PracticeChoice {
   shared: string | null;
 }
 
-function names(practices: readonly PracticeChoice[]): string {
-  const all = practices.map((p) => p.name);
-  return all.length <= 1 ? (all[0] ?? "") : `${all.slice(0, -1).join(", ")} and ${all.at(-1)}`;
+function names(practices: readonly PracticeChoice[], words: Words): string {
+  return namesInWords(
+    practices.map((p) => p.name),
+    words,
+  );
 }
 
 /** Share an approved report with one practice: an explicit yes that names it, like an email send. */
@@ -68,27 +87,26 @@ function SharePanel({
   busy: string | null;
   onShare: () => void;
 }) {
+  const { share } = useMessages().reports.actions;
   const [confirmed, setConfirmed] = useState(false);
   const id = useId();
   return (
     <div className="rounded-file border border-rule px-[22px] py-5">
-      <p className="font-serif text-title-small text-ink">Share it with {practice.name}</p>
+      <p className="font-serif text-title-small text-ink">{share.title(practice.name)}</p>
       <div className="mt-4 flex items-start gap-3">
         <Checkbox id={id} checked={confirmed} onChange={(event) => setConfirmed(event.target.checked)} />
         <label htmlFor={id} className="text-[0.9688rem] leading-[1.55] text-ink-2">
-          I approve sharing this report, exactly as in the PDF below, with{" "}
-          <span className="font-medium text-ink">{practice.who}</span> on sintr.
+          {share.consent[0]}
+          <span className="font-medium text-ink">{practice.who}</span>
+          {share.consent[1]}
         </label>
       </div>
       <div className="mt-5">
         <Button type="button" disabled={!confirmed || busy !== null} onClick={onShare}>
-          {busy === `share-${practice.linkId}` ? "Sharing" : `Share with ${practice.name}`}
+          {busy === `share-${practice.linkId}` ? share.busy : share.button(practice.name)}
         </Button>
       </div>
-      <p className="mt-4 text-caption text-ink-3">
-        They read it in their practice and can download the PDF. Your yes is recorded with the date. You can
-        stop sharing in Sharing; a PDF they downloaded stays with them.
-      </p>
+      <p className="mt-4 text-caption text-ink-3">{share.note}</p>
     </div>
   );
 }
@@ -122,6 +140,8 @@ export function ReportActions({
   /** The practices the person is actively linked with. */
   practices?: readonly PracticeChoice[];
 }) {
+  const words = useMessages().reports;
+  const { actions } = words;
   const router = useRouter();
   const [busy, setBusy] = useState<string | null>(null);
   const [failure, setFailure] = useState<string | null>(null);
@@ -131,16 +151,17 @@ export function ReportActions({
   const act = async (name: string, body: Record<string, unknown>) => {
     setBusy(name);
     setFailure(null);
-    const problem = await post(id, body);
+    const problem = await post(id, body, words.failures);
     setBusy(null);
     if (problem) setFailure(problem);
     else router.refresh();
   };
 
   const automatic = practices.filter((practice) => practice.automatic);
+  const sendConsent = actions.send.consent(delivery.kind === "email" ? delivery.therapist : null);
   const changeWords = shared ? null : (
     <Link href={`/reports/${id}/edit`} className={buttonVariants({ variant: "outline", size: "sm" })}>
-      Change the words
+      {actions.change}
     </Link>
   );
   const practicePanels =
@@ -191,13 +212,13 @@ export function ReportActions({
             disabled={busy !== null}
           >
             {busy === "approve"
-              ? "Approving"
+              ? actions.approving
               : automatic.length
-                ? `Approve and share with ${names(automatic)}`
-                : "Approve this report"}
+                ? actions.approveAndShare(names(automatic, words))
+                : actions.approve}
           </Button>
           <Link href={`/reports/${id}/edit`} className={buttonVariants({ variant: "outline", size: "sm" })}>
-            Change the words
+            {actions.change}
           </Link>
           <Button
             type="button"
@@ -206,19 +227,17 @@ export function ReportActions({
             onClick={() => void act("again", { action: "prepare_again" })}
             disabled={busy !== null}
           >
-            {busy === "again" ? "Preparing" : "Prepare it again"}
+            {busy === "again" ? actions.preparing : actions.again}
           </Button>
         </div>
       ) : null}
       {status === "draft" ? (
         <p className="max-w-[38em] text-[0.9375rem] text-ink-3">
-          Approving keeps this version and prints the final PDF, without the draft mark.{" "}
+          {actions.approveNote}{" "}
           {automatic.length
-            ? `You chose that what you approve goes to ${names(automatic)}, so approving also shares it with ${
-                automatic.length === 1 ? "them" : "each of them"
-              }, and nothing else.`
-            : "Nothing is sent when you approve."}
-          {edited ? " Preparing it again replaces your changes; what they said is kept below." : ""}
+            ? actions.approveShares(names(automatic, words), automatic.length)
+            : actions.approveSendsNothing}
+          {edited ? ` ${actions.againReplaces}` : ""}
         </p>
       ) : null}
       {practicePanels}
@@ -226,7 +245,7 @@ export function ReportActions({
       {status === "reviewed" ? (
         delivery.kind === "email" ? (
           <div className="rounded-file border border-rule px-[22px] py-5">
-            <p className="font-serif text-title-small text-ink">Send it to your therapist</p>
+            <p className="font-serif text-title-small text-ink">{actions.send.title}</p>
             <div className="mt-4 flex items-start gap-3">
               <Checkbox
                 id={confirmId}
@@ -234,9 +253,9 @@ export function ReportActions({
                 onChange={(event) => setConfirmed(event.target.checked)}
               />
               <label htmlFor={confirmId} className="text-[0.9688rem] leading-[1.55] text-ink-2">
-                I approve sending this report, exactly as in the PDF below, to{" "}
-                {delivery.therapist ? `${delivery.therapist}, ` : ""}
-                <span className="font-medium text-ink">{delivery.email}</span>.
+                {sendConsent[0]}
+                <span className="font-medium text-ink">{delivery.email}</span>
+                {sendConsent[1]}
               </label>
             </div>
             <div className="mt-5 flex flex-wrap items-center gap-x-5 gap-y-3">
@@ -247,24 +266,22 @@ export function ReportActions({
                   void act("send", { action: "send", recipient: delivery.email, confirmed: true })
                 }
               >
-                {busy === "send" ? "Sending" : "Approve and send"}
+                {busy === "send" ? actions.send.busy : actions.send.button}
               </Button>
               {changeWords}
             </div>
-            <p className="mt-4 text-caption text-ink-3">
-              An email cannot be taken back. Your yes is recorded with the date, the report and the address.
-            </p>
+            <p className="mt-4 text-caption text-ink-3">{actions.send.note}</p>
           </div>
         ) : (
           <div className="flex flex-wrap items-center gap-x-5 gap-y-3">
             <p className="max-w-[36em] text-[0.9688rem] text-ink-2">
               {delivery.kind === "keep"
                 ? practices.length
-                  ? "Nothing goes by email: you chose to keep the PDF for yourself. You can download it below."
-                  : "You chose to keep reports for yourself. Download the PDF to bring it or share it your way."
+                  ? actions.keepWithPractices
+                  : actions.keep
                 : delivery.kind === "no_address"
-                  ? "To send it, add your therapist's email in Therapy. You can also download the PDF and share it yourself."
-                  : "Email is not set up on this sintr. Download the PDF to bring it or share it yourself."}
+                  ? actions.noAddress
+                  : actions.emailOff}
             </p>
             {changeWords}
           </div>

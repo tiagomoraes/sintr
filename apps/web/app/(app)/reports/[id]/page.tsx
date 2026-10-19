@@ -7,11 +7,14 @@ import { ReportActions, type PracticeChoice } from "@/components/reports/report-
 import { ReportChanges } from "@/components/reports/report-changes";
 import { ReportPaper } from "@/components/reports/report-paper";
 import { formatDay, formatMoment } from "@/lib/format";
-import { STATUS, authorInWords, problemInWords } from "@/lib/reports";
+import { authorInWords, problemInWords } from "@/lib/reports";
 import { practiceWho } from "@/lib/sharing";
+import { currentLanguage, getMessages } from "@/lib/server/language";
 import { requireScope, runtime } from "@/lib/server/runtime";
 
-export const metadata: Metadata = { title: "Report" };
+export async function generateMetadata(): Promise<Metadata> {
+  return { title: (await getMessages()).reports.report.title };
+}
 
 export default async function ReportPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -24,7 +27,9 @@ export default async function ReportPage({ params }: { params: Promise<{ id: str
     scope.sharing.links(),
   ]);
   if (!view) notFound();
-  const locale = { language: "en", timezone: view.timeZone };
+  const [t, language] = await Promise.all([getMessages(), currentLanguage()]);
+  const words = t.reports;
+  const locale = { language: language.code, timezone: view.timeZone };
   // The practices the person is linked with, and whether this report went to each.
   const practices: PracticeChoice[] = links
     .filter((link) => link.status === "active")
@@ -37,11 +42,11 @@ export default async function ReportPage({ params }: { params: Promise<{ id: str
         line: practiceLine(link.practice),
         automatic: link.shareMode === "auto",
         shared: share
-          ? `Shared with ${link.practice.professionalName} on ${formatDay(share.sharedAt, locale)}. ${
-              share.firstReadAt
-                ? `They opened it on ${formatDay(share.firstReadAt, locale)}.`
-                : "Not opened yet."
-            }`
+          ? words.report.sharedWith(
+              link.practice.professionalName,
+              formatDay(share.sharedAt, locale),
+              share.firstReadAt ? formatDay(share.firstReadAt, locale) : null,
+            )
           : null,
       };
     });
@@ -65,19 +70,20 @@ export default async function ReportPage({ params }: { params: Promise<{ id: str
     <>
       <p className="mb-6">
         <Link href="/reports" className={linkStyles}>
-          All reports
+          {words.report.all}
         </Link>
       </p>
       <header className="mb-8">
         <h1 className="text-title">
           {view.period.session ? (
             <>
-              The report for{" "}
+              {words.report.heading.session}{" "}
               <span className="text-ink-soft">{formatMoment(view.period.session, locale)}</span>
             </>
           ) : (
             <>
-              The report for <span className="text-ink-soft">week {view.period.label}</span>
+              {words.report.heading.week}{" "}
+              <span className="text-ink-soft">{words.report.week(view.period.label)}</span>
             </>
           )}
         </h1>
@@ -89,24 +95,27 @@ export default async function ReportPage({ params }: { params: Promise<{ id: str
             />
           ) : null}
           {report.status === "sent" && report.sentAt
-            ? `Sent with your approval to ${report.recipient ?? "your therapist"} on ${formatMoment(report.sentAt, locale)}.`
+            ? words.report.sent(report.recipient, formatMoment(report.sentAt, locale))
             : report.sharedAt
-              ? `Approved by you and shared on ${formatMoment(report.sharedAt, locale)}.`
-              : STATUS[report.status]}
+              ? words.report.shared(formatMoment(report.sharedAt, locale))
+              : words.status[report.status]}
         </p>
         <p className="mt-2 max-w-[38em] text-[0.9375rem] text-ink-3">
-          It covers {formatMoment(report.periodStart, locale)} to {formatMoment(report.periodEnd, locale)}.
+          {words.report.covers(
+            formatMoment(report.periodStart, locale),
+            formatMoment(report.periodEnd, locale),
+          )}
         </p>
       </header>
 
       {view.content.author === "sintr" ? (
         <div className="mb-8 max-w-[44rem] rounded-file border border-rule bg-wash px-[22px] py-5 text-[0.9688rem] text-ink-2">
-          {authorInWords(view.content.problem)}
+          {authorInWords(view.content.problem, words)}
           {view.content.problem === "limit_reached" ? (
             <>
               {" "}
               <Link href="/plan" className={linkStyles}>
-                See your plan
+                {words.report.seePlan}
               </Link>
             </>
           ) : null}
@@ -118,11 +127,11 @@ export default async function ReportPage({ params }: { params: Promise<{ id: str
           className="mb-8 max-w-[44rem] rounded-file border border-rule px-[22px] py-5"
         >
           <h2 id="problems-title" className="font-serif text-title-small font-normal text-ink">
-            Worth a look before you approve it
+            {words.report.problems}
           </h2>
           <ul className="mt-3 list-none space-y-2 p-0 text-[0.9688rem] text-ink-2">
             {view.check.problems.map((problem, i) => (
-              <li key={i}>{problemInWords(problem.code, problem.detail)}</li>
+              <li key={i}>{problemInWords(problem.code, problem.detail, words)}</li>
             ))}
           </ul>
         </section>
@@ -144,25 +153,23 @@ export default async function ReportPage({ params }: { params: Promise<{ id: str
       <section aria-labelledby="pdf-title" className="mt-16">
         <div className="flex flex-wrap items-baseline justify-between gap-x-6 gap-y-2">
           <h2 id="pdf-title" className="font-serif text-title-small font-normal text-ink">
-            {report.status === "draft" ? "The PDF, as a draft" : "The PDF your therapist receives"}
+            {report.status === "draft" ? words.report.pdf.draftTitle : words.report.pdf.title}
           </h2>
           <p className="flex gap-5 text-[0.9375rem]">
             <a href={pdf} target="_blank" rel="noopener" className={linkStyles}>
-              Open the PDF
+              {words.report.pdf.open}
             </a>
             <a href={`${pdf}?download=1`} className={linkStyles}>
-              Download
+              {words.report.pdf.download}
             </a>
           </p>
         </div>
         <p className="mt-2 max-w-[38em] text-[0.9375rem] text-ink-3">
-          {report.status === "draft"
-            ? "Marked as a draft on its first page until you approve it."
-            : "Printed when you approved it. This is exactly the file that is sent or shared."}
+          {report.status === "draft" ? words.report.pdf.draftNote : words.report.pdf.note}
         </p>
         <iframe
           src={pdf}
-          title="PDF preview of the report"
+          title={words.report.pdf.preview}
           className="mt-5 h-[min(88vh,1100px)] w-full rounded-paper border border-rule bg-wash"
         />
       </section>

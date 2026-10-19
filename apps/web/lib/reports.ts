@@ -1,79 +1,76 @@
-import type { ProblemCode, ReportSection, ReportStatus } from "@sintr/core";
+import type { ProblemCode, ReportSection } from "@sintr/core";
+import type { Messages } from "@/messages";
 import { formatDay, formatMoment } from "./format";
 
-/** The lifecycle, in the person's words. */
-export const STATUS: Record<ReportStatus, string> = {
-  draft: "Draft, waiting for you",
-  reviewed: "Approved by you, not sent",
-  sent: "Sent with your approval",
-};
+/** The words of the reports screens, in the page's language. */
+type Words = Messages["reports"];
 
-/** The sections, as the app names them inside a sentence. */
-export const SECTION_NAMES: Record<ReportSection, string> = {
-  week: "how the week went",
-  session: "the topics for the session",
-  mood: "mood, energy and sleep",
-  moments: "the moments",
-  patterns: "what repeated",
-  helped: "what helped",
-};
+/** Several names as a sentence lists them: "a", "a and b", "a, b and c" (empty for none). */
+export function namesInWords(names: readonly string[], words: Words): string {
+  if (names.length <= 1) return names[0] ?? "";
+  return words.and(names.slice(0, -1).join(", "), names.at(-1)!);
+}
 
-export function sectionsInWords(sections: readonly string[]): string {
-  const names = sections.map((s) => SECTION_NAMES[s as ReportSection] ?? s);
-  if (names.length === 0) return "nothing in its words";
-  if (names.length === 1) return names[0]!;
-  return `${names.slice(0, -1).join(", ")} and ${names.at(-1)}`;
+/** The sections a change touched, as the app names them inside a sentence; null for none. */
+export function sectionsInWords(sections: readonly string[], words: Words): string | null {
+  if (sections.length === 0) return null;
+  return namesInWords(
+    sections.map((s) => words.sectionNames[s as ReportSection] ?? s),
+    words,
+  );
 }
 
 /** What a check problem means, for the person. `detail` is their own words. */
-export function problemInWords(code: ProblemCode, detail: string | null): string {
+export function problemInWords(code: ProblemCode, detail: string | null, words: Words): string {
   const quoted = detail ? `“${detail}”` : "";
+  const problems = words.problems;
   switch (code) {
     case "quote_not_found":
-      return `${quoted} is not in your diary word for word, so it is shown without the highlight that marks your own words.`;
+      return problems.quoteNotFound(quoted);
     case "states_a_cause":
-      return `${quoted} reads as a cause. The report describes what happened together, not why.`;
+      return problems.statesACause(quoted);
     case "clinical_label":
-      return `${quoted} reads as a clinical label. The report keeps to your own words.`;
+      return problems.clinicalLabel(quoted);
     case "undated_observation":
-      return `An observation under what repeated has no date: ${quoted}.`;
+      return problems.undatedObservation(quoted);
     case "moment_entry_changed":
-      return `The entry ${quoted} changed after this report was prepared. Prepare it again to take the change.`;
+      return problems.momentEntryChanged(quoted);
     case "moment_entry_missing":
-      return `The entry ${quoted} is no longer in your diary. Remove the moment or prepare the report again.`;
+      return problems.momentEntryMissing(quoted);
     case "note_changed":
-      return `A check-in note changed after this report was prepared: ${quoted}.`;
+      return problems.noteChanged(quoted);
     case "too_many_topics":
-      return "There are more than six topics for the session; two to four read best.";
+      return problems.tooManyTopics;
     case "too_many_moments":
-      return "There are more than six moments; three to five read best.";
+      return problems.tooManyMoments;
     case "long_summary":
-      return "How the week went is long for the first page; three to six lines read best.";
+      return problems.longSummary;
   }
 }
 
 /** Why sintr, not the assistant, prepared a draft. */
-export function authorInWords(problem: string | null): string {
+export function authorInWords(problem: string | null, words: Words): string {
   switch (problem) {
     case "not_configured":
-      return "There is no assistant set up, so sintr prepared what it can on its own: the moments, your notes and your topics, in your own words. How the week went and the reading of the numbers are yours to write.";
+      return words.author.notConfigured;
     case "limit_reached":
-      return "This month's reports written by the assistant are used on your plan, so sintr prepared what it can on its own: the moments, your notes and your topics, in your own words. How the week went is yours to write, or the assistant can prepare it again next month.";
+      return words.author.limitReached;
     case "no_report":
-      return "Your assistant answered without writing the report, so sintr prepared what it can on its own. You can write the rest, or prepare it again.";
+      return words.author.noReport;
     case null:
-      return "sintr prepared what it can on its own.";
+      return words.author.none;
     default:
-      return "Your assistant could not be reached to write this draft, so sintr prepared what it can on its own. You can write the rest, or prepare it again when the assistant answers.";
+      return words.author.unreachable;
   }
 }
 
-/** "For the session of Tuesday 21 October at 18:00", or "Week of 13 October 2026". */
+/** "For the session of Tuesday 21 October at 18:00", or "Week of 13 October 2026", in the page's language. */
 export function reportTitle(
   report: { sessionAt: Date | null; periodStart: Date },
   locale: { language: string; timezone: string },
+  t: Messages,
 ): string {
   return report.sessionAt
-    ? `For the session of ${formatMoment(report.sessionAt, locale)}`
-    : `Week of ${formatDay(report.periodStart, locale)}`;
+    ? t.reports.titles.session(formatMoment(report.sessionAt, locale))
+    : t.reports.titles.week(formatDay(report.periodStart, locale));
 }

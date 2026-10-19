@@ -22,6 +22,7 @@ import {
 } from "@sintr/core";
 import { IntensityChip, NotebookCard, NotebookHead, NotebookRow, Verbatim, cn } from "@sintr/ui";
 import type { ReactNode } from "react";
+import { getMessages } from "@/lib/server/language";
 
 /**
  * A report as the person reads it before approving it (or as a practice
@@ -31,20 +32,26 @@ import type { ReactNode } from "react";
  * underlined, so the person can see it and fix it.
  */
 
-type Check = PaperView["check"];
+/** What the check found in the diary, and the app's words for a quote it did not find there. */
+interface Quotes {
+  check: PaperView["check"];
+  unverified: string;
+  /** Between two intensities, for a screen reader. */
+  to: string;
+}
 
-function Prose({ text, check }: { text: string; check: Check }) {
+function Prose({ text, quotes }: { text: string; quotes: Quotes }) {
   return (
     <>
       {splitQuotes(text).map((part, i) =>
         !part.quote ? (
           <span key={i}>{part.text}</span>
-        ) : isVerified(check, part.text) ? (
+        ) : isVerified(quotes.check, part.text) ? (
           <Verbatim key={i}>{part.text}</Verbatim>
         ) : (
           <span
             key={i}
-            title="Not found in the diary word for word"
+            title={quotes.unverified}
             className="underline decoration-ink-soft decoration-dotted decoration-1 underline-offset-[0.3em]"
           >
             {`“${part.text}”`}
@@ -73,7 +80,19 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
   );
 }
 
-function Feelings({ felt, before }: { felt: ReportMoment["felt"]; before?: ReportMoment["felt"] }) {
+function Feelings({
+  felt,
+  before,
+  to,
+  of100,
+}: {
+  felt: ReportMoment["felt"];
+  before?: ReportMoment["felt"];
+  /** "of 100" in the report's language. */
+  of100: string;
+  /** Said to a screen reader between the two intensities; the eye sees the PDF's arrow. */
+  to: string;
+}) {
   const was = new Map((before ?? []).map((e) => [e.name.toLocaleLowerCase(), e.intensity]));
   return (
     <ul className="m-0 flex list-none flex-wrap gap-x-5 gap-y-1.5 p-0">
@@ -84,10 +103,19 @@ function Feelings({ felt, before }: { felt: ReportMoment["felt"]; before?: Repor
             {emotion.name}
             {emotion.intensity !== null && previous !== undefined && previous !== null ? (
               <span className="ml-2 inline-flex translate-y-[-0.08em] items-center whitespace-nowrap rounded-pill border border-rule px-2 py-px font-sans text-[0.75rem] tabular-nums leading-[1.5] text-ink-3">
-                {previous} to {emotion.intensity}
+                {previous}
+                <svg
+                  viewBox="0 0 12 8"
+                  aria-hidden="true"
+                  className="mx-1 h-[6px] w-[8px] fill-none stroke-current [stroke-linecap:round] [stroke-linejoin:round] [stroke-width:1.3]"
+                >
+                  <path d="M1 4h9.2M7.2 1.2 10 4 7.2 6.8" />
+                </svg>
+                <span className="sr-only">{` ${to} `}</span>
+                {emotion.intensity}
               </span>
             ) : emotion.intensity !== null ? (
-              <IntensityChip value={emotion.intensity} />
+              <IntensityChip value={emotion.intensity}>{`${emotion.intensity} ${of100}`}</IntensityChip>
             ) : null}
           </li>
         );
@@ -96,7 +124,17 @@ function Feelings({ felt, before }: { felt: ReportMoment["felt"]; before?: Repor
   );
 }
 
-function Moment({ moment, view, s }: { moment: ReportMoment; view: PaperView; s: ReportStrings }) {
+function Moment({
+  moment,
+  view,
+  s,
+  quotes,
+}: {
+  moment: ReportMoment;
+  view: PaperView;
+  s: ReportStrings;
+  quotes: Quotes;
+}) {
   const missing = <span className="font-sans text-caption italic text-ink-3">{s.notRecorded}</span>;
   const strongest = moment.hotThought ? normalizeWords(moment.hotThought) : null;
   return (
@@ -106,20 +144,20 @@ function Moment({ moment, view, s }: { moment: ReportMoment; view: PaperView; s:
         tag={moment.tags.join(", ") || undefined}
       />
       <h3 className="px-5 pb-1 pl-11 pt-4 font-serif text-title-small font-normal text-ink">
-        <Prose text={moment.title} check={view.check} />
+        <Prose text={moment.title} quotes={quotes} />
       </h3>
       {moment.felt.length ? (
         <div className="px-5 pb-2 pl-11 pt-1 font-serif text-[1.0625rem] text-ink">
-          <Feelings felt={moment.felt} />
+          <Feelings felt={moment.felt} to={quotes.to} of100={s.of100} />
         </div>
       ) : null}
       <dl className="m-0">
         <NotebookRow label={s.moment.happened}>
-          {moment.happened ? <Prose text={moment.happened} check={view.check} /> : missing}
+          {moment.happened ? <Prose text={moment.happened} quotes={quotes} /> : missing}
         </NotebookRow>
         {moment.context ? (
           <NotebookRow label={s.moment.context}>
-            <Prose text={moment.context} check={view.check} />
+            <Prose text={moment.context} quotes={quotes} />
           </NotebookRow>
         ) : null}
         <NotebookRow label={s.moment.thoughts}>
@@ -143,7 +181,7 @@ function Moment({ moment, view, s }: { moment: ReportMoment; view: PaperView; s:
         {moment.felt.length ? null : <NotebookRow label={s.moment.felt}>{missing}</NotebookRow>}
         {moment.body ? <NotebookRow label={s.moment.body}>{moment.body}</NotebookRow> : null}
         <NotebookRow label={s.moment.did}>
-          {moment.did ? <Prose text={moment.did} check={view.check} /> : missing}
+          {moment.did ? <Prose text={moment.did} quotes={quotes} /> : missing}
         </NotebookRow>
         {moment.evidenceFor ? (
           <NotebookRow label={s.moment.evidenceFor}>{moment.evidenceFor}</NotebookRow>
@@ -163,7 +201,7 @@ function Moment({ moment, view, s }: { moment: ReportMoment; view: PaperView; s:
         ) : null}
         {moment.feltAfter.length ? (
           <NotebookRow label={s.moment.feltAfter}>
-            <Feelings felt={moment.feltAfter} before={moment.felt} />
+            <Feelings felt={moment.feltAfter} before={moment.felt} to={quotes.to} of100={s.of100} />
           </NotebookRow>
         ) : null}
       </dl>
@@ -177,7 +215,7 @@ function logged(day: DigestDay): boolean {
   return day.mood !== null || day.energy !== null || day.anxiety !== null || day.sleepHours !== null;
 }
 
-function Numbers({ view, s }: { view: PaperView; s: ReportStrings }) {
+function Numbers({ view, s, quotes }: { view: PaperView; s: ReportStrings; quotes: Quotes }) {
   const { numbers, content } = view;
   const language = content.language;
   const anyLogged = numbers.days.some(logged);
@@ -216,7 +254,7 @@ function Numbers({ view, s }: { view: PaperView; s: ReportStrings }) {
       )}
       {paragraphs(content.mood).map((p, i) => (
         <p key={i} className="mt-5 max-w-[36em] font-serif text-[1.0625rem] leading-[1.62] text-ink">
-          <Prose text={p} check={view.check} />
+          <Prose text={p} quotes={quotes} />
         </p>
       ))}
       {chart ? (
@@ -324,9 +362,12 @@ function Numbers({ view, s }: { view: PaperView; s: ReportStrings }) {
   );
 }
 
-export function ReportPaper({ view }: { view: PaperView }) {
+export async function ReportPaper({ view }: { view: PaperView }) {
   const { content, numbers, period, check } = view;
   const s = REPORT_STRINGS[content.language];
+  // The app's words around the report, in the page's language; the report's own are in its language.
+  const { paper } = (await getMessages()).reports;
+  const quotes: Quotes = { check, unverified: paper.unverified, to: paper.to };
   const name = view.person.name?.trim() || null;
   const first = numbers.days[0]?.day ?? period.label;
   const last = numbers.days.at(-1)?.day ?? period.label;
@@ -337,7 +378,7 @@ export function ReportPaper({ view }: { view: PaperView }) {
   return (
     <article
       lang={content.language === "pt" ? "pt-BR" : content.language}
-      aria-label="The report"
+      aria-label={paper.label}
       className="rounded-paper border border-rule bg-paper px-[clamp(22px,4.4vw,56px)] pb-[clamp(28px,4vw,48px)] pt-[clamp(24px,4vw,48px)] shadow-lift"
     >
       <h2 className="max-w-[16em] font-serif text-[clamp(1.875rem,1.4rem+1.6vw,2.625rem)] font-light leading-[1.06] tracking-[-0.024em] text-ink">
@@ -375,7 +416,7 @@ export function ReportPaper({ view }: { view: PaperView }) {
               key={i}
               className="mt-3 max-w-[36em] font-serif text-[1.1875rem] leading-[1.55] text-ink first:mt-0"
             >
-              <Prose text={p} check={check} />
+              <Prose text={p} quotes={quotes} />
             </p>
           ))
         ) : (
@@ -397,7 +438,7 @@ export function ReportPaper({ view }: { view: PaperView }) {
                     className="mt-[0.3em] size-3 shrink-0 rounded-[3px] border-[1.3px] border-ink-soft"
                   />
                   <span>
-                    <Prose text={topic.text} check={check} />
+                    <Prose text={topic.text} quotes={quotes} />
                     {topic.suggested ? (
                       <span className="ml-2 inline-flex whitespace-nowrap rounded-pill border border-rule px-2 font-sans text-[0.75rem] text-ink-3">
                         {s.suggested}
@@ -414,18 +455,18 @@ export function ReportPaper({ view }: { view: PaperView }) {
       </Section>
 
       <Section title={s.sections.mood}>
-        <Numbers view={view} s={s} />
+        <Numbers view={view} s={s} quotes={quotes} />
       </Section>
 
       {content.moments.length ? (
         <Section title={s.sections.moments}>
           {content.momentsIntro.trim() ? (
             <p className="max-w-[36em] font-serif italic text-ink-2">
-              <Prose text={content.momentsIntro} check={check} />
+              <Prose text={content.momentsIntro} quotes={quotes} />
             </p>
           ) : null}
           {content.moments.map((moment) => (
-            <Moment key={moment.entryId} moment={moment} view={view} s={s} />
+            <Moment key={moment.entryId} moment={moment} view={view} s={s} quotes={quotes} />
           ))}
         </Section>
       ) : null}
@@ -439,10 +480,10 @@ export function ReportPaper({ view }: { view: PaperView }) {
                 className="grid gap-x-4 gap-y-1 border-b border-rule py-3 sm:grid-cols-[8rem_minmax(0,1fr)]"
               >
                 <span className="pt-0.5 text-caption text-ink-3">
-                  <Prose text={pattern.when} check={check} />
+                  <Prose text={pattern.when} quotes={quotes} />
                 </span>
                 <span className="font-serif text-ink">
-                  <Prose text={pattern.text} check={check} />
+                  <Prose text={pattern.text} quotes={quotes} />
                 </span>
               </li>
             ))}
@@ -458,7 +499,7 @@ export function ReportPaper({ view }: { view: PaperView }) {
                 key={i}
                 className="relative pl-4 font-serif text-ink before:absolute before:left-0 before:top-[0.8em] before:h-px before:w-[7px] before:bg-ink-soft"
               >
-                <Prose text={item} check={check} />
+                <Prose text={item} quotes={quotes} />
               </li>
             ))}
           </ul>
