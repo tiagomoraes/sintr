@@ -2,6 +2,7 @@
 
 import { Button } from "@sintr/ui";
 import { useState } from "react";
+import { useMessages } from "@/components/language";
 import { authClient } from "@/lib/auth-client";
 
 /** The account's address and whether it is confirmed; a new link on request. */
@@ -16,16 +17,17 @@ export function EmailStatus({
   available: boolean;
   justVerified: boolean;
 }) {
+  const t = useMessages().auth.email;
   const [state, setState] = useState<"idle" | "sending" | "sent" | "failed">("idle");
   return (
     <div className="space-y-3">
       <p className="text-ink">
         <span className="font-medium">{email}</span>{" "}
-        <span className="text-ink-3">{verified ? "is confirmed." : "is not confirmed yet."}</span>
+        <span className="text-ink-3">{verified ? t.confirmed : t.notConfirmed}</span>
       </p>
       {justVerified && verified ? (
         <p role="status" className="text-[0.9375rem] text-ink-2">
-          Thank you. sintr can now tell you by email when a report is ready, if you ask for it in Therapy.
+          {t.thanks}
         </p>
       ) : null}
       {!verified && available ? (
@@ -42,22 +44,14 @@ export function EmailStatus({
                 .then((result) => setState(result.error ? "failed" : "sent"));
             }}
           >
-            Send the confirmation link
+            {t.send}
           </Button>
           <p role="status" className="text-[0.9375rem] text-ink-3">
-            {state === "sent"
-              ? "The link is on its way. It works for an hour."
-              : state === "failed"
-                ? "It could not be sent just now. Try again in a few minutes."
-                : "Needed only for email from sintr, such as a report being ready."}
+            {state === "sent" ? t.sent : state === "failed" ? t.failed : t.why}
           </p>
         </div>
       ) : null}
-      {!available ? (
-        <p className="text-[0.9375rem] text-ink-3">
-          Email is not set up on this sintr, so nothing is sent to this address.
-        </p>
-      ) : null}
+      {!available ? <p className="text-[0.9375rem] text-ink-3">{t.unavailable}</p> : null}
     </div>
   );
 }

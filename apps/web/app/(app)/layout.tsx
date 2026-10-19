@@ -9,6 +9,7 @@ import { SiteHeader } from "@/components/site-header";
 import { SupportLines } from "@/components/support-lines";
 import { formatMoment } from "@/lib/format";
 import { noticeText } from "@/lib/sharing";
+import { currentLanguage, getMessages } from "@/lib/server/language";
 import { requireScope, runtime } from "@/lib/server/runtime";
 import { hourIn, timeOfDay } from "@/lib/time-of-day";
 
@@ -30,6 +31,7 @@ const NOTICE_LINK =
  */
 export default async function ShellLayout({ children }: { children: ReactNode }) {
   const { user, scope } = await requireScope();
+  const [t, language] = await Promise.all([getMessages(), currentLanguage()]);
   const [waiting, profile, unread, practice] = await Promise.all([
     scope.reports.waiting(),
     scope.profile.get(),
@@ -75,9 +77,9 @@ export default async function ShellLayout({ children }: { children: ReactNode })
             <ExceptOn paths={["/sharing"]}>
               <p className={NOTICE}>
                 <span aria-hidden="true" className="size-[7px] rounded-full bg-ink" />
-                {noticeText(sharingNotice)}
+                {noticeText(sharingNotice, t)}
                 <Link href="/sharing" className={NOTICE_LINK}>
-                  Open Sharing
+                  {t.shell.notice.openSharing}
                 </Link>
               </p>
             </ExceptOn>
@@ -90,10 +92,12 @@ export default async function ShellLayout({ children }: { children: ReactNode })
                   className="size-[7px] rounded-full bg-draft shadow-[0_0_0_3px_#fbe6da]"
                 />
                 {notice.sessionAt
-                  ? `Your report for the session of ${formatMoment(notice.sessionAt, { language: "en", timezone: profile.timezone })} is ready to read.`
-                  : "Your weekly report is ready to read."}
+                  ? t.shell.notice.reportReady(
+                      formatMoment(notice.sessionAt, { language: language.code, timezone: profile.timezone }),
+                    )
+                  : t.shell.notice.weeklyReady}
                 <Link href={`/reports/${notice.id}`} className={NOTICE_LINK}>
-                  Read it
+                  {t.shell.notice.readIt}
                 </Link>
               </p>
             </ExceptOn>
@@ -105,14 +109,7 @@ export default async function ShellLayout({ children }: { children: ReactNode })
         <div className="wrap py-14">
           <ShellFooter
             person={<SupportLines />}
-            practice={
-              <p className="max-w-[44em] text-[0.9375rem] text-ink-3">
-                Reports arrive when a person approves and shares them, never in real time, and sintr does not
-                watch over them: it is a diary people keep for themselves, not a clinical record, a monitoring
-                tool or a crisis service. If something in a report worries you, reach the person the way you
-                usually do.
-              </p>
-            }
+            practice={<p className="max-w-[44em] text-[0.9375rem] text-ink-3">{t.shell.practiceNote}</p>}
           />
           <LanguageOffers className="mt-10" />
         </div>

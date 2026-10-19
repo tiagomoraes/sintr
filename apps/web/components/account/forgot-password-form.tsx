@@ -2,6 +2,7 @@
 
 import { Button, FieldError, Input, Label } from "@sintr/ui";
 import { useId, useState, type FormEvent } from "react";
+import { useMessages } from "@/components/language";
 import { authClient } from "@/lib/auth-client";
 import { useHydrated } from "@/lib/use-hydrated";
 
@@ -10,6 +11,7 @@ import { useHydrated } from "@/lib/use-hydrated";
  * not the address has a diary, so this page tells nobody who uses sintr.
  */
 export function ForgotPasswordForm() {
+  const t = useMessages().auth;
   const id = useId();
   const hydrated = useHydrated();
   const [state, setState] = useState<"idle" | "sending" | "sent" | "failed">("idle");
@@ -26,22 +28,19 @@ export function ForgotPasswordForm() {
   if (state === "sent") {
     return (
       <p role="status" className="text-lede text-ink-2">
-        If there is a diary for that address, a link to set a new password is on its way. It works for an
-        hour.
+        {t.forgot.sent}
       </p>
     );
   }
   return (
     <form method="post" onSubmit={(event) => void onSubmit(event)} className="space-y-6">
       <div>
-        <Label htmlFor={id}>Email</Label>
+        <Label htmlFor={id}>{t.form.email}</Label>
         <Input id={id} name="email" type="email" autoComplete="email" required className="mt-2" />
       </div>
-      {state === "failed" ? (
-        <FieldError>Too many attempts. Wait a few minutes, then try again.</FieldError>
-      ) : null}
+      {state === "failed" ? <FieldError>{t.forgot.tooMany}</FieldError> : null}
       <Button type="submit" disabled={!hydrated || state === "sending"}>
-        Send me a link
+        {t.forgot.send}
       </Button>
     </form>
   );

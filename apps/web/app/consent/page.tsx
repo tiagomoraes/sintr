@@ -6,10 +6,13 @@ import { ConsentStatement } from "@/components/consent-statement";
 import { SignOutButton } from "@/components/sign-out-button";
 import { SiteHeader } from "@/components/site-header";
 import { SupportLines } from "@/components/support-lines";
+import { getMessages } from "@/lib/server/language";
 import { requireUser, runtime } from "@/lib/server/runtime";
 import { grantConsent } from "./actions";
 
-export const metadata: Metadata = { title: "Before you write" };
+export async function generateMetadata(): Promise<Metadata> {
+  return { title: (await getMessages()).auth.consent.title };
+}
 
 /**
  * Shown when the current consent is not on record (for example after its
@@ -25,6 +28,7 @@ export default async function ConsentPage({
   const latest = await scope.consents.latest("health_data_processing");
   if (latest?.granted && latest.version === HEALTH_DATA_CONSENT_VERSION) redirect("/home");
   const missing = (await searchParams).missing === "1";
+  const t = (await getMessages()).auth.consent;
 
   return (
     <>
@@ -33,11 +37,8 @@ export default async function ConsentPage({
       </SiteHeader>
       <main id="main" className="wrap grid grid-cols-12 gap-x-6 pb-24 pt-[clamp(32px,8vh,96px)]">
         <div className="col-span-12 md:col-span-7 lg:col-span-6">
-          <h1 className="text-title">Before you write anything.</h1>
-          <p className="mt-4 text-lede text-ink-2">
-            A diary like this holds health information, so the law asks for your specific consent, and so do
-            we.
-          </p>
+          <h1 className="text-title">{t.heading}</h1>
+          <p className="mt-4 text-lede text-ink-2">{t.lede}</p>
           <form action={grantConsent} className="mt-10 space-y-6">
             <div className="flex items-start gap-3">
               <Checkbox id="consent" name="consent" required />
@@ -45,8 +46,8 @@ export default async function ConsentPage({
                 <ConsentStatement />
               </label>
             </div>
-            {missing ? <FieldError>Tick the box to give your consent, or sign out.</FieldError> : null}
-            <Button type="submit">I agree, open my diary</Button>
+            {missing ? <FieldError>{t.missing}</FieldError> : null}
+            <Button type="submit">{t.agree}</Button>
           </form>
         </div>
       </main>
