@@ -12,6 +12,8 @@ describe("safeNext", () => {
       "https://evil.example",
       "//evil.example",
       "/\\evil.example",
+      "/\t/evil.example",
+      "/\n/evil.example",
       "javascript:alert(1)",
       "",
       undefined,
