@@ -12,26 +12,21 @@ import { Notices } from "@/components/sharing/notices";
 import { formatDay } from "@/lib/format";
 import { reportTitle } from "@/lib/reports";
 import { patientLabel, practiceDetails, recentNotices, seatsLine } from "@/lib/sharing";
+import { currentLanguage, getMessages } from "@/lib/server/language";
 import { requireScope, runtime } from "@/lib/server/runtime";
+import type { Messages } from "@/messages";
 import { markPracticeNoticesRead, openPatientCode, openPractice } from "./actions";
 
-export const metadata: Metadata = { title: "Your practice" };
+export async function generateMetadata(): Promise<Metadata> {
+  return { title: (await getMessages()).practice.title };
+}
 
-const PROMISES = [
-  "Your patients decide what you see: the reports they approve and share with you, nothing else.",
-  "Each report is read as the person approved it. No scores, and nothing added up across patients.",
-  "Either of you can end a link at any time, and it ends at once on both sides.",
-];
-
-function OpenPractice() {
+function OpenPractice({ t }: { t: Messages["practice"] }) {
   return (
     <>
-      <PageHeading
-        title="Your practice"
-        lede="For therapists: receive the reports your patients choose to share with you, in one calm place."
-      />
+      <PageHeading title={t.title} lede={t.open.lede} />
       <ul className="-mt-2 mb-12 max-w-[40rem] list-none border-t border-ink p-0">
-        {PROMISES.map((line) => (
+        {t.open.promises.map((line) => (
           <li key={line} className="border-b border-rule py-3.5 text-[0.9688rem] text-ink-2">
             {line}
           </li>
@@ -41,11 +36,9 @@ function OpenPractice() {
         <PracticeForm
           save={openPractice}
           defaults={{ professionalName: "", practiceName: "", registration: "" }}
-          submitLabel="Open my practice"
+          submitLabel={t.open.submit}
         />
-        <p className="mt-8 text-[0.9375rem] text-ink-3">
-          Your own diary stays as it is. Opening a practice adds this dashboard; nothing else changes.
-        </p>
+        <p className="mt-8 text-[0.9375rem] text-ink-3">{t.open.diary}</p>
       </div>
     </>
   );
@@ -57,22 +50,25 @@ export default async function PracticePage({
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const { scope } = await requireScope();
+  const messages = await getMessages();
+  const t = messages.practice;
   const practice = await scope.practice.get();
-  if (!practice) return <OpenPractice />;
+  if (!practice) return <OpenPractice t={t} />;
   const params = await searchParams;
   const openId = typeof params.report === "string" ? params.report : null;
   // Opening a report reads it: recorded in the audit of both accounts. Read first, so the list knows.
   const open = openId ? await scope.practice.readReport(openId) : null;
-  const [seats, reports, patients, invites, notices, profile] = await Promise.all([
+  const [seats, reports, patients, invites, notices, profile, language] = await Promise.all([
     scope.practice.seats(),
     scope.practice.reports(),
     scope.practice.patients(),
     scope.practice.invites(),
     scope.notices.list(),
     scope.profile.get(),
+    currentLanguage(),
   ]);
   const paper = open ? sharedPaper(open.snapshot) : null;
-  const locale = { language: "en", timezone: profile.timezone };
+  const locale = { language: language.code, timezone: profile.timezone };
   const details = practiceDetails(practice);
   // Link news of the last two weeks; a new report shows in the list instead.
   const lately = recentNotices(notices, "practice", { skip: "report_shared" });
@@ -86,14 +82,14 @@ export default async function PracticePage({
         <h1 className="text-title [overflow-wrap:anywhere]">{practice.professionalName}</h1>
         {details ? <p className="mt-3 text-[0.9688rem] text-ink-2">{details}</p> : null}
         <p role="status" className="mt-2 text-[0.9688rem] text-ink-2">
-          {seatsLine(seats)}
+          {seatsLine(seats, messages)}
         </p>
         <div className="mt-6 flex flex-wrap items-center gap-x-5 gap-y-3">
           <Link href="/practice/invite" className={buttonVariants({ size: "sm" })}>
-            Invite a patient
+            {t.invite.title}
           </Link>
           <Link href="/practice/details" className={buttonVariants({ variant: "outline", size: "sm" })}>
-            Practice details
+            {t.details.title}
           </Link>
         </div>
       </header>
@@ -102,7 +98,7 @@ export default async function PracticePage({
       {unseen ? <MarkSeen action={markPracticeNoticesRead} /> : null}
       {openId && !open ? (
         <p role="status" className="mb-10 max-w-[44rem] text-[0.9688rem] text-ink-2">
-          That report is not here any more: the link it came through has ended.
+          {t.gone}
         </p>
       ) : null}
 
@@ -117,32 +113,31 @@ export default async function PracticePage({
           <ReportList reports={reports} openId={open?.id ?? null} locale={locale} />
           <PatientList patients={patients} locale={locale} />
           <InviteList invites={waiting} origin={origin} locale={locale} />
-          <CodeForm open={openPatientCode} label="A code a patient gave you" button="Open it" />
+          <CodeForm open={openPatientCode} label={t.code.label} button={t.code.button} />
         </div>
         {open && paper ? (
           <section aria-labelledby="open-report-title" className="order-1 min-w-0 min-[1100px]:order-2">
             <p className="mb-4 min-[1100px]:hidden">
               <Link href="/practice" className={linkStyles}>
-                All reports
+                {t.report.all}
               </Link>
             </p>
             <header className="mb-6">
               <h2 id="open-report-title" className="font-serif text-title-small font-normal text-ink">
-                {patientLabel(open)},{" "}
+                {patientLabel(open, messages)},{" "}
                 <span className="text-ink-soft">
-                  {reportTitle(open, locale).replace(/^./u, (c) => c.toLowerCase())}
+                  {reportTitle(open, locale, messages).replace(/^./u, (c) => c.toLowerCase())}
                 </span>
               </h2>
               <p className="mt-1 text-caption text-ink-3">
-                Shared with you on {formatDay(open.sharedAt, locale)}. This is the report exactly as they
-                approved it.
+                {t.report.shared(formatDay(open.sharedAt, locale))}
               </p>
               <p className="mt-3 flex flex-wrap gap-x-5 gap-y-2 text-[0.9375rem]">
                 <a href={`/api/practice/reports/${open.id}/pdf`} className={linkStyles}>
-                  Download the PDF
+                  {t.report.pdf}
                 </a>
                 <Link href="/practice" className={linkStyles}>
-                  Close it
+                  {t.report.close}
                 </Link>
               </p>
             </header>

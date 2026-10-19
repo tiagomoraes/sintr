@@ -1,32 +1,12 @@
-import type { NoticeView, PracticeCard, SeatUse, ShareMode } from "@sintr/core";
+import type { NoticeView, PracticeCard, SeatUse } from "@sintr/core";
+import type { Messages } from "@/messages";
 
 /**
- * The words of sharing, on both sides of a link. Plain and exact: what the
+ * The sentences of sharing, on both sides of a link, built from the page's
+ * words (`sharing` and `practice` in the catalog). Plain and exact: what the
  * therapist can see is said the same way everywhere, and nothing here
  * promises more than the code does.
  */
-
-/** The one sentence that says what a link allows. */
-export const SCOPE_SENTENCE = "Your therapist can read the reports you approve; nothing else.";
-
-/** What never travels through a link, whatever the person chooses. */
-export const NEVER_SHARED = "Never your entries, check-ins, conversations or drafts.";
-
-/** The other two promises of a practice's invite, said the same way wherever it is answered. */
-export const EACH_REPORT =
-  "You choose for each report, unless you decide otherwise. Nothing goes to them until you approve it.";
-export const STOP_ANY_TIME = "You can stop at any time, and they lose access at once.";
-
-export const MODE_COPY: Record<ShareMode, { label: string; sentence: string }> = {
-  ask: {
-    label: "Ask me each time",
-    sentence: "Each time you approve a report, you choose whether it goes to them.",
-  },
-  auto: {
-    label: "Send what I approve",
-    sentence: "Every report you approve goes to them as you approve it.",
-  },
-};
 
 /** "Clínica Horizonte, CRP 06/1234", or null when the professional showed neither. */
 export function practiceDetails(card: Pick<PracticeCard, "practiceName" | "registration">): string | null {
@@ -39,48 +19,62 @@ export function practiceWho(card: Pick<PracticeCard, "professionalName" | "pract
   return card.practiceName ? `${card.professionalName} (${card.practiceName})` : card.professionalName;
 }
 
-/** The name a person chose, or a neutral label the practice can tell apart. */
-export function patientLabel(patient: { personName: string | null; number: number | null }): string {
+/** The name a person chose, or a neutral label the practice can tell apart: "Patient 3". */
+export function patientLabel(
+  patient: { personName: string | null; number: number | null },
+  t: Messages,
+): string {
   if (patient.personName) return patient.personName;
-  return patient.number ? `Patient ${patient.number}` : "A patient";
+  return patient.number ? t.practice.patient(patient.number) : t.practice.aPatient;
 }
 
 /** "3 active patients. 4 of 10 seats in use, 1 of them waiting for an acceptance." */
-export function seatsLine(use: SeatUse): string {
-  const patients = `${use.active} active ${use.active === 1 ? "patient" : "patients"}.`;
-  if (use.seats === null) return `${patients} Unlimited seats.`;
-  const inUse = use.active + use.held;
-  const held = use.held ? `, ${use.held} of them waiting for an acceptance` : "";
-  return `${patients} ${inUse} of ${use.seats} ${use.seats === 1 ? "seat" : "seats"} in use${held}.`;
+export function seatsLine(use: SeatUse, t: Messages): string {
+  const seats = t.practice.seats;
+  const patients = seats.active(use.active);
+  if (use.seats === null) return `${patients} ${seats.unlimited}`;
+  return `${patients} ${seats.inUse(use.active + use.held, use.seats, use.held)}`;
+}
+
+/** The plans sintr names itself; any other is a name someone gave a grant, shown as given. */
+const BUILT_IN_PLANS = { "Self-hosted": "selfHosted", Free: "free", Practice: "practice" } as const;
+
+/** A practice's plan, in the page's words when it is one of the built-in ones. */
+export function practicePlanName(plan: string, t: Messages): string {
+  return Object.hasOwn(BUILT_IN_PLANS, plan)
+    ? t.practice.plans[BUILT_IN_PLANS[plan as keyof typeof BUILT_IN_PLANS]]
+    : plan;
 }
 
 /** A notice, worded for the side it was written for. */
-export function noticeText(notice: NoticeView): string {
+export function noticeText(notice: NoticeView, t: Messages): string {
   if (notice.side === "person") {
-    const who = notice.practice?.professionalName ?? "Your therapist's practice";
+    const words = t.sharing.notices;
+    const who = notice.practice?.professionalName ?? words.someone;
     switch (notice.kind) {
       case "link_pending":
-        return `${who} accepted your invite. Confirm it to start sharing.`;
+        return words.pending(who);
       case "link_ended":
-        return `${who} ended the link. They no longer see your reports.`;
+        return words.ended(who);
       case "link_declined":
-        return `${who} withdrew from your invite. Nothing was shared.`;
+        return words.declined(who);
       default:
-        return `${who} updated the link.`;
+        return words.other(who);
     }
   }
-  const who = notice.personName ?? (notice.number ? `Patient ${notice.number}` : "A patient");
+  const words = t.practice.notices;
+  const who = patientLabel(notice, t);
   switch (notice.kind) {
     case "link_active":
-      return `${who} linked with your practice.`;
+      return words.active(who);
     case "link_declined":
-      return "A person you accepted chose not to link. Nothing was shared.";
+      return words.declined;
     case "link_ended":
-      return "A patient ended their link with your practice. Their reports are no longer here.";
+      return words.ended;
     case "report_shared":
-      return `${who} shared a report with you.`;
+      return words.shared(who);
     default:
-      return `${who} updated their link.`;
+      return words.other(who);
   }
 }
 

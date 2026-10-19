@@ -11,6 +11,7 @@ import {
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { joinPath } from "@/lib/sharing";
+import { getMessages } from "@/lib/server/language";
 import { requireScope, runtime } from "@/lib/server/runtime";
 
 export interface CodeState {
@@ -22,7 +23,7 @@ export async function openCode(_state: CodeState, form: FormData): Promise<CodeS
   await requireScope();
   const raw = form.get("code");
   const code = typeof raw === "string" ? normalizeInviteCode(raw) : null;
-  if (!code) return { problem: "Check the code: 12 letters and digits, such as K7QD-2MXP-9F4R." };
+  if (!code) return { problem: (await getMessages()).sharing.problems.code };
   redirect(joinPath(formatInviteCode(code)));
 }
 
@@ -57,10 +58,7 @@ export async function inviteTherapist(
     };
   } catch (error) {
     if (error instanceof InvalidStateError) {
-      return {
-        invite: null,
-        problem: "You have five invites waiting already. Cancel one you no longer need, then make a new one.",
-      };
+      return { invite: null, problem: (await getMessages()).sharing.problems.invites };
     }
     throw error;
   }
@@ -83,7 +81,8 @@ export async function confirmLink(
   form: FormData,
 ): Promise<ConfirmState> {
   const { scope } = await requireScope();
-  if (form.get("consent") !== "on") return { problem: "Tick the box to give your consent, or decline." };
+  const t = (await getMessages()).sharing.problems;
+  if (form.get("consent") !== "on") return { problem: t.consent };
   // The practice as the page showed it: the consent names exactly that.
   const shown = form.get("shown");
   try {
@@ -92,14 +91,8 @@ export async function confirmLink(
       shownPractice: typeof shown === "string" ? shown : "",
     });
   } catch (error) {
-    if (error instanceof NotFoundError)
-      return { problem: "This link is no longer waiting. Reload the page." };
-    if (error instanceof InvalidStateError) {
-      return {
-        problem:
-          "The practice changed its name or details since this page opened. Reload the page and read them again.",
-      };
-    }
+    if (error instanceof NotFoundError) return { problem: t.notWaiting };
+    if (error instanceof InvalidStateError) return { problem: t.changed };
     throw error;
   }
   revalidatePath("/", "layout");
@@ -139,7 +132,8 @@ export async function renameLink(linkId: string, _state: NameState, form: FormDa
   try {
     await scope.sharing.rename(linkId, name || null);
   } catch (error) {
-    if (error instanceof ValidationError) return { saved: false, problem: "Use at most 80 characters." };
+    if (error instanceof ValidationError)
+      return { saved: false, problem: (await getMessages()).sharing.problems.nameTooLong };
     throw error;
   }
   revalidatePath("/sharing");

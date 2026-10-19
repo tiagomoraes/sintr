@@ -11,7 +11,9 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import type { CodeState } from "@/app/(app)/sharing/actions";
 import { joinPath } from "@/lib/sharing";
+import { getMessages } from "@/lib/server/language";
 import { requireScope, runtime } from "@/lib/server/runtime";
+import type { Messages } from "@/messages";
 
 export interface PracticeFormState {
   saved: boolean;
@@ -23,15 +25,18 @@ function text(form: FormData, name: string): string {
   return typeof value === "string" ? value.trim() : "";
 }
 
-function practiceFields(form: FormData): { values: PracticePatch; problems: Record<string, string> } {
+function practiceFields(
+  form: FormData,
+  t: Messages["practice"]["problems"],
+): { values: PracticePatch; problems: Record<string, string> } {
   const problems: Record<string, string> = {};
   const professionalName = text(form, "professionalName");
   const practiceName = text(form, "practiceName");
   const registration = text(form, "registration");
-  if (!professionalName) problems.professionalName = "Write your name as the people you see know it.";
-  if (professionalName.length > 120) problems.professionalName = "Use at most 120 characters.";
-  if (practiceName.length > 160) problems.practiceName = "Use at most 160 characters.";
-  if (registration.length > 120) problems.registration = "Use at most 120 characters.";
+  if (!professionalName) problems.professionalName = t.name;
+  if (professionalName.length > 120) problems.professionalName = t.tooLong(120);
+  if (practiceName.length > 160) problems.practiceName = t.tooLong(160);
+  if (registration.length > 120) problems.registration = t.tooLong(120);
   return {
     values: { professionalName, practiceName: practiceName || null, registration: registration || null },
     problems,
@@ -41,7 +46,7 @@ function practiceFields(form: FormData): { values: PracticePatch; problems: Reco
 /** Open the practice: one per account, from inside the app. The diary stays as it is. */
 export async function openPractice(_state: PracticeFormState, form: FormData): Promise<PracticeFormState> {
   const { scope } = await requireScope();
-  const { values, problems } = practiceFields(form);
+  const { values, problems } = practiceFields(form, (await getMessages()).practice.problems);
   if (Object.keys(problems).length) return { saved: false, problems };
   try {
     await scope.practice.open({ ...values, professionalName: values.professionalName! });
@@ -55,12 +60,13 @@ export async function openPractice(_state: PracticeFormState, form: FormData): P
 /** The names the practice shows, and whether to hear about new reports by email. */
 export async function savePractice(_state: PracticeFormState, form: FormData): Promise<PracticeFormState> {
   const { scope } = await requireScope();
-  const { values, problems } = practiceFields(form);
+  const t = (await getMessages()).practice.problems;
+  const { values, problems } = practiceFields(form, t);
   if (Object.keys(problems).length) return { saved: false, problems };
   try {
     await scope.practice.update({ ...values, notifyEmail: form.get("notifyEmail") === "on" });
   } catch (error) {
-    if (error instanceof ValidationError) return { saved: false, problems: { form: "Check the fields." } };
+    if (error instanceof ValidationError) return { saved: false, problems: { form: t.check } };
     throw error;
   }
   revalidatePath("/", "layout");
@@ -91,13 +97,8 @@ export async function invitePatient(_state: PatientInviteState, form: FormData):
     };
   } catch (error) {
     if (error instanceof InvalidStateError) {
-      return {
-        invite: null,
-        problem:
-          error.message === "no seat is free"
-            ? "Every seat of your practice is in use. Cancel an invite you no longer need, or ask for more seats."
-            : "You have many invites waiting already. Cancel the ones you no longer need first.",
-      };
+      const t = (await getMessages()).practice.problems;
+      return { invite: null, problem: error.message === "no seat is free" ? t.noSeat : t.invites };
     }
     throw error;
   }
@@ -122,7 +123,7 @@ export async function openPatientCode(_state: CodeState, form: FormData): Promis
   await requireScope();
   const raw = form.get("code");
   const code = typeof raw === "string" ? normalizeInviteCode(raw) : null;
-  if (!code) return { problem: "Check the code: 12 letters and digits, such as K7QD-2MXP-9F4R." };
+  if (!code) return { problem: (await getMessages()).sharing.problems.code };
   redirect(joinPath(formatInviteCode(code)));
 }
 

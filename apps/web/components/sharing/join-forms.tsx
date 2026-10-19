@@ -3,12 +3,10 @@
 import { Button, Checkbox, FieldError, FieldHint, Input, Label } from "@sintr/ui";
 import { useActionState, useId, useState } from "react";
 import type { JoinState } from "@/app/join/[code]/actions";
+import { useMessages } from "@/components/language";
 import { Segmented } from "@/components/segmented";
-import { MODE_COPY } from "@/lib/sharing";
 import { useHydrated } from "@/lib/use-hydrated";
 import { submitWith } from "@/lib/use-form-action";
-
-const MODES = (["ask", "auto"] as const).map((value) => ({ value, label: MODE_COPY[value].label }));
 
 /** The person's acceptance: the name the practice sees, how reports go, and the consent. */
 export function AcceptAsPersonForm({
@@ -26,15 +24,18 @@ export function AcceptAsPersonForm({
   reportName: string | null;
   accept: (state: JoinState, form: FormData) => Promise<JoinState>;
 }) {
+  const t = useMessages().sharing;
+  const words = t.join.asPerson;
   const hydrated = useHydrated();
   const [state, action, pending] = useActionState(accept, { problem: null });
   const [mode, setMode] = useState<"ask" | "auto">("ask");
   const ids = { name: useId(), consent: useId() };
+  const modes = (["ask", "auto"] as const).map((value) => ({ value, label: t.modes[value].label }));
   return (
-    <form onSubmit={submitWith(action)} className="space-y-8" aria-label="Accept the invite">
+    <form onSubmit={submitWith(action)} className="space-y-8" aria-label={words.form}>
       <input type="hidden" name="shown" value={shown} />
       <div>
-        <Label htmlFor={ids.name}>How they will see you</Label>
+        <Label htmlFor={ids.name}>{words.name}</Label>
         <Input
           id={ids.name}
           name="personName"
@@ -44,25 +45,27 @@ export function AcceptAsPersonForm({
           className="mt-2 max-w-md"
         />
         <FieldHint>
-          Optional. The name they know you by, in their list. Left empty, they see a neutral label instead.
-          {reportName ? ` Your reports themselves show the name you set in Therapy, ${reportName}.` : ""}
+          {words.nameHint}
+          {reportName ? ` ${words.reportName(reportName)}` : ""}
         </FieldHint>
       </div>
       <fieldset className="min-w-0 border-0 p-0">
-        <legend className="p-0 text-label font-medium text-ink">When you approve a report</legend>
-        <Segmented name="shareMode" options={MODES} value={mode} onChange={setMode} className="mt-3" />
-        <FieldHint>{MODE_COPY[mode].sentence} You can change this later.</FieldHint>
+        <legend className="p-0 text-label font-medium text-ink">{t.mode.legend}</legend>
+        <Segmented name="shareMode" options={modes} value={mode} onChange={setMode} className="mt-3" />
+        <FieldHint>
+          {t.modes[mode].sentence} {t.mode.later}
+        </FieldHint>
       </fieldset>
       <div className="flex items-start gap-3">
         <Checkbox id={ids.consent} name="consent" />
         <label htmlFor={ids.consent} className="text-[0.9688rem] leading-[1.55] text-ink-2">
-          I agree to share the reports I approve with <span className="font-medium text-ink">{who}</span>, as
-          described above. I can stop at any time.
+          {t.consent.before} <span className="font-medium text-ink">{who}</span>
+          {t.consent.afterAbove}
         </label>
       </div>
       {state.problem ? <FieldError>{state.problem}</FieldError> : null}
       <Button type="submit" disabled={!hydrated || pending} className="w-full sm:w-auto">
-        {pending ? "Linking" : "Accept and link"}
+        {pending ? words.accepting : words.accept}
       </Button>
     </form>
   );
@@ -77,37 +80,41 @@ export function AcceptAsPracticeForm({
   practice: { who: string; seats: string } | null;
   accept: (state: JoinState, form: FormData) => Promise<JoinState>;
 }) {
+  const t = useMessages();
+  const words = t.sharing.join.asPractice;
+  const fields = t.practice.form;
   const hydrated = useHydrated();
   const [state, action, pending] = useActionState(accept, { problem: null });
   const ids = { name: useId(), place: useId(), registration: useId() };
   return (
-    <form onSubmit={submitWith(action)} className="space-y-8" aria-label="Accept for your practice">
+    <form onSubmit={submitWith(action)} className="space-y-8" aria-label={words.form}>
       {practice ? (
         <p className="text-ink-2">
-          You accept it for <span className="font-medium text-ink">{practice.who}</span>. {practice.seats}
+          {words.forPractice.before} <span className="font-medium text-ink">{practice.who}</span>
+          {words.forPractice.after} {practice.seats}
         </p>
       ) : (
         <div className="space-y-6">
-          <p className="text-ink-2">To accept, open your practice on sintr first. It takes one step.</p>
+          <p className="text-ink-2">{words.open}</p>
           <div>
-            <Label htmlFor={ids.name}>Your name, as the people you see know it</Label>
+            <Label htmlFor={ids.name}>{fields.name}</Label>
             <Input id={ids.name} name="professionalName" required maxLength={120} className="mt-2 max-w-md" />
           </div>
           <div>
-            <Label htmlFor={ids.place}>Practice or clinic</Label>
+            <Label htmlFor={ids.place}>{fields.place}</Label>
             <Input id={ids.place} name="practiceName" maxLength={160} className="mt-2 max-w-md" />
-            <FieldHint>Optional.</FieldHint>
+            <FieldHint>{fields.optional}</FieldHint>
           </div>
           <div>
-            <Label htmlFor={ids.registration}>Registration you want to show</Label>
+            <Label htmlFor={ids.registration}>{fields.registration}</Label>
             <Input id={ids.registration} name="registration" maxLength={120} className="mt-2 max-w-md" />
-            <FieldHint>Optional, such as CRP 06/123456.</FieldHint>
+            <FieldHint>{fields.registrationHint}</FieldHint>
           </div>
         </div>
       )}
       {state.problem ? <FieldError>{state.problem}</FieldError> : null}
       <Button type="submit" disabled={!hydrated || pending} className="w-full sm:w-auto">
-        {pending ? "Accepting" : practice ? "Accept for my practice" : "Open my practice and accept"}
+        {pending ? words.accepting : practice ? words.accept : words.openAndAccept}
       </Button>
     </form>
   );

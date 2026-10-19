@@ -4,24 +4,24 @@ import { Button, Checkbox, FieldError, FieldHint, Input, Label } from "@sintr/ui
 import { useRouter } from "next/navigation";
 import { useActionState, useEffect, useId, useRef, useState } from "react";
 import type { ConfirmState, NameState } from "@/app/(app)/sharing/actions";
+import { useMessages } from "@/components/language";
 import { Segmented } from "@/components/segmented";
-import { MODE_COPY } from "@/lib/sharing";
 import { submitWith } from "@/lib/use-form-action";
 import type { ShareMode } from "@sintr/core";
 
-const MODES = (["ask", "auto"] as const).map((value) => ({ value, label: MODE_COPY[value].label }));
-
 /** "Ask me each time" or "Send what I approve", saved as soon as it is chosen. */
 export function ModeForm({ mode, save }: { mode: ShareMode; save: (form: FormData) => Promise<void> }) {
+  const t = useMessages().sharing;
   const form = useRef<HTMLFormElement>(null);
   const [chosen, setChosen] = useState(mode);
+  const modes = (["ask", "auto"] as const).map((value) => ({ value, label: t.modes[value].label }));
   return (
     <form ref={form} action={save}>
       <fieldset className="min-w-0 border-0 p-0">
-        <legend className="p-0 text-label font-medium text-ink">When you approve a report</legend>
+        <legend className="p-0 text-label font-medium text-ink">{t.mode.legend}</legend>
         <Segmented
           name="shareMode"
-          options={MODES}
+          options={modes}
           defaultValue={mode}
           onChange={(value) => {
             setChosen(value);
@@ -30,10 +30,10 @@ export function ModeForm({ mode, save }: { mode: ShareMode; save: (form: FormDat
           }}
           className="mt-3"
         />
-        <FieldHint>{MODE_COPY[chosen].sentence}</FieldHint>
+        <FieldHint>{t.modes[chosen].sentence}</FieldHint>
         <noscript>
           <Button type="submit" variant="outline" size="sm" className="mt-3">
-            Save
+            {t.mode.save}
           </Button>
         </noscript>
       </fieldset>
@@ -54,23 +54,15 @@ export function NameForm({
   reportName: string | null;
   save: (state: NameState, form: FormData) => Promise<NameState>;
 }) {
+  const t = useMessages().sharing.name;
   const [editing, setEditing] = useState(false);
   const [state, action, pending] = useActionState(save, { saved: false, problem: null });
   const id = useId();
   if (!editing) {
     return (
       <p className="text-[0.9375rem] text-ink-2">
-        {name ? (
-          <>
-            In their list they see you as <span className="font-serif text-[1.0625rem] text-ink">{name}</span>
-            .
-          </>
-        ) : (
-          <>
-            In their list they see you as{" "}
-            <span className="font-serif text-[1.0625rem] text-ink">{neutral}</span>, a neutral label.
-          </>
-        )}{" "}
+        {t.seenAs} <span className="font-serif text-[1.0625rem] text-ink">{name ?? neutral}</span>
+        {name ? t.afterName : t.afterNeutral}{" "}
         <Button
           type="button"
           variant="quiet"
@@ -78,12 +70,10 @@ export function NameForm({
           className="text-[0.9375rem] underline decoration-rule-strong underline-offset-[0.28em]"
           onClick={() => setEditing(true)}
         >
-          Change it
+          {t.change}
         </Button>
         {reportName ? (
-          <span className="mt-1 block text-caption text-ink-3">
-            Your reports show the name you set in Therapy, {reportName}, as their PDF does.
-          </span>
+          <span className="mt-1 block text-caption text-ink-3">{t.reportName(reportName)}</span>
         ) : null}
       </p>
     );
@@ -94,19 +84,19 @@ export function NameForm({
         action(form);
         setEditing(false);
       })}
-      aria-label="How they see you"
+      aria-label={t.label}
     >
-      <Label htmlFor={id}>How they see you</Label>
+      <Label htmlFor={id}>{t.label}</Label>
       <div className="mt-2 flex flex-wrap items-center gap-3">
         <Input id={id} name="personName" defaultValue={name ?? ""} maxLength={80} className="max-w-[18rem]" />
         <Button type="submit" variant="outline" size="sm" disabled={pending}>
-          Save
+          {t.save}
         </Button>
         <Button type="button" variant="quiet" size="sm" onClick={() => setEditing(false)}>
-          Cancel
+          {t.cancel}
         </Button>
       </div>
-      <FieldHint>Leave it empty and they see {neutral}.</FieldHint>
+      <FieldHint>{t.empty(neutral)}</FieldHint>
       {state.problem ? <FieldError>{state.problem}</FieldError> : null}
     </form>
   );
@@ -125,24 +115,25 @@ export function ConfirmForm({
   confirm: (state: ConfirmState, form: FormData) => Promise<ConfirmState>;
   decline: () => Promise<void>;
 }) {
+  const t = useMessages().sharing;
   const [state, action, pending] = useActionState(confirm, { problem: null });
   const [declining, setDeclining] = useState(false);
   const id = useId();
   return (
     <div>
-      <form onSubmit={submitWith(action)} aria-label="Confirm the link" className="space-y-5">
+      <form onSubmit={submitWith(action)} aria-label={t.pending.form} className="space-y-5">
         <input type="hidden" name="shown" value={shown} />
         <div className="flex items-start gap-3">
           <Checkbox id={id} name="consent" />
           <label htmlFor={id} className="text-[0.9688rem] leading-[1.55] text-ink-2">
-            I agree to share the reports I approve with <span className="font-medium text-ink">{who}</span>,
-            as described here. I can stop at any time.
+            {t.consent.before} <span className="font-medium text-ink">{who}</span>
+            {t.consent.afterHere}
           </label>
         </div>
         {state.problem ? <FieldError>{state.problem}</FieldError> : null}
         <div className="flex flex-wrap items-center gap-x-5 gap-y-3">
           <Button type="submit" disabled={pending || declining}>
-            {pending ? "Confirming" : "Confirm, it is my therapist"}
+            {pending ? t.pending.confirming : t.pending.confirm}
           </Button>
           <Button
             type="button"
@@ -154,7 +145,7 @@ export function ConfirmForm({
               void decline();
             }}
           >
-            {declining ? "Declining" : "It is not my therapist"}
+            {declining ? t.pending.declining : t.pending.decline}
           </Button>
         </div>
       </form>

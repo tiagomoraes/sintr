@@ -4,17 +4,12 @@ import { InvalidStateError, NotFoundError, ShareMode, ValidationError } from "@s
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { tooManyLookups } from "@/lib/server/join";
+import { getMessages } from "@/lib/server/language";
 import { requireScope } from "@/lib/server/runtime";
 
 export interface JoinState {
   problem: string | null;
 }
-
-const GONE =
-  "This invite does not work any more: it may have expired, been cancelled or been used. Ask for a new one.";
-const BUSY = "Too many tries from here. Wait a few minutes, then try again.";
-const CHANGED =
-  "The practice changed its name or details since this page opened. Reload the page and read them again.";
 
 function text(form: FormData, name: string): string {
   const value = form.get(name);
@@ -28,15 +23,17 @@ function text(form: FormData, name: string): string {
  */
 export async function acceptAsPerson(code: string, _state: JoinState, form: FormData): Promise<JoinState> {
   const { scope } = await requireScope();
-  if (await tooManyLookups()) return { problem: BUSY };
-  if (form.get("consent") !== "on")
-    return { problem: "Tick the box to give your consent, or leave it for now." };
+  const messages = await getMessages();
+  const t = messages.sharing.join.problems;
+  const changed = messages.sharing.problems.changed;
+  if (await tooManyLookups()) return { problem: t.busy };
+  if (form.get("consent") !== "on") return { problem: t.consent };
   // The practice as the page showed it: the consent names exactly that.
   const shown = form.get("shown");
-  if (typeof shown !== "string" || !shown) return { problem: CHANGED };
+  if (typeof shown !== "string" || !shown) return { problem: changed };
   const mode = ShareMode.safeParse(form.get("shareMode") ?? "ask");
   const personName = text(form, "personName");
-  if (personName.length > 80) return { problem: "Use at most 80 characters for your name." };
+  if (personName.length > 80) return { problem: t.nameTooLong };
   try {
     await scope.sharing.acceptInvite(code, {
       consent: true,
@@ -45,18 +42,12 @@ export async function acceptAsPerson(code: string, _state: JoinState, form: Form
       shownPractice: shown,
     });
   } catch (error) {
-    if (error instanceof NotFoundError) return { problem: GONE };
+    if (error instanceof NotFoundError) return { problem: t.gone };
     if (error instanceof InvalidStateError) {
-      if (error.message === "already linked")
-        return { problem: "You are already linked with this practice." };
-      if (error.message === "this is your own practice")
-        return { problem: "This is your own practice's invite." };
-      if (error.message === "the practice changed since it was shown") return { problem: CHANGED };
-      if (error.message === "no seat is free") {
-        return {
-          problem: "This practice has no free seat right now. Let your therapist know; nothing was shared.",
-        };
-      }
+      if (error.message === "already linked") return { problem: t.linkedPractice };
+      if (error.message === "this is your own practice") return { problem: t.ownPractice };
+      if (error.message === "the practice changed since it was shown") return { problem: changed };
+      if (error.message === "no seat is free") return { problem: t.noSeat };
     }
     throw error;
   }
@@ -70,10 +61,12 @@ export async function acceptAsPerson(code: string, _state: JoinState, form: Form
  */
 export async function acceptAsPractice(code: string, _state: JoinState, form: FormData): Promise<JoinState> {
   const { scope } = await requireScope();
-  if (await tooManyLookups()) return { problem: BUSY };
+  const messages = await getMessages();
+  const t = messages.sharing.join.problems;
+  if (await tooManyLookups()) return { problem: t.busy };
   if (!(await scope.practice.get())) {
     const professionalName = text(form, "professionalName");
-    if (!professionalName) return { problem: "Write your name as the people you see know it." };
+    if (!professionalName) return { problem: messages.practice.problems.name };
     try {
       await scope.practice.open({
         professionalName,
@@ -81,23 +74,18 @@ export async function acceptAsPractice(code: string, _state: JoinState, form: Fo
         registration: text(form, "registration") || null,
       });
     } catch (error) {
-      if (error instanceof ValidationError)
-        return { problem: "Some of it is too long. Shorten it and try again." };
+      if (error instanceof ValidationError) return { problem: t.tooLong };
       if (!(error instanceof InvalidStateError)) throw error;
     }
   }
   try {
     await scope.practice.acceptInvite(code);
   } catch (error) {
-    if (error instanceof NotFoundError) return { problem: GONE };
+    if (error instanceof NotFoundError) return { problem: t.gone };
     if (error instanceof InvalidStateError) {
-      if (error.message === "already linked") return { problem: "You are already linked with this person." };
-      if (error.message === "this is your own invite") return { problem: "This is your own invite." };
-      if (error.message === "no seat is free") {
-        return {
-          problem: "Your practice has no free seat. Free one, or ask for more, then open this link again.",
-        };
-      }
+      if (error.message === "already linked") return { problem: t.linkedPerson };
+      if (error.message === "this is your own invite") return { problem: t.ownInvite };
+      if (error.message === "no seat is free") return { problem: t.noSeatOwn };
     }
     throw error;
   }
