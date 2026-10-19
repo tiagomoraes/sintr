@@ -107,7 +107,7 @@ The owner's request: a person may go every fifteen days, twice a week, or on a r
 
 **What did not come back.** "Has a session moved?" stays gone: a moved session is simply a session on another day, chosen on the calendar, never a date that guesses which session it replaces.
 
-The reasons are in DECISIONS 124 to 129, and 136.
+The reasons are in DECISIONS 124 to 130.
 
 ## Giving another assistant a key (F12)
 
@@ -121,7 +121,7 @@ The owner's decision: on "Connect another assistant" the button that made the ke
 
 **Without JavaScript** a key is made, shown once and its steps read the same way.
 
-The reasons are in DECISIONS 130 to 135.
+The reasons are in DECISIONS 131 to 136.
 
 ## Voice and users
 
