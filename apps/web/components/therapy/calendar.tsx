@@ -373,7 +373,7 @@ export function TherapyCalendar({ view, footer }: { view: CalendarView; footer?:
   return (
     <section id="sessions" aria-labelledby="sessions-title" className="scroll-mt-24">
       <div className="flex flex-wrap items-end justify-between gap-x-8 gap-y-4">
-        <div className="min-w-0 max-w-[34em] flex-1">
+        <div className="min-w-[min(100%,22rem)] max-w-[34em] flex-1">
           <h2 id="sessions-title" className="text-label font-medium text-ink-3">
             {T.title}
           </h2>
