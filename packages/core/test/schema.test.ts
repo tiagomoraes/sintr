@@ -353,8 +353,8 @@ describe("migrations", () => {
             year,
             month,
             day: date,
-            hour: Number(person.time!.slice(0, 2)),
-            minute: Number(person.time!.slice(3)),
+            hour: Number(person.time.slice(0, 2)),
+            minute: Number(person.time.slice(3)),
           },
           person.zone,
         );

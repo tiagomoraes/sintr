@@ -29,8 +29,8 @@ function series(partial: Partial<SessionSeries> & Pick<SessionSeries, "startsOn"
 }
 
 function schedule(
-  list: SessionSeries[],
-  changes: SessionChange[] = [],
+  list: readonly SessionSeries[],
+  changes: readonly SessionChange[] = [],
   reportLeadMinutes = 60,
 ): SessionSchedule {
   return { series: list, changes, reportLeadMinutes };
