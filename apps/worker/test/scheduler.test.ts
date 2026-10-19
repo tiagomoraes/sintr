@@ -95,14 +95,14 @@ describe("scheduler", () => {
 });
 
 describe("jobs", () => {
-  it("prepares due reports every minute, at the scheduler's moment", async () => {
+  it("prepares due reports every minute, reading everyone's weekly schedule once a tick", async () => {
     const job = JOBS.find((j) => j.name === "prepare-reports");
     expect(job?.intervalMs).toBe(60 * 1000);
-    const asked: Date[] = [];
-    const fake = { reportSchedules: async (now: Date) => (asked.push(now), []) };
+    let asked = 0;
+    const fake = { reportSchedules: async () => ((asked += 1), []) };
     const now = new Date("2026-10-19T20:00:00Z");
     expect(await job!.run(fake as never, now)).toEqual({ prepared: 0, failed: 0 });
-    expect(asked).toEqual([now]);
+    expect(asked).toBe(1);
   });
 
   it("purges expired auth records hourly through the runtime", async () => {
