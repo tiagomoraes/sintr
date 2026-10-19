@@ -13,7 +13,7 @@ import {
   seatsLine,
 } from "../lib/sharing";
 
-const DASH = /[–—]/u;
+const DASH = /[\u2013\u2014]/u;
 
 function notice(overrides: Partial<NoticeView>): NoticeView {
   return {
