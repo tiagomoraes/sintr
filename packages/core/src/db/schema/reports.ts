@@ -45,6 +45,8 @@ export const reports = pgTable(
     consentId: uuid("consent_id"),
     /** When the person was told by email that it is ready. */
     notifiedAt: timestamp("notified_at", { withTimezone: true }),
+    /** First shared with a practice: from then on the words are final, as after an email. */
+    sharedAt: timestamp("shared_at", { withTimezone: true }),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
@@ -72,11 +74,18 @@ export const reports = pgTable(
   ],
 );
 
-export const consentPurpose = pgEnum("consent_purpose", ["health_data_processing", "report_send"]);
+export const consentPurpose = pgEnum("consent_purpose", [
+  "health_data_processing",
+  "report_send",
+  "practice_link",
+  "report_share",
+]);
 
 /**
  * Append-only, versioned consent log. `granted = false` records a withdrawal.
- * A `report_send` consent names the one report it approves.
+ * A `report_send` consent names the one report it approves; a `practice_link`
+ * consent names the link to one practice, and a `report_share` consent names
+ * both the report and the link it goes through.
  */
 export const consents = pgTable(
   "consents",
@@ -89,6 +98,8 @@ export const consents = pgTable(
     reportId: uuid("report_id"),
     /** sealed: the recipient approved for this send */
     recipient: bytea("recipient"),
+    /** The link to a practice this consent is about. A reference only: the log outlives the link. */
+    linkId: uuid("link_id"),
     createdAt: createdAt(),
   },
   (t): PgTableExtraConfigValue[] => [
@@ -102,6 +113,15 @@ export const consents = pgTable(
     check(
       "consents_report_send_names_report",
       sql`${t.purpose} <> 'report_send' or ${t.reportId} is not null`,
+    ),
+    // Compared as text: values added to an enum cannot be used in the transaction that adds them.
+    check(
+      "consents_practice_names_link",
+      sql`${t.purpose}::text not in ('practice_link', 'report_share') or ${t.linkId} is not null`,
+    ),
+    check(
+      "consents_report_share_names_report",
+      sql`${t.purpose}::text <> 'report_share' or ${t.reportId} is not null`,
     ),
   ],
 );

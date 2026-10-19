@@ -1,13 +1,14 @@
-import { isEmailAddress, reportView } from "@sintr/core";
+import { isEmailAddress, practiceLine, reportView } from "@sintr/core";
 import { linkStyles } from "@sintr/ui";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ReportActions } from "@/components/reports/report-actions";
+import { ReportActions, type PracticeChoice } from "@/components/reports/report-actions";
 import { ReportChanges } from "@/components/reports/report-changes";
 import { ReportPaper } from "@/components/reports/report-paper";
-import { formatMoment } from "@/lib/format";
+import { formatDay, formatMoment } from "@/lib/format";
 import { STATUS, authorInWords, problemInWords } from "@/lib/reports";
+import { practiceWho } from "@/lib/sharing";
 import { requireScope, runtime } from "@/lib/server/runtime";
 
 export const metadata: Metadata = { title: "Report" };
@@ -17,9 +18,33 @@ export default async function ReportPage({ params }: { params: Promise<{ id: str
   const { scope } = await requireScope();
   const report = await scope.reports.get(id);
   if (!report) notFound();
-  const [view, revisions] = await Promise.all([reportView(scope, report), scope.reports.revisions(id)]);
+  const [view, revisions, links] = await Promise.all([
+    reportView(scope, report),
+    scope.reports.revisions(id),
+    scope.sharing.links(),
+  ]);
   if (!view) notFound();
   const locale = { language: "en", timezone: view.timeZone };
+  // The practices the person is linked with, and whether this report went to each.
+  const practices: PracticeChoice[] = links
+    .filter((link) => link.status === "active")
+    .map((link) => {
+      const share = link.shares.find((s) => s.reportId === id);
+      return {
+        linkId: link.id,
+        who: practiceWho(link.practice),
+        name: link.practice.professionalName,
+        line: practiceLine(link.practice),
+        automatic: link.shareMode === "auto",
+        shared: share
+          ? `Shared with ${link.practice.professionalName} on ${formatDay(share.sharedAt, locale)}. ${
+              share.firstReadAt
+                ? `They opened it on ${formatDay(share.firstReadAt, locale)}.`
+                : "Not opened yet."
+            }`
+          : null,
+      };
+    });
   const { therapist } = view;
   const emailAvailable = runtime().email.available;
   const delivery =
@@ -65,7 +90,9 @@ export default async function ReportPage({ params }: { params: Promise<{ id: str
           ) : null}
           {report.status === "sent" && report.sentAt
             ? `Sent with your approval to ${report.recipient ?? "your therapist"} on ${formatMoment(report.sentAt, locale)}.`
-            : STATUS[report.status]}
+            : report.sharedAt
+              ? `Approved by you and shared on ${formatMoment(report.sharedAt, locale)}.`
+              : STATUS[report.status]}
         </p>
         <p className="mt-2 max-w-[38em] text-[0.9375rem] text-ink-3">
           It covers {formatMoment(report.periodStart, locale)} to {formatMoment(report.periodEnd, locale)}.
@@ -94,7 +121,14 @@ export default async function ReportPage({ params }: { params: Promise<{ id: str
       ) : null}
 
       <div className="mb-12">
-        <ReportActions id={id} status={report.status} edited={report.editedAt !== null} delivery={delivery} />
+        <ReportActions
+          id={id}
+          status={report.status}
+          edited={report.editedAt !== null}
+          shared={report.sharedAt !== null}
+          delivery={delivery}
+          practices={practices}
+        />
       </div>
 
       <ReportPaper view={view} />
@@ -116,7 +150,7 @@ export default async function ReportPage({ params }: { params: Promise<{ id: str
         <p className="mt-2 max-w-[38em] text-[0.9375rem] text-ink-3">
           {report.status === "draft"
             ? "Marked as a draft on its first page until you approve it."
-            : "Printed when you approved it. This is exactly the file that is sent."}
+            : "Printed when you approved it. This is exactly the file that is sent or shared."}
         </p>
         <iframe
           src={pdf}

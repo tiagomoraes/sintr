@@ -109,3 +109,23 @@ export function verificationEmail(input: { to: string; url: string }): EmailMess
     html: html(paragraphs, { href: input.url, label: "Confirm this address" }),
   };
 }
+
+/**
+ * To a professional who asked for it: reports arrived in their practice. A
+ * link and a count only; never who shared them or what they say.
+ */
+export function practiceReportEmail(input: { to: string; url: string; count: number }): EmailMessage {
+  const paragraphs = [
+    input.count === 1
+      ? "A person you see shared a report with your practice on sintr."
+      : `People you see shared ${input.count} reports with your practice on sintr.`,
+    "It waits for you in your practice. This email says nothing about who shared it or what it says.",
+  ];
+  return {
+    to: input.to,
+    subject:
+      input.count === 1 ? "A report was shared with you" : `${input.count} reports were shared with you`,
+    text: `${paragraphs.join("\n\n")}\n\n${input.url}\n\nsintr\n`,
+    html: html(paragraphs, { href: input.url, label: "Open your practice" }),
+  };
+}

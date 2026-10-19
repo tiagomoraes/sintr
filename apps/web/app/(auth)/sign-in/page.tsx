@@ -31,7 +31,10 @@ export default async function SignInPage({
       ) : null}
       <p className="mt-10 text-[0.9375rem] text-ink-3">
         New here?{" "}
-        <Link href="/sign-up" className={linkStyles}>
+        <Link
+          href={next === "/entries" ? "/sign-up" : `/sign-up?next=${encodeURIComponent(next)}`}
+          className={linkStyles}
+        >
           Create your diary
         </Link>
       </p>

@@ -21,12 +21,13 @@ export default async function SettingsPage({
 }) {
   const { scope } = await requireScope();
   // Only what may be shown: the key is reduced to a hint on the server.
-  const [settings, profile, account, params, keys] = await Promise.all([
+  const [settings, profile, account, params, keys, practice] = await Promise.all([
     scope.agentSettings.get(),
     scope.profile.get(),
     scope.profile.account(),
     searchParams,
     workingKeys(scope),
+    scope.practice.get(),
   ]);
   const timezones = TIMEZONES.includes(profile.timezone) ? TIMEZONES : [profile.timezone, ...TIMEZONES];
 
@@ -81,6 +82,29 @@ export default async function SettingsPage({
             justVerified={params.verified === "1"}
           />
         </div>
+      </section>
+      <section aria-labelledby="practice-title" className="mt-16 max-w-[40rem] border-t border-rule pt-12">
+        <h2 id="practice-title" className="font-serif text-title-small font-normal text-ink">
+          {practice ? "Your practice" : "Are you a therapist?"}
+        </h2>
+        <p className="mt-3 text-ink-2">
+          {practice ? (
+            <>
+              Your practice, {practice.professionalName}, receives the reports your patients share with you.{" "}
+              <Link href="/practice" className={linkStyles}>
+                Open the dashboard
+              </Link>
+            </>
+          ) : (
+            <>
+              Open a practice on this account to receive the reports your patients choose to share with you.
+              Your own diary stays as it is.{" "}
+              <Link href="/practice" className={linkStyles}>
+                Open a practice
+              </Link>
+            </>
+          )}
+        </p>
       </section>
       <section aria-labelledby="preferences-title" className="mt-16 max-w-[40rem] border-t border-rule pt-12">
         <h2 id="preferences-title" className="font-serif text-title-small font-normal text-ink">

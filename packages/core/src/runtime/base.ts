@@ -3,7 +3,8 @@ import type { Config } from "../config";
 import { createDatabase, type DatabaseHandle } from "../db/client";
 import { createEmailTransport, type EmailTransport } from "../email";
 import { createLogger, type Logger } from "../log";
-import { purgeExpiredAuthRecords, purgeExpiredConversations } from "../maintenance";
+import { purgeExpiredAuthRecords, purgeExpiredConversations, purgeStaleInvites } from "../maintenance";
+import { sendPracticeNotices } from "../practice/notices";
 import { reportSchedules, type PersonSchedule } from "../report/schedules";
 import { createRepositories, type Repositories } from "../repositories";
 
@@ -24,6 +25,10 @@ export interface BaseRuntime {
   purgeExpiredAuthRecords(): Promise<{ sessions: number; verificationTokens: number }>;
   /** Conversations past their owner's retention setting (agent_settings). */
   purgeExpiredConversations(): Promise<{ conversations: number }>;
+  /** Invites a month past being usable. */
+  purgeStaleInvites(now?: Date): Promise<{ invites: number }>;
+  /** Email professionals who asked for it that reports arrived (a link and a count). */
+  notifyPractices(now?: Date): Promise<{ sent: number }>;
   /** Readiness: true when the database answers. */
   ping(): Promise<boolean>;
   close(): Promise<void>;
@@ -43,14 +48,24 @@ export function openBaseRuntime(
 ): { base: BaseRuntime; database: DatabaseHandle } {
   const log = createLogger({ level: config.logLevel, service: options.service });
   const database = createDatabase(config.databaseUrl, { max: options.poolSize ?? 10 });
+  const emailTransport = options.email ?? createEmailTransport(config.email);
   const base: BaseRuntime = {
     config,
     log,
-    repositories: createRepositories(database.db, config.masterKey),
-    email: options.email ?? createEmailTransport(config.email),
+    repositories: createRepositories(database.db, config.masterKey, { practiceDefaults: config.practice }),
+    email: emailTransport,
     reportSchedules: (now) => reportSchedules(database.db, now),
     purgeExpiredAuthRecords: () => purgeExpiredAuthRecords(database.db),
     purgeExpiredConversations: () => purgeExpiredConversations(database.db),
+    purgeStaleInvites: (now) => purgeStaleInvites(database.db, now),
+    notifyPractices: (now) =>
+      sendPracticeNotices({
+        db: database.db,
+        email: emailTransport,
+        origin: config.url.origin,
+        log,
+        ...(now ? { now } : {}),
+      }),
     async ping() {
       try {
         await database.db.execute(sql`select 1`);

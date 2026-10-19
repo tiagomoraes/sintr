@@ -244,6 +244,8 @@ export interface Report {
   sentAt: Date | null;
   consentId: string | null;
   notifiedAt: Date | null;
+  /** First shared with a practice; the words are final from then on. */
+  sharedAt: Date | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -264,7 +266,12 @@ export interface ReportRevision {
 
 /* Consents */
 
-export const ConsentPurpose = z.enum(["health_data_processing", "report_send"]);
+export const ConsentPurpose = z.enum([
+  "health_data_processing",
+  "report_send",
+  "practice_link",
+  "report_share",
+]);
 export type ConsentPurpose = z.infer<typeof ConsentPurpose>;
 
 export const ConsentInput = z.object({
@@ -272,7 +279,8 @@ export const ConsentInput = z.object({
   version: z.string().min(1).max(40),
   granted: z.boolean(),
   reportId: z.uuid().nullable().optional(),
-  recipient: z.string().min(1).max(320).nullable().optional(),
+  recipient: z.string().min(1).max(600).nullable().optional(),
+  linkId: z.uuid().nullable().optional(),
 });
 export type ConsentInput = z.input<typeof ConsentInput>;
 
@@ -283,6 +291,7 @@ export interface Consent {
   granted: boolean;
   reportId: string | null;
   recipient: string | null;
+  linkId: string | null;
   createdAt: Date;
 }
 
@@ -291,6 +300,213 @@ export const HEALTH_DATA_CONSENT_VERSION = "2026-10-18";
 
 /** The current wording of the approval to send one report to one recipient. */
 export const REPORT_SEND_CONSENT_VERSION = "2026-10-18";
+
+/** The current wording of the consent to share approved reports with one practice (the link). */
+export const PRACTICE_LINK_CONSENT_VERSION = "2026-10-18";
+
+/** The current wording of the approval to share one report with one linked practice. */
+export const REPORT_SHARE_CONSENT_VERSION = "2026-10-18";
+
+/* Practices, invites and links (the therapist's side) */
+
+/** A name or a line a professional shows: kept as typed, bounded for storage. */
+const ShownLine = (max: number) => z.string().min(1).max(max);
+
+export const PracticeInput = z.object({
+  professionalName: ShownLine(120),
+  practiceName: ShownLine(160).nullable().optional(),
+  registration: ShownLine(120).nullable().optional(),
+});
+export type PracticeInput = z.input<typeof PracticeInput>;
+
+export const PracticePatch = PracticeInput.partial().extend({ notifyEmail: z.boolean().optional() });
+export type PracticePatch = z.input<typeof PracticePatch>;
+
+/** Where a practice's seats come from: the installation's defaults, or a grant for this practice. */
+export type SeatSource = "config" | "grant";
+
+/** A plan and its seat count; `seats: null` is unlimited. */
+export interface PracticePlan {
+  plan: string;
+  seats: number | null;
+}
+
+export interface Practice extends PracticePlan {
+  id: string;
+  professionalName: string;
+  practiceName: string | null;
+  registration: string | null;
+  notifyEmail: boolean;
+  seatSource: SeatSource;
+  createdAt: Date;
+}
+
+/** What a person is shown of a practice: the names the professional chose to show. */
+export interface PracticeCard {
+  id: string;
+  professionalName: string;
+  practiceName: string | null;
+  registration: string | null;
+}
+
+/** How a practice's seats stand: links open or waiting, and practice invites still pending. */
+export interface SeatUse {
+  plan: string;
+  seats: number | null;
+  /** Active links. */
+  active: number;
+  /** Links waiting for the person's confirmation, and practice invites not yet accepted. */
+  held: number;
+  /** Seats left for a new invite or acceptance; null when unlimited. */
+  free: number | null;
+}
+
+/** How long an invite can be accepted. */
+export const INVITE_DAYS = 7;
+/** Invites one account may have waiting at once. */
+export const MAX_PENDING_INVITES = { practice: 50, person: 5 } as const;
+
+export const InviteDirection = z.enum(["practice_to_person", "person_to_practice"]);
+export type InviteDirection = z.infer<typeof InviteDirection>;
+
+/** The name a person chooses to be seen as by a practice. */
+export const PersonName = z.string().min(1).max(80);
+
+export const PracticeInviteInput = z.object({ note: z.string().min(1).max(120).nullable().optional() });
+export type PracticeInviteInput = z.input<typeof PracticeInviteInput>;
+
+export const PersonInviteInput = z.object({ personName: PersonName.nullable().optional() });
+export type PersonInviteInput = z.input<typeof PersonInviteInput>;
+
+export type InviteStatus = "pending" | "accepted" | "expired" | "revoked";
+
+/** An invite as its creator sees it. */
+export interface Invite {
+  id: string;
+  direction: InviteDirection;
+  status: InviteStatus;
+  /** The code as it is read aloud and typed: XXXX-XXXX-XXXX. */
+  code: string;
+  /** The professional's own note on who it is for. */
+  note: string | null;
+  /** For a person's invite: the name they chose to be seen as. */
+  personName: string | null;
+  expiresAt: Date;
+  acceptedAt: Date | null;
+  revokedAt: Date | null;
+  linkId: string | null;
+  createdAt: Date;
+}
+
+/** What /join shows about a code before anyone accepts it. Nothing about an invalid one. */
+export type InvitePreview =
+  | {
+      status: "valid";
+      direction: "practice_to_person";
+      inviteId: string;
+      expiresAt: Date;
+      practice: PracticeCard;
+      /** The viewer made it. */
+      own: boolean;
+    }
+  | {
+      status: "valid";
+      direction: "person_to_practice";
+      inviteId: string;
+      expiresAt: Date;
+      personName: string | null;
+      own: boolean;
+    }
+  | { status: "invalid" };
+
+export const ShareMode = z.enum(["ask", "auto"]);
+export type ShareMode = z.infer<typeof ShareMode>;
+export type LinkStatus = "pending" | "active" | "ended";
+export type LinkParty = "person" | "practice";
+
+/** A report shared through a link, without its words. */
+export interface ShareSummary {
+  id: string;
+  reportId: string;
+  sessionAt: Date | null;
+  periodStart: Date;
+  periodEnd: Date;
+  sharedAt: Date;
+  firstReadAt: Date | null;
+}
+
+/** A link as the person sees it. */
+export interface PersonLink {
+  id: string;
+  status: "pending" | "active";
+  practice: PracticeCard;
+  personName: string | null;
+  /** The practice's neutral label for the person ("Patient 3"), shown when they chose no name. */
+  number: number;
+  shareMode: ShareMode;
+  personAcceptedAt: Date | null;
+  practiceAcceptedAt: Date | null;
+  createdAt: Date;
+  shares: ShareSummary[];
+}
+
+/** A link as the practice sees it: the name the person chose, or none, and nothing else of them. */
+export interface PracticeLink {
+  id: string;
+  status: "pending" | "active";
+  number: number;
+  personName: string | null;
+  createdAt: Date;
+  /** When both sides had accepted. */
+  activeSince: Date | null;
+  lastSharedAt: Date | null;
+}
+
+/** A report a practice received, without its words. */
+export interface ReceivedReport extends ShareSummary {
+  linkId: string;
+  number: number;
+  personName: string | null;
+}
+
+/**
+ * The approved report as the practice reads it in place: the content with
+ * its frozen numbers, the period, which quotes were found in the diary word
+ * for word (the highlighter), the time zone and the name the report prints.
+ */
+export interface SharedReportSnapshot {
+  v: 1;
+  content: unknown;
+  period: { kind: "session" | "week"; label: string; start: string; end: string; session: string | null };
+  verified: string[];
+  timeZone: string;
+  personName: string | null;
+}
+
+export interface SharedReport extends ReceivedReport {
+  snapshot: SharedReportSnapshot;
+}
+
+export type NoticeKind = "link_pending" | "link_active" | "link_declined" | "link_ended" | "report_shared";
+
+/**
+ * An in-app notice: a kind and ids, worded when it is shown. `side` says
+ * which side of a link the account is on (an account can be both a person
+ * and a professional). The person's side is shown the practice; the
+ * practice's side the name the person chose, only while the link is open.
+ */
+export interface NoticeView {
+  id: string;
+  kind: NoticeKind;
+  side: "person" | "practice";
+  linkId: string | null;
+  sharedReportId: string | null;
+  readAt: Date | null;
+  createdAt: Date;
+  practice: PracticeCard | null;
+  personName: string | null;
+  number: number | null;
+}
 
 /* Conversations */
 
@@ -462,6 +678,19 @@ export const AuditAction = z.enum([
   "data.deleted",
   "agent_key.saved",
   "agent_key.removed",
+  "practice.opened",
+  "practice.updated",
+  "practice.plan_changed",
+  "invite.created",
+  "invite.revoked",
+  "invite.accepted",
+  "link.activated",
+  "link.declined",
+  "link.ended",
+  "link.changed",
+  "share.created",
+  "share.read",
+  "share.downloaded",
 ]);
 export type AuditAction = z.infer<typeof AuditAction>;
 

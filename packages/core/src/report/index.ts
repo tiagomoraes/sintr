@@ -104,6 +104,14 @@ export {
   zonedTime,
 } from "./time";
 export {
+  approveAndShare,
+  automaticLinks,
+  shareReport,
+  sharedPaper,
+  snapshotOf,
+  type PaperView,
+} from "./share";
+export {
   approveReport,
   editReport,
   notifyReportReady,

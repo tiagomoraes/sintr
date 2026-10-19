@@ -3,12 +3,18 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { AuthForm } from "@/components/auth-form";
+import { safeNext } from "@/lib/redirect";
 import { getSession, runtime } from "@/lib/server/runtime";
 
 export const metadata: Metadata = { title: "Create your diary" };
 
-export default async function SignUpPage() {
-  if (await getSession()) redirect("/entries");
+export default async function SignUpPage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
+  const next = safeNext((await searchParams).next);
+  if (await getSession()) redirect(next);
   const open = runtime().config.signup === "open";
   return (
     <>
@@ -19,7 +25,7 @@ export default async function SignUpPage() {
             An email and a password are all it takes. No name, no profile to fill in.
           </p>
           <div className="mt-10">
-            <AuthForm mode="sign-up" next="/entries" />
+            <AuthForm mode="sign-up" next={next} />
           </div>
         </>
       ) : (
@@ -29,7 +35,10 @@ export default async function SignUpPage() {
       )}
       <p className="mt-10 text-[0.9375rem] text-ink-3">
         Already keeping one?{" "}
-        <Link href="/sign-in" className={linkStyles}>
+        <Link
+          href={next === "/entries" ? "/sign-in" : `/sign-in?next=${encodeURIComponent(next)}`}
+          className={linkStyles}
+        >
           Sign in
         </Link>
       </p>

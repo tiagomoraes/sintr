@@ -12,7 +12,9 @@
  *   happened and what they did, but the thoughts, emotions, intensities and
  *   the working of a thought come from the entry, never from the model.
  * - The numbers are computed. They are frozen into `numbers` when the
- *   person approves the report, so a sent report keeps what was sent.
+ *   person approves the report, so a sent report keeps what was sent; so
+ *   are the quotes found word for word (`verified`), which decide the
+ *   highlighter, so a shared copy reads exactly as it was approved.
  */
 import { z } from "zod";
 import { Emotion } from "../domain";
@@ -84,6 +86,8 @@ export const ReportContent = z.object({
   /** Why the assistant did not write it, as a code. */
   problem: z.string().max(60).nullable(),
   numbers: Numbers.nullable(),
+  /** The quotes found in the diary word for word when the person approved it (normalised). */
+  verified: z.array(z.string().max(6_000)).max(1_000).nullable().optional(),
 });
 export type ReportContent = z.infer<typeof ReportContent>;
 

@@ -17,21 +17,21 @@ import {
   type DigestDay,
   type MeasureKey,
   type ReportMoment,
+  type PaperView,
   type ReportStrings,
-  type ReportView,
 } from "@sintr/core";
 import { IntensityChip, NotebookCard, NotebookHead, NotebookRow, Verbatim, cn } from "@sintr/ui";
 import type { ReactNode } from "react";
 
 /**
- * A report as the person reads it before approving it: the same words and
- * numbers as the PDF, set as a page of the app rather than raw Markdown,
- * in the report's language. The peach highlighter marks only words found
+ * A report as the person reads it before approving it (or as a practice
+ * reads the copy the person shared): the same words and numbers as the PDF,
+ * set as a page of the app rather than raw Markdown, in the report's language. The peach highlighter marks only words found
  * in the diary word for word; a quote that was not found keeps its marks,
  * underlined, so the person can see it and fix it.
  */
 
-type Check = ReportView["check"];
+type Check = PaperView["check"];
 
 function Prose({ text, check }: { text: string; check: Check }) {
   return (
@@ -44,7 +44,7 @@ function Prose({ text, check }: { text: string; check: Check }) {
         ) : (
           <span
             key={i}
-            title="Not in your diary word for word"
+            title="Not found in the diary word for word"
             className="underline decoration-ink-soft decoration-dotted decoration-1 underline-offset-[0.3em]"
           >
             {`“${part.text}”`}
@@ -96,7 +96,7 @@ function Feelings({ felt, before }: { felt: ReportMoment["felt"]; before?: Repor
   );
 }
 
-function Moment({ moment, view, s }: { moment: ReportMoment; view: ReportView; s: ReportStrings }) {
+function Moment({ moment, view, s }: { moment: ReportMoment; view: PaperView; s: ReportStrings }) {
   const missing = <span className="font-sans text-caption italic text-ink-3">{s.notRecorded}</span>;
   const strongest = moment.hotThought ? normalizeWords(moment.hotThought) : null;
   return (
@@ -177,7 +177,7 @@ function logged(day: DigestDay): boolean {
   return day.mood !== null || day.energy !== null || day.anxiety !== null || day.sleepHours !== null;
 }
 
-function Numbers({ view, s }: { view: ReportView; s: ReportStrings }) {
+function Numbers({ view, s }: { view: PaperView; s: ReportStrings }) {
   const { numbers, content } = view;
   const language = content.language;
   const anyLogged = numbers.days.some(logged);
@@ -324,7 +324,7 @@ function Numbers({ view, s }: { view: ReportView; s: ReportStrings }) {
   );
 }
 
-export function ReportPaper({ view }: { view: ReportView }) {
+export function ReportPaper({ view }: { view: PaperView }) {
   const { content, numbers, period, check } = view;
   const s = REPORT_STRINGS[content.language];
   const name = view.person.name?.trim() || null;

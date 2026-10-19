@@ -9,11 +9,15 @@ import {
   corrections,
   entries,
   insights,
+  invites,
+  links,
   messages,
+  practices,
   profiles,
   proposals,
   reportRevisions,
   reports,
+  sharedReports,
   therapyNotes,
   therapySettings,
   userKeys,
@@ -88,11 +92,24 @@ export const SEALED = {
   agentSettings: sealedFields(agentSettings, { apiKey: "text" }),
   proposals: sealedFields(proposals, { payload: "json" }),
   corrections: sealedFields(corrections, { previous: "json", note: "text" }),
+  // Sealed with the professional's own key, opened for the people the practice invites.
+  practices: sealedFields(practices, {
+    professionalName: "text",
+    practiceName: "text",
+    registration: "text",
+  }),
+  // Sealed with the creator's own key.
+  invites: sealedFields(invites, { code: "text", note: "text", personName: "text" }),
+  // Sealed with the link's own key (bound to the link's id, not a person's): what
+  // travels through a link, destroyed with the key when the link ends.
+  links: sealedFields(links, { personName: "text" }),
+  sharedReports: sealedFields(sharedReports, { snapshot: "json", pdf: "bytes" }),
 } as const;
 
 /** bytea columns that hold wrapped keys rather than sealed content. */
 export const KEY_MATERIAL: readonly { table: PgTable; column: string }[] = [
   { table: userKeys, column: "wrappedDek" },
+  { table: links, column: "wrappedKey" },
 ];
 
 /** Seal the given fields; `null` stays `null`, absent fields stay absent. */

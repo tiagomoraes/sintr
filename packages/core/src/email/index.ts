@@ -1,4 +1,10 @@
-export { passwordResetEmail, reportEmail, reportReadyEmail, verificationEmail } from "./messages";
+export {
+  passwordResetEmail,
+  practiceReportEmail,
+  reportEmail,
+  reportReadyEmail,
+  verificationEmail,
+} from "./messages";
 export {
   EmailError,
   createEmailTransport,

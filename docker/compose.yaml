@@ -28,6 +28,9 @@ x-app-env: &app-env
   SINTR_SMTP_USER: ${SINTR_SMTP_USER:-}
   SINTR_SMTP_PASSWORD: ${SINTR_SMTP_PASSWORD:-}
   SINTR_EMAIL_FROM: ${SINTR_EMAIL_FROM:-}
+  # Practices: the seats of a practice without a grant (unlimited by default here).
+  SINTR_PRACTICE_SEATS: ${SINTR_PRACTICE_SEATS:-}
+  SINTR_PRACTICE_PLAN: ${SINTR_PRACTICE_PLAN:-}
 
 services:
   db:

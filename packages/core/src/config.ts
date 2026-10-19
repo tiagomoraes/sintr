@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { parseMasterKey, type MasterKey } from "./crypto/keys";
+import type { PracticePlan } from "./domain";
 import type { EmailConfig } from "./email/transport";
 import type { LogLevel } from "./log";
 
@@ -38,6 +39,14 @@ const EnvSchema = z.object({
   SINTR_EMAIL_OUTBOX: z.string().optional(),
   // The Chromium that prints reports; Playwright's own when unset.
   SINTR_CHROMIUM_PATH: z.string().optional(),
+  // The seats of a practice that has no grant of its own: a number, or
+  // "unlimited". Unlimited on a self-host; none on the hosted offer until granted.
+  SINTR_PRACTICE_SEATS: z
+    .string()
+    .regex(/^(unlimited|\d{1,6})$/, 'must be a whole number or "unlimited"')
+    .optional(),
+  // The name of that plan, as the practice sees it.
+  SINTR_PRACTICE_PLAN: z.string().min(1).max(60).optional(),
 });
 
 export interface Config {
@@ -58,6 +67,8 @@ export interface Config {
   email: EmailConfig;
   /** A Chromium binary to print reports with; null uses Playwright's own. */
   chromiumPath: string | null;
+  /** The plan and seats of a practice without a grant (seats null: unlimited). */
+  practice: PracticePlan;
 }
 
 export class ConfigError extends Error {
@@ -112,6 +123,11 @@ export function loadConfig(env: Record<string, string | undefined> = process.env
   } catch (error) {
     throw new ConfigError(`invalid configuration: SINTR_MASTER_KEY: ${(error as Error).message}`);
   }
+  const seats = e.SINTR_PRACTICE_SEATS ?? (e.SINTR_MODE === "saas" ? "0" : "unlimited");
+  const practice: PracticePlan = {
+    plan: e.SINTR_PRACTICE_PLAN ?? (e.SINTR_MODE === "saas" ? "Hosted" : "Self-hosted"),
+    seats: seats === "unlimited" ? null : Number(seats),
+  };
   return {
     databaseUrl: e.DATABASE_URL,
     url: new URL(e.SINTR_URL),
@@ -123,5 +139,6 @@ export function loadConfig(env: Record<string, string | undefined> = process.env
     fakeAgent: e.SINTR_FAKE_AGENT === "1",
     email,
     chromiumPath: e.SINTR_CHROMIUM_PATH ?? null,
+    practice,
   };
 }
