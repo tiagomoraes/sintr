@@ -109,7 +109,8 @@ export function checkBaseUrl(
     if (url.protocol !== "https:") return { ok: false, problem: "https_required" };
     // "localhost." and "metadata.google.internal." are the same hosts.
     const host = url.hostname.replace(/\.+$/u, "");
-    if (PRIVATE_HOST.test(host) || IP_LITERAL.test(host)) {
+    // A public host name has a dot; a single label only resolves on a private network.
+    if (PRIVATE_HOST.test(host) || IP_LITERAL.test(host) || !host.includes(".")) {
       return { ok: false, problem: "private_address" };
     }
   }

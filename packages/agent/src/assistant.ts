@@ -38,6 +38,10 @@ export async function resolveAssistant(
   const source: AssistantSource | null = own ? "own" : config.house ? "house" : null;
   const credentials = own ?? config.house;
   if (!source || !credentials) return { ok: false, source: null, problem: "not_configured" };
+  // A person's own provider is never the house's own address: that would be the house, uncounted.
+  if (own && config.house?.baseUrl && sameHost(own.baseUrl, config.house.baseUrl)) {
+    return { ok: false, source: "own", problem: "private_address" };
+  }
   if (config.fakeAgent) return { ok: true, source, model: rehearsalModel(), rehearsal: true };
   try {
     const model = createLanguageModel(credentials, {
@@ -49,6 +53,14 @@ export async function resolveAssistant(
   } catch (error) {
     if (error instanceof ProviderSetupError) return { ok: false, source, problem: error.code };
     throw error;
+  }
+}
+
+function sameHost(a: string | null, b: string): boolean {
+  try {
+    return a !== null && new URL(a).host.toLowerCase() === new URL(b).host.toLowerCase();
+  } catch {
+    return false;
   }
 }
 

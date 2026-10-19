@@ -187,86 +187,97 @@ export function runCaptureTurn(turn: CaptureTurn): ReadableStream<SintrUIMessage
         }
       }
 
-      const signal: { crisis: { language: string | undefined } | null } = { crisis: null };
-      const proposedThisTurn: string[] = [];
-      const tools = inCrisis
-        ? undefined
-        : captureTools({
-            ports: turn.ports,
-            personTexts: personTexts(messages),
-            timezone: person.timezone,
-            proposedThisTurn,
-            onCrisis: (language) => {
-              signal.crisis = { language };
-            },
-          });
-      const states = inCrisis ? new Map() : await turn.ports.proposalStates();
+      try {
+        const signal: { crisis: { language: string | undefined } | null } = { crisis: null };
+        const proposedThisTurn: string[] = [];
+        const tools = inCrisis
+          ? undefined
+          : captureTools({
+              ports: turn.ports,
+              personTexts: personTexts(messages),
+              timezone: person.timezone,
+              proposedThisTurn,
+              onCrisis: (language) => {
+                signal.crisis = { language };
+              },
+            });
+        const states = inCrisis ? new Map() : await turn.ports.proposalStates();
 
-      const result = streamText({
-        model: turn.model,
-        instructions: inCrisis
-          ? crisisPrompt()
-          : capturePrompt({ ...person, now: turn.now ?? new Date(), ...(turnNote ? { turnNote } : {}) }),
-        messages: await toModelMessages(messages, {
-          states,
-          textOnly: inCrisis,
+        const result = streamText({
+          model: turn.model,
+          instructions: inCrisis
+            ? crisisPrompt()
+            : capturePrompt({ ...person, now: turn.now ?? new Date(), ...(turnNote ? { turnNote } : {}) }),
+          messages: await toModelMessages(messages, {
+            states,
+            textOnly: inCrisis,
+            ...(tools ? { tools } : {}),
+          }),
+          ...(tools ? { tools, stopWhen: [isStepCount(MAX_STEPS), hasToolCall("signal_crisis")] } : {}),
+          experimental_transform: smoothDashes(),
+          maxRetries: 1,
+          timeout: { totalMs: 180_000 },
+          ...(turn.abortSignal ? { abortSignal: turn.abortSignal } : {}),
+          telemetry: { isEnabled: false },
+          // The default writes the whole error, request included, to the console.
+          onError: ({ error }) =>
+            log.warn("agent.model_error", { code: describeProviderError(error), error }),
+        });
+
+        let failed = false;
+        const chunks = toUIMessageStream({
+          stream: result.stream,
           ...(tools ? { tools } : {}),
-        }),
-        ...(tools ? { tools, stopWhen: [isStepCount(MAX_STEPS), hasToolCall("signal_crisis")] } : {}),
-        experimental_transform: smoothDashes(),
-        maxRetries: 1,
-        timeout: { totalMs: 180_000 },
-        ...(turn.abortSignal ? { abortSignal: turn.abortSignal } : {}),
-        telemetry: { isEnabled: false },
-        // The default writes the whole error, request included, to the console.
-        onError: ({ error }) => log.warn("agent.model_error", { code: describeProviderError(error), error }),
-      });
-
-      let failed = false;
-      const chunks = toUIMessageStream({
-        stream: result.stream,
-        ...(tools ? { tools } : {}),
-        sendStart: false,
-        sendFinish: false,
-        // Also called for a refused tool input or a failing tool, which the
-        // model can recover from; only an `error` chunk fails the turn.
-        onError: (error) => describeProviderError(error),
-      }) as ReadableStream<SintrUIMessageChunk>;
-      const reader = chunks.getReader();
-      for (;;) {
-        const { done, value: chunk } = await reader.read();
-        if (done) break;
-        if (chunk.type === "error") {
-          failed = true;
-          // In crisis mode a failure must not leave the person without the numbers.
-          if (inCrisis) continue;
+          sendStart: false,
+          sendFinish: false,
+          // Also called for a refused tool input or a failing tool, which the
+          // model can recover from; only an `error` chunk fails the turn.
+          onError: (error) => describeProviderError(error),
+        }) as ReadableStream<SintrUIMessageChunk>;
+        const reader = chunks.getReader();
+        for (;;) {
+          const { done, value: chunk } = await reader.read();
+          if (done) break;
+          if (chunk.type === "error") {
+            failed = true;
+            // In crisis mode a failure must not leave the person without the numbers.
+            if (inCrisis) continue;
+          }
+          writer.write(chunk);
         }
-        writer.write(chunk);
-      }
 
-      const withdraw = async () => {
-        for (const id of proposedThisTurn) {
-          await turn.ports.discardProposal(id).catch(() => undefined);
+        const withdraw = async () => {
+          for (const id of proposedThisTurn) {
+            await turn.ports.discardProposal(id).catch(() => undefined);
+          }
+        };
+        if (failed && !inCrisis) {
+          // Drafts of a reply that is not kept would wait unseen; withdraw them.
+          keepReply = false;
+          await withdraw();
         }
-      };
-      if (failed && !inCrisis) {
-        // Drafts of a reply that is not kept would wait unseen; withdraw them.
-        keepReply = false;
-        await withdraw();
-      }
-      // A reply that failed is not counted against the month.
-      if (failed) await turn.metered?.giveBack();
-      if (signal.crisis) {
-        // A stopped diary is always stored, so the next turn stays stopped.
-        keepReply = true;
-        await withdraw();
-        log.info("agent.crisis", { code: "assistant" });
-        writeCrisis(writer, "assistant", crisisLanguage(signal.crisis.language ?? person.language));
-      } else if (inCrisis && failed) {
+        // A reply that failed is not counted against the month.
+        if (failed) await turn.metered?.giveBack();
+        if (signal.crisis) {
+          // A stopped diary is always stored, so the next turn stays stopped.
+          keepReply = true;
+          await withdraw();
+          log.info("agent.crisis", { code: "assistant" });
+          writeCrisis(writer, "assistant", crisisLanguage(signal.crisis.language ?? person.language));
+        } else if (inCrisis && failed) {
+          writeText(writer, crisisMessage(crisisLanguage(person.language)));
+        }
+        log.info("agent.turn_done", { durationMs: Date.now() - started, code: failed ? "failed" : "ok" });
+        writer.write({ type: "finish" });
+      } catch (error) {
+        // Whatever broke before the reply, the month is not charged for it,
+        // and a paused conversation still gets the help lines.
+        await turn.metered?.giveBack();
+        if (!inCrisis) throw error;
+        log.warn("agent.turn_failed", { error });
         writeText(writer, crisisMessage(crisisLanguage(person.language)));
+        writer.write({ type: "finish" });
       }
-      log.info("agent.turn_done", { durationMs: Date.now() - started, code: failed ? "failed" : "ok" });
-      writer.write({ type: "finish" });
     },
   });
 }

@@ -102,6 +102,28 @@ describe("the meter in a conversation", () => {
     expect(state).toMatchObject({ used: 10, takes: 1, givenBack: 1 });
   });
 
+  it("gives the unit back when the turn breaks before the model answers", async () => {
+    const model = scriptedModel([{ text: "unused" }]);
+    const { port, state } = meter(100, 10);
+    const memory = memoryPorts();
+    memory.ports.proposalStates = () => Promise.reject(new Error("database unavailable"));
+    const out = await collect(
+      runCaptureTurn({
+        model,
+        history: [],
+        message: user(SITUATION),
+        person: PERSON,
+        ports: memory.ports,
+        log: capturedLogger().log,
+        now: NOW,
+        metered: port,
+      }),
+    );
+    expect(out.types).toContain("error");
+    expect(model.calls).toHaveLength(0);
+    expect(state).toMatchObject({ used: 10, takes: 1, givenBack: 1 });
+  });
+
   it("never counts a message that signals risk: the screen answers before anything", async () => {
     const model = scriptedModel([{ text: "unused" }]);
     const { port, state } = meter(100, 100);
@@ -295,7 +317,7 @@ describe("who answers", () => {
       ok: true,
       source: "house",
     });
-    const internal: ProviderCredentials = { ...OWN, baseUrl: "http://litellm:4000/v1" };
+    const internal: ProviderCredentials = { ...OWN, baseUrl: "http://ollama:11434/v1" };
     expect(
       await resolveAssistant(scopeWith(internal), { mode: "saas", fakeAgent: false, house: gateway }),
     ).toEqual({
@@ -303,6 +325,26 @@ describe("who answers", () => {
       source: "own",
       problem: "https_required",
     });
+    // A single name with https is still a private network's, not a public host.
+    const single: ProviderCredentials = { ...OWN, baseUrl: "https://ollama/v1" };
+    expect(
+      await resolveAssistant(scopeWith(single), { mode: "saas", fakeAgent: false, house: gateway }),
+    ).toEqual({
+      ok: false,
+      source: "own",
+      problem: "private_address",
+    });
+  });
+
+  it("never takes the house's own address as a person's key, which would be the house uncounted", async () => {
+    const asOwn: ProviderCredentials = { ...OWN, baseUrl: "https://HOUSE.example.test/v1/", apiKey: null };
+    for (const mode of ["saas", "selfhost"] as const) {
+      expect(await resolveAssistant(scopeWith(asOwn), { mode, fakeAgent: false, house: HOUSE })).toEqual({
+        ok: false,
+        source: "own",
+        problem: "private_address",
+      });
+    }
   });
 
   it("is the offline rehearsal model for both, with SINTR_FAKE_AGENT", async () => {

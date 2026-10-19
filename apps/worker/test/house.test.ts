@@ -193,4 +193,69 @@ describe("a new account on an installation with a house assistant", () => {
     expect(endpoint.requests).toHaveLength(0);
     expect((await cris.plans.current(now)).used.reports).toBe(reports);
   });
+
+  it("leaves an assistant's draft as it is when the scheduler would prepare it again over the limit", async () => {
+    const endpoint = scriptedEndpoint(rehearsalScript);
+    const dani = await signUp("house-dani");
+    // Another session nobody else has: Fridays at 04:41 in Chatham.
+    const ZONE = "Pacific/Chatham";
+    await dani.profile.update({ timezone: ZONE });
+    await dani.therapySettings.update({ sessionDay: 5, sessionTime: "04:41", reportLeadMinutes: 60 });
+    await dani.checkins.create({
+      occurredAt: zonedTime({ year: 2026, month: 10, day: 21, hour: 10, minute: 0 }, ZONE),
+      mood: 3,
+      note: "a calm day",
+    });
+    // "Prepare it now" the evening before: the assistant writes it, one unit.
+    const early = zonedTime({ year: 2026, month: 10, day: 22, hour: 20, minute: 0 }, ZONE);
+    const plan = planReportNow({
+      schedule: await dani.therapySettings.get(),
+      timeZone: ZONE,
+      reports: await dani.reports.recent(),
+      now: early,
+    });
+    if (plan.action !== "create") throw new Error("expected a report to prepare");
+    const now = await reportModel(dani, config, { fetch: endpoint.fetch });
+    await prepareReport({ scope: dani, period: plan.period, model: now.model, metered: now.metered, log });
+    expect(parseContent((await dani.reports.list())[0]!.content)?.author).toBe("assistant");
+    // Then the month's reports are used, and the preparation time comes.
+    const used = { reports: PERSON_PLANS.free.allowance.reports! };
+    await handle.db
+      .insert(usageCounters)
+      .values({ userId: dani.userId, period: "2026-10-01", ...used })
+      .onConflictDoUpdate({ target: [usageCounters.userId, usageCounters.period], set: used });
+    const calls = endpoint.requests.length;
+    const due = await prepareDueReports(
+      { ...runtime, log, config: { ...config, fakeAgent: false } },
+      zonedTime({ year: 2026, month: 10, day: 23, hour: 3, minute: 41 }, ZONE),
+      { modelFor: (scope) => reportModel(scope, config, { fetch: endpoint.fetch }) },
+    );
+    expect(due).toEqual({ prepared: 0, failed: 0 });
+    const reports = await dani.reports.list();
+    expect(reports).toHaveLength(1);
+    expect(parseContent(reports[0]!.content)?.author).toBe("assistant");
+    expect(endpoint.requests.length).toBe(calls);
+    expect((await dani.plans.current(early)).used.reports).toBe(PERSON_PLANS.free.allowance.reports);
+  });
+
+  it("counts one report when two preparations of the same period race", async () => {
+    const endpoint = scriptedEndpoint(rehearsalScript);
+    const eli = await signUp("house-eli");
+    const plan = planReportNow({
+      schedule: await eli.therapySettings.get(),
+      timeZone: "UTC",
+      reports: [],
+      now: new Date(),
+    });
+    if (plan.action !== "create") throw new Error("expected a report to prepare");
+    const both = await Promise.all(
+      [1, 2].map(async () => {
+        const { model, metered: reports } = await reportModel(eli, config, { fetch: endpoint.fetch });
+        return prepareReport({ scope: eli, period: plan.period, model, metered: reports, log });
+      }),
+    );
+    expect(both.filter(Boolean)).toHaveLength(1);
+    expect(await eli.reports.list()).toHaveLength(1);
+    expect((await eli.plans.current()).used.reports).toBe(1);
+  });
 });

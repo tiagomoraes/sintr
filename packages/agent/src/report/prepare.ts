@@ -69,9 +69,29 @@ function isDuplicate(error: unknown): boolean {
  * Prepare one report: the digest of the period, the six sections (written
  * by the assistant and checked, or the parts sintr can make alone),
  * stored as a draft that waits for the person. Nothing is sent. Returns
- * null when another preparation of the same period got there first.
+ * null when another preparation of the same period got there first, or
+ * when the scheduler would bring a draft up to date but the month's
+ * reports are used: the draft the person has is left as it is, never
+ * replaced by a thinner one.
+ *
+ * A unit of the meter is counted only for a report the assistant wrote and
+ * that was stored; every other way out gives it back.
  */
 export async function prepareReport(input: PrepareReport): Promise<PreparedReport | null> {
+  let charged = false;
+  try {
+    const prepared = await prepareCounted(input, () => {
+      charged = true;
+    });
+    if (prepared === null && charged) await input.metered?.giveBack();
+    return prepared;
+  } catch (error) {
+    if (charged) await input.metered?.giveBack();
+    throw error;
+  }
+}
+
+async function prepareCounted(input: PrepareReport, charge: () => void): Promise<PreparedReport | null> {
   const { scope, period, log } = input;
   const [profile, notes] = await Promise.all([scope.profile.get(), scope.therapyNotes.list()]);
   const timeZone = profile.timezone;
@@ -88,7 +108,12 @@ export async function prepareReport(input: PrepareReport): Promise<PreparedRepor
   let problems: ReportProblem[] = [];
   // This month's reports on the person's plan are used: sintr prepares it alone, in their words.
   const taken = input.model && input.metered ? await input.metered.take() : null;
+  if (taken?.ok) charge();
   if (taken && !taken.ok) {
+    if (input.reportId && input.untouched) {
+      log.info("report.prepare_skipped", { reportId: input.reportId, code: "limit_reached" });
+      return null;
+    }
     content = draftContent({ digest, language, toBring, problem: "limit_reached" });
   } else if (input.model) {
     const written = await writeReport({
