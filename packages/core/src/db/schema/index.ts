@@ -42,7 +42,14 @@ export {
   usageCounters,
   type SubscriptionRow,
 } from "./plans";
-export { deliveryChannel, profiles, therapySettings } from "./profile";
+export {
+  deliveryChannel,
+  profiles,
+  sessionRepeat,
+  therapySeries,
+  therapySeriesChanges,
+  therapySettings,
+} from "./profile";
 export {
   consentPurpose,
   consents,

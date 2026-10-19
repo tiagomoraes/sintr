@@ -81,8 +81,6 @@ export function therapySettingsRepository({ db, userId, cipher }: ScopeContext) 
     return {
       therapistName: sealed.therapistName as string | null,
       therapistContact: sealed.therapistContact as string | null,
-      sessionDay: row.sessionDay,
-      sessionTime: row.sessionTime ? row.sessionTime.slice(0, 5) : null,
       reportLeadMinutes: row.reportLeadMinutes,
       requireApproval: true,
       deliveryChannel: row.deliveryChannel,
@@ -97,8 +95,6 @@ export function therapySettingsRepository({ db, userId, cipher }: ScopeContext) 
       return {
         therapistName: null,
         therapistContact: null,
-        sessionDay: null,
-        sessionTime: null,
         reportLeadMinutes: 60,
         requireApproval: true,
         deliveryChannel: "download",

@@ -24,6 +24,7 @@ interface Owned {
   rawToken: string;
   proposal: string;
   memory: string;
+  series: string;
 }
 
 describe("tenant isolation", () => {
@@ -42,7 +43,9 @@ describe("tenant isolation", () => {
     b = await repositories.forUser(bobId);
 
     await a.profile.update({ displayName: "Alice", timezone: "America/Sao_Paulo" });
-    await a.therapySettings.update({ therapistName: "Dr. A", sessionDay: 3, sessionTime: "18:00" });
+    await a.therapySettings.update({ therapistName: "Dr. A" });
+    owned.series = (await a.sessions.add({ startsOn: "2026-10-07", time: "18:00", repeat: "weekly" })).id;
+    await a.sessions.cancel({ seriesId: owned.series, occursOn: "2026-10-14" });
     owned.entry = (
       await a.entries.create({ situation: "alice's situation", thoughts: ["alice's thought"] })
     ).id;
@@ -176,6 +179,7 @@ describe("tenant isolation", () => {
     expect(await b.conversations.messages(owned.conversation)).toEqual([]);
     expect(await b.apiTokens.list()).toEqual([]);
     expect(await b.auditLog.list()).toEqual([]);
+    expect(await b.sessions.calendar()).toEqual({ series: [], changes: [] });
   });
 
   it("does not let B read A's rows by id", async () => {
@@ -210,6 +214,21 @@ describe("tenant isolation", () => {
     expect(await b.therapyNotes.setDone(owned.note, true)).toBeNull();
     expect(await b.insights.archive(owned.insight)).toBeNull();
     expect(await b.apiTokens.revoke(owned.token)).toBe(false);
+    // A's sessions, named exactly: B can neither move, cancel, put back, change nor stop them.
+    const session = { seriesId: owned.series, occursOn: "2026-10-21" };
+    expect(await b.sessions.move(session, { on: "2026-10-22", time: "09:00" })).toBe(false);
+    expect(await b.sessions.cancel(session)).toBe(false);
+    expect(await b.sessions.restore({ seriesId: owned.series, occursOn: "2026-10-14" })).toBe(false);
+    expect(
+      await b.sessions.changeFrom(session, { startsOn: "2026-10-22", time: "09:00", repeat: "weekly" }),
+    ).toBeNull();
+    expect(await b.sessions.stopFrom(session)).toBe(false);
+    // The database itself refuses a change in B's name on A's rhythm.
+    await expect(
+      handle.db.execute(
+        sql`insert into therapy_series_changes (user_id, series_id, occurs_on) values (${b.userId}, ${owned.series}, '2026-10-21')`,
+      ),
+    ).rejects.toThrow();
     await expect(b.reports.edit(owned.report, "x")).rejects.toBeInstanceOf(NotFoundError);
     await expect(b.reports.prepareAgain(owned.report, { content: "x" })).rejects.toBeInstanceOf(
       NotFoundError,
@@ -234,6 +253,10 @@ describe("tenant isolation", () => {
     expect((await a.insights.list())[0]?.archivedAt).toBeNull();
     expect((await a.apiTokens.list())[0]?.revokedAt).toBeNull();
     expect(await a.conversations.messages(owned.conversation)).toHaveLength(1);
+    expect(await a.sessions.calendar()).toEqual({
+      series: [expect.objectContaining({ id: owned.series, startsOn: "2026-10-07", stopsOn: null })],
+      changes: [{ seriesId: owned.series, occursOn: "2026-10-14", movedTo: null }],
+    });
   });
 
   it("does not let B send A's report with A's consent", async () => {

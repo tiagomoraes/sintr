@@ -54,18 +54,15 @@ const sp = (month: number, day: number, hour: number, minute = 0) =>
   zonedTime({ year: 2026, month, day, hour, minute }, SP);
 
 let alice: UserScope;
+let aliceMondays: string;
 let bob: UserScope;
 
 beforeAll(async () => {
   // Alice: São Paulo, Mondays at 18:00, an assistant, and the notice by email.
   alice = await person("alice", true);
   await alice.profile.update({ timezone: SP, locale: "pt-BR", displayName: "Alice" });
-  await alice.therapySettings.update({
-    sessionDay: 1,
-    sessionTime: "18:00",
-    reportLeadMinutes: 60,
-    reportNoticeEmail: true,
-  });
+  await alice.therapySettings.update({ reportLeadMinutes: 60, reportNoticeEmail: true });
+  aliceMondays = (await alice.sessions.add({ startsOn: "2026-09-07", time: "18:00", repeat: "weekly" })).id;
   await alice.agentSettings.update({
     provider: "anthropic",
     model: "a-model",
@@ -88,7 +85,8 @@ beforeAll(async () => {
   // Bob: Tokyo, Mondays at 18:00 there, no assistant, no notice.
   bob = await person("bob", true);
   await bob.profile.update({ timezone: "Asia/Tokyo" });
-  await bob.therapySettings.update({ sessionDay: 1, sessionTime: "18:00", reportLeadMinutes: 120 });
+  await bob.therapySettings.update({ reportLeadMinutes: 120 });
+  await bob.sessions.add({ startsOn: "2026-09-07", time: "18:00", repeat: "weekly" });
 });
 
 afterAll(async () => {
@@ -138,9 +136,12 @@ describe("preparing reports on schedule", () => {
     expect(email.sent.length).toBe(sent);
   });
 
-  it("follows a session that moves: the untouched draft is prepared again for the new day", async () => {
-    // Before Monday's session, Alice moves her sessions to Wednesdays at 18:00, and writes on Tuesday.
-    await alice.therapySettings.update({ sessionDay: 3 });
+  it("follows a rhythm that moves: the untouched draft is prepared again for the new day", async () => {
+    // Before Monday's session, Alice moves her sessions to Wednesdays at 18:00 from this one on, and writes on Tuesday.
+    await alice.sessions.changeFrom(
+      { seriesId: aliceMondays, occursOn: "2026-10-19" },
+      { startsOn: "2026-10-21", time: "18:00", repeat: "weekly" },
+    );
     await alice.checkins.create({ occurredAt: sp(10, 20, 9), mood: 3, note: "terça mais calma" });
     expect(await prepareDueReports(runtime, sp(10, 21, 16, 59))).toEqual({ prepared: 0, failed: 0 });
     expect(await prepareDueReports(runtime, sp(10, 21, 17))).toEqual({ prepared: 1, failed: 0 });
@@ -185,14 +186,14 @@ describe("preparing reports on schedule", () => {
 
   it("prepares nothing for a person whose consent to process their data is withdrawn or outdated", async () => {
     const erin = await person("erin", true);
-    await erin.therapySettings.update({ sessionDay: 1, sessionTime: "21:00" });
+    await erin.sessions.add({ startsOn: "2026-10-05", time: "21:00", repeat: "weekly" });
     await erin.consents.record({
       purpose: "health_data_processing",
       version: HEALTH_DATA_CONSENT_VERSION,
       granted: false,
     });
     const frank = await person("frank", true);
-    await frank.therapySettings.update({ sessionDay: 1, sessionTime: "21:00" });
+    await frank.sessions.add({ startsOn: "2026-10-05", time: "21:00", repeat: "weekly" });
     await frank.consents.record({ purpose: "health_data_processing", version: "2000-01-01", granted: true });
     const scheduled = (await runtime.reportSchedules()).map((p) => p.userId);
     expect(scheduled).not.toContain(erin.userId);
@@ -205,7 +206,7 @@ describe("preparing reports on schedule", () => {
     const carol = await person("carol", false);
     const dan = await person("dan", false);
     for (const scope of [carol, dan])
-      await scope.therapySettings.update({ sessionDay: 1, sessionTime: "20:00" });
+      await scope.sessions.add({ startsOn: "2026-10-05", time: "20:00", repeat: "weekly" });
     const lines: string[] = [];
     const log = createLogger({ write: (_level, line) => lines.push(line) });
     const result = await prepareDueReports({ ...runtime, log }, new Date("2026-11-02T19:00:00Z"), {
@@ -221,6 +222,73 @@ describe("preparing reports on schedule", () => {
     expect(lines.join("\n")).not.toContain("deixo a desejar");
     expect(await carol.reports.list()).toEqual([]);
     expect(await dan.reports.list()).toHaveLength(1);
+  });
+});
+
+/**
+ * The calendar's shapes, in November, at 08:00 in São Paulo with half an
+ * hour of lead, so nobody above is due at these moments: a fortnightly
+ * rhythm, two sessions a week, and a weekly rhythm with one session moved
+ * on its own and one cancelled.
+ */
+describe("preparing reports on the calendar", () => {
+  const lead = { reportLeadMinutes: 30 };
+  async function withSessions(label: string) {
+    const scope = await person(label, false);
+    await scope.profile.update({ timezone: SP });
+    await scope.therapySettings.update(lead);
+    return scope;
+  }
+
+  it("prepares a fortnightly rhythm once every two weeks, each report meeting the last", async () => {
+    const gabi = await withSessions("gabi");
+    await gabi.sessions.add({ startsOn: "2026-11-03", time: "08:00", repeat: "fortnightly" });
+    expect(await prepareDueReports(runtime, sp(11, 3, 7, 29))).toEqual({ prepared: 0, failed: 0 });
+    expect(await prepareDueReports(runtime, sp(11, 3, 7, 30))).toEqual({ prepared: 1, failed: 0 });
+    // The week in between has no session, so nothing is prepared.
+    expect(await prepareDueReports(runtime, sp(11, 10, 7, 30))).toEqual({ prepared: 0, failed: 0 });
+    expect(await prepareDueReports(runtime, sp(11, 17, 7, 30))).toEqual({ prepared: 1, failed: 0 });
+    const [second, first] = await gabi.reports.list();
+    expect(first).toMatchObject({ sessionAt: sp(11, 3, 8), periodEnd: sp(11, 3, 7, 30) });
+    expect(second).toMatchObject({
+      sessionAt: sp(11, 17, 8),
+      periodStart: sp(11, 3, 7, 30),
+      periodEnd: sp(11, 17, 7, 30),
+    });
+  });
+
+  it("prepares two sessions in a week as two reports", async () => {
+    const hugo = await withSessions("hugo");
+    await hugo.sessions.add({ startsOn: "2026-11-04", time: "08:00", repeat: "weekdays", weekdays: [3, 5] });
+    expect(await prepareDueReports(runtime, sp(11, 4, 7, 30))).toEqual({ prepared: 1, failed: 0 });
+    expect(await prepareDueReports(runtime, sp(11, 6, 7, 30))).toEqual({ prepared: 1, failed: 0 });
+    const [friday, wednesday] = await hugo.reports.list();
+    expect(wednesday).toMatchObject({ sessionAt: sp(11, 4, 8), periodEnd: sp(11, 4, 7, 30) });
+    expect(friday).toMatchObject({
+      sessionAt: sp(11, 6, 8),
+      periodStart: sp(11, 4, 7, 30),
+      periodEnd: sp(11, 6, 7, 30),
+    });
+  });
+
+  it("follows one session moved on its own, skips one cancelled, and the rhythm goes on", async () => {
+    const ines = await withSessions("ines");
+    const mondays = await ines.sessions.add({ startsOn: "2026-11-02", time: "08:00", repeat: "weekly" });
+    await ines.sessions.move(
+      { seriesId: mondays.id, occursOn: "2026-11-09" },
+      { on: "2026-11-11", time: "12:00" },
+    );
+    await ines.sessions.cancel({ seriesId: mondays.id, occursOn: "2026-11-16" });
+    expect(await prepareDueReports(runtime, sp(11, 2, 7, 30))).toEqual({ prepared: 1, failed: 0 });
+    expect(await prepareDueReports(runtime, sp(11, 9, 7, 30))).toEqual({ prepared: 0, failed: 0 });
+    expect(await prepareDueReports(runtime, sp(11, 11, 11, 30))).toEqual({ prepared: 1, failed: 0 });
+    expect(await prepareDueReports(runtime, sp(11, 16, 7, 30))).toEqual({ prepared: 0, failed: 0 });
+    expect(await prepareDueReports(runtime, sp(11, 23, 7, 30))).toEqual({ prepared: 1, failed: 0 });
+    const reports = (await ines.reports.list()).reverse();
+    expect(reports.map((r) => r.sessionAt)).toEqual([sp(11, 2, 8), sp(11, 11, 12), sp(11, 23, 8)]);
+    // Nothing lost, nothing counted twice: each period starts where the one before ended.
+    expect(reports[1]!.periodStart).toEqual(reports[0]!.periodEnd);
+    expect(reports[2]!.periodStart).toEqual(reports[1]!.periodEnd);
   });
 });
 

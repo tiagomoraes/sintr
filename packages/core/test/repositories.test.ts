@@ -177,12 +177,8 @@ describe("settings", () => {
   });
 
   it("keeps approval mandatory, in code and in the database", async () => {
-    const settings = await scope.therapySettings.update({
-      sessionDay: 3,
-      sessionTime: "18:00",
-      reportLeadMinutes: 60,
-    });
-    expect(settings).toMatchObject({ sessionDay: 3, sessionTime: "18:00", requireApproval: true });
+    const settings = await scope.therapySettings.update({ reportLeadMinutes: 60 });
+    expect(settings).toMatchObject({ reportLeadMinutes: 60, requireApproval: true });
     const attempt = handle.db.execute(
       sql`update therapy_settings set require_approval = false where user_id = ${scope.userId}`,
     );
