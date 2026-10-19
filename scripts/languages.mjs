@@ -1,8 +1,8 @@
 // The app's languages are data: a catalog folder in apps/web/messages and a
 // line in apps/web/messages/languages.json. This writes the one module that
 // imports each listed catalog, so adding a language needs no code. The web
-// app's dev, build and test scripts run it; `make languages` runs it alone,
-// and `--check` only says whether the module is current.
+// app's dev and build scripts run it; `make languages` runs it alone, and
+// `--check` (make lint, and the parity test) says whether it is current.
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";

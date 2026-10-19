@@ -55,7 +55,12 @@ function outputs(fn: (...args: unknown[]) => unknown): string[] {
 /** Every difference in shape between English and a language, as "feature.key: what". */
 function differences(source: unknown, other: unknown, path: string): string[] {
   if (typeof source === "string") return typeof other === "string" ? [] : [`${path}: not a sentence`];
-  if (typeof source === "function") return typeof other === "function" ? [] : [`${path}: not a function`];
+  if (typeof source === "function") {
+    if (typeof other !== "function") return [`${path}: not a function`];
+    // A sentence that drops a value English gives it would lose that value silently.
+    const [want, got] = [(source as () => unknown).length, (other as () => unknown).length];
+    return got === want ? [] : [`${path}: takes ${got} values, English gives ${want}`];
+  }
   if (Array.isArray(source)) {
     if (!Array.isArray(other)) return [`${path}: not a list`];
     if (other.length !== source.length)
@@ -119,6 +124,17 @@ describe("the languages", () => {
         expect(copied, `${code} still reads ${copied.join(", ")} in English`).toEqual([]);
       });
 
+      it("is written in its own words, not English left in place after copying the folder", () => {
+        // Words that stay the same in any language (sintr, PDF, a code) are short; a sentence is not.
+        const left = (Object.keys(english) as (keyof typeof english)[]).filter((feature) => {
+          const theirs = new Map(sentences(catalog[feature], feature).map(({ path, text }) => [path, text]));
+          const long = sentences(english[feature], feature).filter(({ text }) => text.length >= 24);
+          const same = long.filter(({ path, text }) => theirs.get(path) === text);
+          return long.length > 0 && same.length * 2 > long.length;
+        });
+        expect(left, `${code} reads ${left.join(", ")} mostly in English`).toEqual([]);
+      });
+
       it("has every key of English, of the same shape, and nothing English does not have", () => {
         expect(differences(english, catalog, code)).toEqual([]);
       });
@@ -170,7 +186,7 @@ describe("who decides the language", () => {
       code: "pt-BR",
       source: "browser",
     });
-    expect(resolveLanguage({ chosen: null, installation: null, accept: "fr-FR,de;q=0.5" })).toEqual({
+    expect(resolveLanguage({ chosen: null, installation: null, accept: "zz-ZZ,xx;q=0.5" })).toEqual({
       code: "en",
       source: "default",
     });
@@ -178,8 +194,8 @@ describe("who decides the language", () => {
   });
 
   it("skips a choice or a setting it has no catalog for", () => {
-    expect(resolveLanguage({ chosen: "fr", installation: null, accept: "pt-BR" }).code).toBe("pt-BR");
-    expect(resolveLanguage({ chosen: null, installation: "ja", accept: "en" })).toEqual({
+    expect(resolveLanguage({ chosen: "zz", installation: null, accept: "pt-BR" }).code).toBe("pt-BR");
+    expect(resolveLanguage({ chosen: null, installation: "xx", accept: "en" })).toEqual({
       code: "en",
       source: "browser",
     });
@@ -188,13 +204,13 @@ describe("who decides the language", () => {
   it("reads the browser's languages by weight, and answers a variant with the language it knows", () => {
     expect(acceptedTags("en;q=0.5, pt-PT , fr;q=0, *;q=0.1")).toEqual(["pt-PT", "en"]);
     expect(acceptedTags("")).toEqual([]);
-    expect(resolveLanguage({ accept: "fr;q=1, pt-PT;q=0.7, en;q=0.6" })).toEqual({
+    expect(resolveLanguage({ accept: "zz;q=1, pt-PT;q=0.7, en;q=0.6" })).toEqual({
       code: "pt-BR",
       source: "browser",
     });
     expect(matchLanguage("PT-br")).toBe("pt-BR");
     expect(matchLanguage("en-US")).toBe("en");
-    expect(matchLanguage("es")).toBeNull();
+    expect(matchLanguage("zz")).toBeNull();
   });
 });
 
@@ -202,7 +218,7 @@ describe("a language chosen in the browser", () => {
   it("is read from its cookie, and only when sintr speaks it", () => {
     expect(chosenInCookie("a=1; sintr_language=pt-BR; b=2")).toBe("pt-BR");
     expect(chosenInCookie("sintr_language=pt-br")).toBe("pt-BR");
-    expect(chosenInCookie("sintr_language=fr")).toBeNull();
+    expect(chosenInCookie("sintr_language=zz")).toBeNull();
     expect(chosenInCookie("other_sintr_language=pt-BR")).toBeNull();
     expect(chosenInCookie("sintr_language=%E0%A4%A")).toBeNull();
     expect(chosenInCookie(null)).toBeNull();
