@@ -1,9 +1,13 @@
 "use server";
 
-import { BillingError, isEntitling, type SubscriptionKind } from "@sintr/core";
+import { BillingError, isEntitling } from "@sintr/core";
 import { redirect } from "next/navigation";
+import { z } from "zod";
 import { MAX_SEATS } from "@/lib/plan";
 import { requireScope, runtime } from "@/lib/server/runtime";
+
+/** Arguments bound to a server action come back from the browser: read them again. */
+const Kind = z.enum(["person", "practice"]);
 
 function seatsFrom(form: FormData): number | null {
   const value = Number(form.get("seats"));
@@ -17,10 +21,12 @@ function seatsFrom(form: FormData): number | null {
  * through. Refused, back to the plan page, when payments are off, the plan
  * is not sold here, or the account already pays for it.
  */
-export async function subscribe(kind: SubscriptionKind, form: FormData): Promise<void> {
+export async function subscribe(given: unknown, form: FormData): Promise<void> {
   const { user, scope } = await requireScope();
   const { payments, config, log } = runtime();
-  if (!payments) redirect("/plan");
+  const parsed = Kind.safeParse(given);
+  if (!payments || !parsed.success) redirect("/plan");
+  const kind = parsed.data;
   let quantity = 1;
   if (kind === "person") {
     if (!config.house || !payments.offers.personal) redirect("/plan");

@@ -81,7 +81,7 @@ The embedded assistant talks to one of two providers, and Settings always says w
 
 - What it means: the words of a conversation, and the digest of a report's period, go to that provider under the operator's agreement with it, not the person's. The person has no account there and no key to manage. What the provider keeps, and for how long, is governed by that agreement; the hosted offer will use zero-data-retention routes, and this document will say which before it opens.
 - The operator's key is a server secret: read from the environment, never stored in the database, never sent to a browser, never logged (tests check pages, logs and the person's stored settings for it).
-- The person's plan counts how many messages the house assistant answered and how many reports it wrote that month: numbers in the clear, no words. A message that signals risk is never counted and never sent to the provider.
+- The person's plan counts how many messages the house assistant answered and how many reports it wrote that month: numbers in the clear, no words. A message the crisis screen stops is never counted and never sent to the provider.
 
 **Your own key** (bring your own key) waits behind "Use your own key instead" in Settings, and is the way in on an installation without a house assistant: an OpenAI-compatible endpoint (OpenAI, OpenRouter, a local Ollama or LiteLLM), Anthropic or Google.
 
@@ -180,6 +180,7 @@ Recorded here so they are not mistaken for features:
 - Deleting an account (not in the UI yet) ends its links by cascade without telling the other side; that should tell them.
 - A practice cannot be closed from the app yet; its links can each be ended.
 - The person sees when a shared report was first opened; the full audit view is still to come.
+- At the plan's limit the house assistant does not run, so only the fixed crisis screen looks at a message (as without any provider); the help lines stay on every page.
 - On the house assistant, what the provider keeps is governed by the operator's agreement with it; this document does not name the hosted offer's provider and its retention yet, and will before it opens.
 - Monthly usage counts are kept while the account exists; they hold numbers only.
 - Stripe keeps the email, the payment details and the invoices of a person who subscribed, under its own terms; deleting a sintr account does not delete the Stripe customer (the operator does that in Stripe).

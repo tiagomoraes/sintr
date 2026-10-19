@@ -50,6 +50,11 @@ export async function saveAssistant(_state: AssistantFormState, form: FormData):
     const checked = checkBaseUrl(text(form, "baseUrl"), runtime().config.mode);
     if (checked.ok) baseUrl = checked.url;
     else problems.baseUrl = URL_PROBLEMS[checked.problem] ?? URL_PROBLEMS.invalid_url!;
+    const house = runtime().config.house?.baseUrl;
+    if (baseUrl && house && new URL(baseUrl).host === new URL(house).host) {
+      problems.baseUrl =
+        "That is the address of this sintr's own assistant, which is already included. Use your provider's address.";
+    }
   }
   // The key field is never prefilled: empty means "keep the saved one".
   const key = text(form, "apiKey");
