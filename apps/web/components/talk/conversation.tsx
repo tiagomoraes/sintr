@@ -557,9 +557,14 @@ function VoiceAvailability({ voice, speaking }: { voice: VoiceView; speaking: bo
     const line = t.voice.unavailable[voice.reason](voice.provider);
     return line ? <p className="mt-2 text-caption text-ink-3">{line}</p> : null;
   }
-  if (voice.secondsLeft !== null && voice.secondsLeft < 180) {
-    return <p className="mt-2 text-caption text-ink-3">{t.voice.left(Math.ceil(voice.secondsLeft / 60))}</p>;
-  }
-  // Who hears it, said while the person speaks, before anything leaves the device.
-  return speaking ? <p className="mt-2 text-caption text-ink-3">{t.voice.privacy(voice.heardBy)}</p> : null;
+  const low = voice.secondsLeft !== null && voice.secondsLeft < 180;
+  return (
+    <>
+      {/* Who hears it, said while the person speaks, before anything leaves the device. */}
+      {speaking ? <p className="mt-2 text-caption text-ink-3">{t.voice.privacy(voice.heardBy)}</p> : null}
+      {low ? (
+        <p className="mt-2 text-caption text-ink-3">{t.voice.left(Math.ceil(voice.secondsLeft! / 60))}</p>
+      ) : null}
+    </>
+  );
 }

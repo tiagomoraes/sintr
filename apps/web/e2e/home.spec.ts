@@ -144,11 +144,45 @@ test.describe("the home, by voice", () => {
   }) => {
     await signUpQuietly(page, newEmail("home-no-audio"));
     await setUpAssistant(page);
+    // A microphone that takes a moment to open, as when the browser is still asking the person.
+    await page.addInitScript(() => {
+      const devices = navigator.mediaDevices;
+      const open = devices.getUserMedia.bind(devices);
+      const opened: MediaStream[] = [];
+      (window as unknown as { opened: MediaStream[] }).opened = opened;
+      devices.getUserMedia = async (constraints) => {
+        await new Promise((resolve) => setTimeout(resolve, 1500));
+        const stream = await open(constraints);
+        opened.push(stream);
+        return stream;
+      };
+    });
+    const sent: string[] = [];
+    page.on("request", (request) => {
+      if (new URL(request.url()).pathname === "/api/voice") sent.push(request.url());
+    });
     await page.goto("/home");
+
+    // Cancelled while listening: nothing kept.
+    await page.getByRole("button", { name: "Speak instead of typing" }).click();
+    await expect(page.getByRole("group", { name: "Listening" }).getByText("Listening")).toBeVisible();
+    await page.getByRole("button", { name: "Cancel" }).click();
+    await expect(page.getByLabel("Your message")).toHaveValue("");
+
+    // Cancelled before the microphone even opened: when it opens it is closed at once, and nothing records.
     await page.getByRole("button", { name: "Speak instead of typing" }).click();
     await expect(page.getByRole("group", { name: "Listening" })).toBeVisible();
     await page.getByRole("button", { name: "Cancel" }).click();
-    await expect(page.getByLabel("Your message")).toHaveValue("");
+    await expect(page.getByLabel("Your message")).toBeVisible();
+    await page.waitForTimeout(2500);
+    const tracks = await page.evaluate(() =>
+      (window as unknown as { opened: MediaStream[] }).opened.flatMap((stream) =>
+        stream.getTracks().map((track) => track.readyState),
+      ),
+    );
+    expect(tracks).toEqual(["ended", "ended"]);
+    expect(sent).toEqual([]);
+    await expect(page.getByRole("group", { name: "Listening" })).toHaveCount(0);
     await expect(page.getByText("Here is what I heard.", { exact: false })).toHaveCount(0);
 
     // Anthropic takes no audio: the box, and one clear line.

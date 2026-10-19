@@ -199,7 +199,7 @@ Recorded here so they are not mistaken for features:
 - On the house assistant, what the provider keeps is governed by the operator's agreement with it; this document does not name the hosted offer's provider and its retention yet, and will before it opens.
 - Monthly usage counts are kept while the account exists; they hold numbers only.
 - Speaking sends the recording to the transcriber the person's route names; what that provider keeps is governed by its terms (and, on the house, the operator's agreement and account settings with it), as for the conversation. sintr cannot prove a provider dropped it.
-- The length of a recording is measured by the browser before it is counted; the provider's own count settles it afterwards where it gives one (OpenRouter does), and otherwise the browser's stands.
+- The length of a recording is measured by the browser before it is counted, never below what its size makes it (and exactly, for WAV); the provider's own count settles it afterwards where it gives one (OpenRouter does), and otherwise that measure stands.
 - Stripe keeps the email, the payment details and the invoices of a person who subscribed, under its own terms; deleting a sintr account does not delete the Stripe customer (the operator does that in Stripe).
 
 This is a description of the software, not legal advice or a compliance claim.

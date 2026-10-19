@@ -149,11 +149,25 @@ export function PhoneMenu({
   ];
   return (
     <div className="min-[900px]:hidden">
+      {/* Without JavaScript the sheet cannot open: the sections are plain links instead. */}
+      <noscript>
+        <style>{".sintr-menu-button { display: none; }"}</style>
+        <nav
+          aria-label={t.shell.nav.label}
+          className="flex flex-wrap justify-end gap-x-4 gap-y-1 text-[0.9375rem]"
+        >
+          {items.map((item) => (
+            <a key={item.href} href={item.href} className="text-ink-2 underline decoration-rule-strong">
+              {t.shell.nav[item.key]}
+            </a>
+          ))}
+        </nav>
+      </noscript>
       <button
         type="button"
         onClick={() => dialog.current?.showModal()}
         aria-haspopup="dialog"
-        className="inline-flex min-h-10 items-center gap-2 rounded-pill border border-rule bg-paper px-4 text-label font-medium text-ink-2 transition-colors duration-300 hover:border-rule-strong hover:text-ink"
+        className="sintr-menu-button inline-flex min-h-10 items-center gap-2 rounded-pill border border-rule bg-paper px-4 text-label font-medium text-ink-2 transition-colors duration-300 hover:border-rule-strong hover:text-ink"
       >
         <span aria-hidden="true" className="flex w-4 flex-col gap-[4px]">
           <span className="h-[1.5px] w-full rounded-pill bg-current" />
