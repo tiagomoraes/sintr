@@ -1,8 +1,8 @@
 "use client";
 
-import { Button, Rise } from "@sintr/ui";
+import { Button, cn } from "@sintr/ui";
 import { usePathname } from "next/navigation";
-import { useEffect, useLayoutEffect, useRef } from "react";
+import { useEffect, useLayoutEffect, useRef, useSyncExternalStore } from "react";
 import { useMessages } from "@/components/language";
 import { presenceOn } from "@/lib/assistant/where";
 import { useLatest } from "@/lib/use-latest";
@@ -11,88 +11,85 @@ import { ConversationLog } from "./conversation-log";
 import { PoolDock } from "./pool-travel";
 import { useAssistant } from "./provider";
 
-/** A page scrolled down by more than this hides the corner on a phone until it scrolls back. */
-const SCROLL_STEP = 8;
+/** The side list of the diary is there from this width (shell-nav.tsx); under it, the header holds the corner. */
+const WIDE = "(min-width: 900px)";
+
+function subscribeWide(change: () => void) {
+  const query = window.matchMedia(WIDE);
+  query.addEventListener("change", change);
+  return () => query.removeEventListener("change", change);
+}
+
+/** Whether the side list shows; null while the page is still the server's (both places then render). */
+function useWide(): boolean | null {
+  return useSyncExternalStore(
+    subscribeWide,
+    () => window.matchMedia(WIDE).matches,
+    () => null,
+  );
+}
 
 /**
- * The assistant on every page of the diary but the home: a small pool of
- * light in the corner that opens the same conversation beside the page,
- * without leaving it. Nothing here exists while there is no assistant, and
- * nothing on the practice's pages.
+ * The conversation beside a page, on every page of the diary but the home.
+ * Nothing here exists while there is no assistant, and nothing on the
+ * practice's pages. The corner it opens from is `AssistantSpot`.
  */
 export function AssistantCorner() {
   const a = useAssistant();
   const pathname = usePathname();
   if (!a.setup.ready || presenceOn(pathname) !== "corner") return null;
-  return (
-    <>
-      {!a.panel.open || a.panel.closing ? <CornerLight /> : null}
-      {a.panel.open ? <AssistantPanel /> : null}
-    </>
-  );
+  return a.panel.open ? <AssistantPanel /> : null;
 }
 
 /**
- * The corner: the pool, settled in a small round window of paper, and over
- * it a round button of the same size that opens the conversation.
- * What the assistant is doing is in the button's name, and beside it in a
- * few words whenever it is doing something. On a phone it steps out of the
- * way while the page scrolls down, and comes back when it scrolls up.
+ * The assistant's corner: a small round window of paper with the pool of
+ * light in it, at the foot of the side list on a wide screen ("into a
+ * sidebar"), and beside the Menu in the header of a phone. It never covers
+ * a word of the page. A tap opens the conversation beside the page, and the
+ * light travels there; the window stays, empty, and closes it again. What
+ * the assistant is doing is in its name, and in a few words beside it on a
+ * wide screen.
  */
-function CornerLight() {
+export function AssistantSpot({ place }: { place: "rail" | "header" }) {
   const t = useMessages();
   const a = useAssistant();
-  const corner = useRef<HTMLDivElement>(null);
+  const pathname = usePathname();
+  const wide = useWide();
   const button = useRef<HTMLButtonElement>(null);
+  // Only the corner on screen holds the pool; before the page knows its width, both do.
+  const shown = wide === null || wide === (place === "rail");
+  const open = a.panel.open && !a.panel.closing;
 
-  // Back from the conversation: focus returns where it was.
-  const focusIfAsked = useLatest(() => {
-    if (a.takeFocus("corner")) button.current?.focus({ preventScroll: true });
+  // Back from the conversation: focus returns to the corner it opened from.
+  const focusBack = useLatest(() => {
+    if (wide !== null && shown && a.takeFocus("corner")) button.current?.focus({ preventScroll: true });
   });
   useLayoutEffect(() => {
-    focusIfAsked.current();
-  }, [focusIfAsked]);
+    if (!open) focusBack.current();
+  }, [open, focusBack]);
 
-  useEffect(() => {
-    const element = corner.current;
-    if (!element) return;
-    const phone = window.matchMedia("(max-width: 719px)");
-    let last = window.scrollY;
-    function onScroll() {
-      const y = window.scrollY;
-      const atEnd = window.innerHeight + y >= document.documentElement.scrollHeight - 48;
-      if (!phone.matches || atEnd || y < 120 || last - y > SCROLL_STEP) {
-        delete element!.dataset.away;
-        last = y;
-      } else if (y - last > SCROLL_STEP) {
-        if (!element!.contains(document.activeElement)) element!.dataset.away = "true";
-        last = y;
-      }
-    }
-    window.addEventListener("scroll", onScroll, { passive: true });
-    return () => window.removeEventListener("scroll", onScroll);
-  }, []);
-
+  if (!a.setup.ready || presenceOn(pathname) !== "corner") return null;
   const doing = a.mood === "resting" ? null : t.home.status[a.mood];
   return (
-    <div ref={corner} className="sintr-corner" data-doing={doing ? "true" : undefined}>
-      <div className="sintr-corner__light">
-        <PoolDock poolClassName="[--pool-size:calc(var(--corner-size)*1.3)]" />
-      </div>
-      <button
-        ref={button}
-        type="button"
-        onClick={a.panel.show}
-        aria-label={doing ? t.assistant.openWhile(doing) : t.assistant.open}
-        aria-expanded={false}
-        aria-controls="assistant-panel"
-        className="sintr-corner__button"
-      >
-        <span aria-hidden="true" className="sintr-corner__words">
-          {doing ?? t.assistant.hint}
+    <button
+      ref={button}
+      type="button"
+      onClick={open ? a.panel.hide : a.panel.show}
+      aria-label={doing ? t.assistant.openWhile(doing) : t.assistant.open}
+      aria-expanded={open}
+      aria-controls={open ? "assistant-panel" : undefined}
+      className={cn("sintr-spot", place === "rail" ? "sintr-spot--rail" : "sintr-spot--header")}
+    >
+      <span className="sintr-spot__window">
+        {shown && !open ? <PoolDock poolClassName="[--pool-size:calc(var(--spot-size)*1.3)]" /> : null}
+      </span>
+      {place === "rail" ? (
+        <span aria-hidden="true" className="sintr-spot__words">
+          {t.assistant.open}
+          <span className="sintr-spot__doing">{doing ?? t.assistant.hint}</span>
         </span>
-      </button>
-    </div>
+      ) : null}
+    </button>
   );
 }
 
@@ -218,20 +215,14 @@ function AssistantPanel() {
               className="flex flex-col items-center pb-6 pt-2 text-center"
             >
               {closing ? <span className="size-[112px]" /> : <PoolDock size={112} />}
-              <Rise as="p" index={0} className="mt-1 font-serif text-[1.0625rem] italic text-ink-3">
-                {a.setup.greeting}
-              </Rise>
-              <Rise index={1}>
-                <h2
-                  id="panel-question"
-                  className="mt-1 font-serif text-[clamp(1.75rem,1.4rem+1vw,2.125rem)] leading-[1.1] tracking-[-0.02em]"
-                >
-                  {t.home.title}
-                </h2>
-              </Rise>
-              <Rise as="p" index={2} className="mt-3 max-w-[30em] text-[1rem] text-ink-2">
-                {lede}
-              </Rise>
+              <p className="mt-1 font-serif text-[1.0625rem] italic text-ink-3">{a.setup.greeting}</p>
+              <h2
+                id="panel-question"
+                className="mt-1 font-serif text-[clamp(1.75rem,1.4rem+1vw,2.125rem)] leading-[1.1] tracking-[-0.02em]"
+              >
+                {t.home.title}
+              </h2>
+              <p className="mt-3 max-w-[30em] text-[1rem] text-ink-2">{lede}</p>
             </section>
           )}
           <ConversationLog

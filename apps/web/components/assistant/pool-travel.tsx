@@ -194,7 +194,8 @@ class Journeys {
     if (this.#waiting !== null) clearTimeout(this.#waiting);
     this.#waiting = null;
     const settle = () => {
-      this.#resting = pool;
+      // A place that is not on screen (the other corner, at this width) holds nothing to remember.
+      if (pool.getBoundingClientRect().width > 0) this.#resting = pool;
       land();
     };
     if (!departure || reducedMotion() || performance.now() - departure.at > WAIT_MS) {

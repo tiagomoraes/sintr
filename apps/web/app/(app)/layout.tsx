@@ -1,7 +1,6 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
-import { cn } from "@sintr/ui";
-import { AssistantCorner } from "@/components/assistant/corner";
+import { AssistantCorner, AssistantSpot } from "@/components/assistant/corner";
 import { AssistantProvider, type AssistantSetup } from "@/components/assistant/provider";
 import { LanguageOffers } from "@/components/language";
 import { ExceptOn, ShellFooter, ShellMain } from "@/components/shell-frame";
@@ -70,10 +69,13 @@ export default async function ShellLayout({ children }: { children: ReactNode })
   return (
     <ShellLight time={timeOfDay(hourIn(profile.timezone))}>
       <AssistantProvider setup={setup}>
-        <SiteHeader home="/home">
+        <SiteHeader home="/home" sticky>
           <span className="hidden text-caption text-ink-3 min-[900px]:inline">{user.email}</span>
           <span className="hidden min-[900px]:inline-flex">
             <SignOutButton />
+          </span>
+          <span className="inline-flex min-[900px]:hidden">
+            <AssistantSpot place="header" />
           </span>
           <PhoneMenu
             {...nav}
@@ -89,6 +91,9 @@ export default async function ShellLayout({ children }: { children: ReactNode })
           <aside className="hidden min-[900px]:col-span-3 min-[900px]:block">
             <div className="min-[900px]:sticky min-[900px]:top-7">
               <ShellNav {...nav} />
+              <div className="mt-12 empty:hidden">
+                <AssistantSpot place="rail" />
+              </div>
             </div>
           </aside>
           <ShellMain>
@@ -128,8 +133,7 @@ export default async function ShellLayout({ children }: { children: ReactNode })
           </ShellMain>
         </div>
         <footer className="border-t border-rule">
-          {/* On a phone, room under the last line for the assistant's corner. */}
-          <div className={cn("wrap py-14", setup.ready && "max-[719px]:pb-28")}>
+          <div className="wrap py-14">
             <ShellFooter
               person={<SupportLines />}
               practice={<p className="max-w-[44em] text-[0.9375rem] text-ink-3">{t.shell.practiceNote}</p>}

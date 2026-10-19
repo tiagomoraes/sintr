@@ -30,96 +30,86 @@
 }
 
 /*
- * The assistant in the corner of every page but the home (F8): the pool in
- * a small round window of paper, and over it a round button of the same size.
- * Bottom right, where the thumb rests; on a phone it steps out of the way
- * while the page scrolls down. The few words beside it say what it is doing,
- * or, on a pointer's hover or the keyboard's focus, what it is for.
+ * The assistant's corner on every page but the home (F8): a small round
+ * window of paper (a hairline first, then the card shadow) with the light a
+ * little larger than it, clipped by the circle. At the foot of the side list
+ * on a wide screen, with its name beside it; beside the Menu on a phone.
+ * While the conversation is open the window is empty, its light gone there.
  */
-.sintr-corner {
-  --corner-size: 56px;
-  --corner-right: 14px;
-  --corner-bottom: max(14px, env(safe-area-inset-bottom));
+.sintr-spot {
+  --spot-size: 56px;
+  display: inline-flex;
+  align-items: center;
+  gap: 14px;
+  border-radius: 999px;
+  text-align: left;
+  cursor: pointer;
 }
-@media (min-width: 720px) {
-  .sintr-corner {
-    --corner-size: 64px;
-    --corner-right: 28px;
-    --corner-bottom: 28px;
-  }
+.sintr-spot--header {
+  --spot-size: 40px;
 }
-.sintr-corner__light,
-.sintr-corner__button {
-  position: fixed;
-  right: var(--corner-right);
-  bottom: var(--corner-bottom);
-  z-index: 30;
-  width: var(--corner-size);
-  height: var(--corner-size);
-  transition:
-    transform 0.6s var(--ease-out-expo),
-    opacity 0.45s var(--ease-out-expo);
+.sintr-spot:focus-visible {
+  border-radius: 999px;
 }
-/* A small round window of paper the light settles in: a hairline first, then the card shadow. */
-.sintr-corner__light {
-  pointer-events: none;
+.sintr-spot__window {
+  position: relative;
+  flex: none;
+  width: var(--spot-size);
+  height: var(--spot-size);
   overflow: hidden;
   border: 1px solid var(--color-rule);
   border-radius: 999px;
   background: var(--color-paper);
   box-shadow: var(--shadow-card);
+  /* Transform only: a shadow that changes is painted again on every frame. */
+  transition: transform 0.6s var(--ease-out-expo);
 }
-/* The light a little larger than its window, so the window is full of it; the circle clips the soft edge. */
-.sintr-corner__light > * {
+.sintr-spot__window > * {
   position: absolute;
   top: 50%;
   left: 50%;
   translate: -50% -50%;
 }
-.sintr-corner__button {
-  cursor: pointer;
-  border-radius: 999px;
-  background: transparent;
+.sintr-spot:hover .sintr-spot__window,
+.sintr-spot:focus-visible .sintr-spot__window {
+  transform: scale(1.06);
 }
-.sintr-corner__button:focus-visible {
-  border-radius: 999px;
+.sintr-spot[aria-expanded="true"] .sintr-spot__window {
+  box-shadow: none;
 }
-.sintr-corner:has(.sintr-corner__button:hover) .sintr-corner__light,
-.sintr-corner:has(.sintr-corner__button:focus-visible) .sintr-corner__light {
-  transform: scale(1.08);
-}
-.sintr-corner__words {
-  position: absolute;
-  right: calc(100% + 6px);
-  top: 50%;
-  translate: 0 -50%;
-  white-space: nowrap;
-  border: 1px solid var(--color-rule);
-  border-radius: 999px;
-  background: var(--color-paper);
-  padding: 5px 12px;
-  font-size: var(--text-caption);
-  line-height: 1.45;
+.sintr-spot__words {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: var(--text-label);
+  font-weight: 500;
+  line-height: 1.3;
   color: var(--color-ink-2);
-  opacity: 0;
-  transition: opacity 0.4s var(--ease-out-expo);
-  pointer-events: none;
+  transition: color 0.3s;
 }
-.sintr-corner[data-doing] .sintr-corner__words,
-.sintr-corner__button:focus-visible .sintr-corner__words {
-  opacity: 1;
+.sintr-spot:hover .sintr-spot__words {
+  color: var(--color-ink);
 }
-@media (hover: hover) {
-  .sintr-corner__button:hover .sintr-corner__words {
-    opacity: 1;
+.sintr-spot__doing {
+  max-width: 13rem;
+  font-size: var(--text-caption);
+  font-weight: 400;
+  color: var(--color-ink-3);
+}
+
+/*
+ * On a phone the diary's header stays at the top, so the corner beside the
+ * Menu is always a tap away: clear over the light at the top of the page,
+ * paper with a hairline once the page has scrolled under it.
+ */
+@media (max-width: 899px) {
+  .sintr-header--sticky {
+    position: sticky;
+    top: 0;
   }
-}
-@media (max-width: 719px) {
-  .sintr-corner[data-away] .sintr-corner__light,
-  .sintr-corner[data-away] .sintr-corner__button {
-    transform: translateY(calc(var(--corner-size) + var(--corner-bottom) + 8px));
-    opacity: 0;
-    pointer-events: none;
+  .sintr-header--sticky[data-scrolled] {
+    background: var(--color-paper);
+    box-shadow: 0 1px 0 var(--color-rule);
   }
 }
 
@@ -131,7 +121,6 @@
  * light veil over the page closes it on a tap.
  */
 .sintr-panel {
-  --panel-from: translateX(28px);
   position: fixed;
   z-index: 40;
   display: flex;
@@ -159,7 +148,6 @@
 }
 @media (max-width: 719px) {
   .sintr-panel {
-    --panel-from: translateY(48px);
     left: 0;
     right: 0;
     bottom: var(--keyboard, 0px);
@@ -185,12 +173,21 @@
     touch-action: none;
   }
 }
+/* Plain values in the keyframes (no variables), so the compositor plays them on its own. */
 @media (prefers-reduced-motion: no-preference) {
   .sintr-panel[data-state="open"] {
     animation: sintr-panel-in 0.6s var(--ease-out-expo) both;
   }
   .sintr-panel[data-state="closing"] {
     animation: sintr-panel-out 0.28s cubic-bezier(0.4, 0, 1, 1) both;
+  }
+  @media (max-width: 719px) {
+    .sintr-panel[data-state="open"] {
+      animation-name: sintr-sheet-up;
+    }
+    .sintr-panel[data-state="closing"] {
+      animation-name: sintr-sheet-down;
+    }
   }
   .sintr-panel-scrim[data-state="open"] {
     animation: sintr-fade 0.45s ease both;
@@ -206,12 +203,24 @@
 @keyframes sintr-panel-in {
   from {
     opacity: 0;
-    transform: var(--panel-from);
+    transform: translateX(28px);
   }
 }
 @keyframes sintr-panel-out {
   to {
     opacity: 0;
-    transform: var(--panel-from);
+    transform: translateX(28px);
+  }
+}
+@keyframes sintr-sheet-up {
+  from {
+    opacity: 0;
+    transform: translateY(48px);
+  }
+}
+@keyframes sintr-sheet-down {
+  to {
+    opacity: 0;
+    transform: translateY(48px);
   }
 }

@@ -166,7 +166,7 @@ test.describe("the assistant everywhere", () => {
     await expect(flight).toHaveCSS("pointer-events", "none");
     await expect(corner(page)).toBeEnabled();
     await expect(flight).toBeHidden({ timeout: 5_000 });
-    await expect(page.locator(".sintr-corner__light .sintr-pool")).toHaveCSS("visibility", "visible");
+    await expect(page.locator(".sintr-spot--rail .sintr-pool")).toHaveCSS("visibility", "visible");
 
     await page.emulateMedia({ reducedMotion: "reduce" });
     await page.evaluate(() => {
