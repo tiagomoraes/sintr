@@ -14,6 +14,7 @@ import { memoriesRepository } from "./memories";
 import { plansRepository } from "./plans";
 import { practiceRepository } from "./practice";
 import { consentsRepository, reportsRepository } from "./reports";
+import { sessionsRepository } from "./sessions";
 import { profileRepository, therapySettingsRepository } from "./settings";
 import { noticesRepository, previewInvite, sharingRepository } from "./sharing";
 
@@ -32,6 +33,8 @@ export interface UserScope {
   readonly userId: string;
   readonly profile: ReturnType<typeof profileRepository>;
   readonly therapySettings: ReturnType<typeof therapySettingsRepository>;
+  /** The therapy calendar: the sessions, their rhythms, and the ones moved or cancelled on their own. */
+  readonly sessions: ReturnType<typeof sessionsRepository>;
   readonly entries: ReturnType<typeof entriesRepository>;
   readonly checkins: ReturnType<typeof checkinsRepository>;
   readonly therapyNotes: ReturnType<typeof therapyNotesRepository>;
@@ -100,6 +103,7 @@ function buildScope(ctx: BuildContext): UserScope {
     userId: ctx.userId,
     profile: guard(profileRepository(ctx)),
     therapySettings: guard(therapySettingsRepository(ctx)),
+    sessions: guard(sessionsRepository(ctx)),
     entries: guard(entriesRepository(ctx)),
     checkins: guard(checkinsRepository(ctx)),
     therapyNotes: guard(therapyNotesRepository(ctx)),

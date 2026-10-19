@@ -92,6 +92,15 @@ export function addDays(day: string, days: number): string {
   return `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())}`;
 }
 
+/** How many days from `first` to `second` (negative when `second` comes first). */
+export function dayDiff(first: string, second: string): number {
+  const a = parseDay(first);
+  const b = parseDay(second);
+  return Math.round(
+    (Date.UTC(b.year, b.month - 1, b.day) - Date.UTC(a.year, a.month - 1, a.day)) / 86_400_000,
+  );
+}
+
 /** 0 = Sunday ... 6 = Saturday. */
 export function weekdayOf(day: string): number {
   const p = parseDay(day);

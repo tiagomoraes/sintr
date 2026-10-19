@@ -8,11 +8,8 @@ import { zonedTime } from "../src/report/time";
  * event in it is invented.
  */
 export const DEMO_TZ = "America/Sao_Paulo";
-export const DEMO_SCHEDULE = {
-  sessionDay: 1,
-  sessionTime: "18:00",
-  reportLeadMinutes: 60,
-};
+/** Mondays at 18:00, as the calendar holds a weekly rhythm. */
+export const DEMO_SESSIONS = { startsOn: "2026-09-07", time: "18:00", repeat: "weekly" } as const;
 
 export function local(month: number, day: number, hour = 12, minute = 0): Date {
   return zonedTime({ year: 2026, month, day, hour, minute }, DEMO_TZ);
@@ -145,7 +142,8 @@ export const DEMO_TO_BRING = ["A conversa com a coordenadora."];
 /** Write the demo diary into a person's scope. */
 export async function seedDemoDiary(scope: UserScope): Promise<void> {
   await scope.profile.update({ displayName: "Pessoa Exemplo", timezone: DEMO_TZ, locale: "pt-BR" });
-  await scope.therapySettings.update({ therapistName: "Dra. Exemplo", ...DEMO_SCHEDULE });
+  await scope.therapySettings.update({ therapistName: "Dra. Exemplo", reportLeadMinutes: 60 });
+  await scope.sessions.add(DEMO_SESSIONS);
   for (const entry of DEMO_ENTRIES) await scope.entries.create(entry);
   for (const checkin of DEMO_CHECKINS) await scope.checkins.create(checkin);
   for (const body of DEMO_TO_BRING) await scope.therapyNotes.create({ kind: "to_bring", body });

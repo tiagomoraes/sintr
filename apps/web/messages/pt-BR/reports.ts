@@ -32,8 +32,9 @@ export const reports = {
       `O próximo é preparado ${na(prepared)} `,
       `, para a sua sessão de ${session}.`,
     ],
-    noSession: "Nenhum dia de sessão está definido, então os relatórios só são preparados quando você pede.",
-    setSessions: "Definir as suas sessões",
+    noSession:
+      "Nenhuma sessão está no seu calendário, então os relatórios só são preparados quando você pede.",
+    setSessions: "Adicionar as suas sessões",
     used: (next: string) =>
       `Os relatórios deste mês escritos pelo assistente já foram usados, então até ${next} o sintr os prepara a partir das suas próprias palavras: os momentos, as suas anotações e os seus temas.`,
     yourPlan: "Seu plano",

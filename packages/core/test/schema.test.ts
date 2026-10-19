@@ -8,7 +8,10 @@ import { PgTable, getTableConfig } from "drizzle-orm/pg-core";
 import { afterAll, describe, expect, it } from "vitest";
 import { KEY_MATERIAL, ROTATED, SEALED } from "../src/db/sealed";
 import * as schema from "../src/db/schema";
-import { createUser, openTestDatabase } from "./support";
+import { createRepositories } from "../src/repositories";
+import { inSchedule, upcomingSession } from "../src/report/period";
+import { addDays, localDay, localParts, zonedTime } from "../src/report/time";
+import { createUser, openTestDatabase, testMasterKey } from "./support";
 
 const tables = (Object.values(schema) as unknown[]).filter((value): value is PgTable => is(value, PgTable));
 
@@ -55,6 +58,8 @@ describe("schema invariants", () => {
         "shared_reports",
         "subscriptions",
         "therapy_notes",
+        "therapy_series",
+        "therapy_series_changes",
         "therapy_settings",
         "usage_counters",
         "user_keys",
@@ -280,5 +285,84 @@ describe("migrations", () => {
       .where(inArray(schema.therapySettings.userId, [moved]));
     // The weekly schedule is the person's and stays; the one-off date is gone.
     expect(row).toEqual({ day: 1, once: null });
+  });
+
+  it("keep every weekly slot as a weekly rhythm, with the same next session, and empty the slot (0010)", async () => {
+    const root = fileURLToPath(new URL("..", import.meta.url));
+    const statements = readFileSync(join(root, "drizzle/0010_therapy_calendar.sql"), "utf8")
+      .split("--> statement-breakpoint")
+      .map((part) => part.trim())
+      .filter(
+        (part) => part.includes('INSERT INTO "therapy_series"') || part.includes('UPDATE "therapy_settings"'),
+      );
+    expect(statements, "the statements that move the slot").toHaveLength(2);
+    const zone = "America/Sao_Paulo";
+    const people = [
+      // Set long ago, set yesterday, in two zones; and one person with no slot at all.
+      {
+        id: await createUser(db.db, "slot-old"),
+        day: 2,
+        time: "18:00",
+        zone,
+        updatedAt: new Date("2026-03-02T12:00:00Z"),
+      },
+      {
+        id: await createUser(db.db, "slot-new"),
+        day: 5,
+        time: "07:30",
+        zone: "Asia/Tokyo",
+        updatedAt: new Date(Date.now() - 86_400_000),
+      },
+      { id: await createUser(db.db, "slot-none"), day: null, time: null, zone, updatedAt: new Date() },
+    ];
+    for (const person of people) {
+      await db.db.insert(schema.profiles).values({ userId: person.id, timezone: person.zone });
+      await db.db.insert(schema.therapySettings).values({
+        userId: person.id,
+        sessionDay: person.day,
+        sessionTime: person.time,
+        updatedAt: person.updatedAt,
+      });
+    }
+    for (const statement of statements) await db.db.execute(sql.raw(statement));
+
+    const repositories = createRepositories(db.db, testMasterKey);
+    const now = new Date();
+    for (const person of people) {
+      const scope = await repositories.forUser(person.id);
+      const schedule = await scope.sessions.schedule();
+      const [settings] = await db.db
+        .select({ day: schema.therapySettings.sessionDay, time: schema.therapySettings.sessionTime })
+        .from(schema.therapySettings)
+        .where(inArray(schema.therapySettings.userId, [person.id]));
+      expect(settings, "the slot is emptied").toEqual({ day: null, time: null });
+      if (person.day === null) {
+        expect(schedule.series).toEqual([]);
+        continue;
+      }
+      expect(schedule.series).toEqual([
+        expect.objectContaining({ time: person.time, repeat: "weekly", stopsOn: null }),
+      ]);
+      // The next session is the one the weekly slot gave: the slot's day and time, after now, in their zone.
+      let day = localDay(now, person.zone);
+      let next: Date | null = null;
+      for (let i = 0; i < 9 && !next; i += 1, day = addDays(day, 1)) {
+        const [year, month, date] = day.split("-").map(Number) as [number, number, number];
+        const at = zonedTime(
+          {
+            year,
+            month,
+            day: date,
+            hour: Number(person.time.slice(0, 2)),
+            minute: Number(person.time.slice(3)),
+          },
+          person.zone,
+        );
+        if (localParts(at, person.zone).weekday === person.day && at > now) next = at;
+      }
+      expect(upcomingSession(schedule, person.zone, now)).toEqual(next);
+      // The week before is still a session of the rhythm, so a draft prepared for it stays where it is.
+      expect(inSchedule(schedule, person.zone, new Date(next!.getTime() - 7 * 86_400_000))).toBe(true);
+    }
   });
 });

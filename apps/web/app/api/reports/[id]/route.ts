@@ -74,8 +74,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
         break;
       case "prepare_again": {
         if (report.status === "sent") return apiError(409, "invalid_state");
-        const [settings, profile] = await Promise.all([scope.therapySettings.get(), scope.profile.get()]);
-        const period = periodAgain(report, settings, profile.timezone, new Date());
+        const [schedule, profile] = await Promise.all([scope.sessions.schedule(), scope.profile.get()]);
+        const period = periodAgain(report, schedule, profile.timezone, new Date());
         const { model, problem, metered } = await reportModel(scope, config);
         await prepareReport({
           scope,

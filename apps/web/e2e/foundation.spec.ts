@@ -95,7 +95,7 @@ test.describe("sign up, the diary, sign out", () => {
     await expect(page.getByText("Nothing written yet.")).toBeVisible();
     for (const [label, heading] of [
       ["Check-ins", "No check-ins yet."],
-      ["Therapy", "Without a session day and time, no report is prepared on its own."],
+      ["Therapy", "Without a session in your calendar, no report is prepared on its own."],
       ["Reports", "No reports yet."],
     ] as const) {
       await page.getByRole("link", { name: label, exact: true }).click();

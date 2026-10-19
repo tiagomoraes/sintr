@@ -1,6 +1,13 @@
 "use server";
 
-import { InvalidStateError, NotFoundError, ShareMode, ValidationError, isTimeZone } from "@sintr/core";
+import {
+  InvalidStateError,
+  NotFoundError,
+  ShareMode,
+  ValidationError,
+  isTimeZone,
+  localDay,
+} from "@sintr/core";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { tooManyLookups } from "@/lib/server/join";
@@ -53,7 +60,12 @@ export async function saveTherapist(name: string): Promise<StepResult> {
   return OK;
 }
 
-/** When the sessions are, read in the person's time zone; the report is prepared before each one. */
+/**
+ * When the sessions are, read in the person's time zone; the report is
+ * prepared before each one. One weekly rhythm, in one move: the calendar's
+ * one weekly rhythm changes to it from its next session, or it is added.
+ * "It changes from week to week" keeps the calendar as it is, erasing nothing.
+ */
 export async function saveSession(input: {
   day: string;
   time: string;
@@ -70,7 +82,9 @@ export async function saveSession(input: {
   if (!isTimeZone(input.timezone)) return fail(t.welcome.problem);
   try {
     await scope.profile.update({ timezone: input.timezone });
-    await scope.therapySettings.update({ sessionDay: day, sessionTime: time });
+    if (day !== null && time !== null) {
+      await scope.sessions.setWeekly(day, time, localDay(new Date(), input.timezone));
+    }
   } catch (error) {
     if (error instanceof ValidationError) return fail(t.welcome.problem);
     throw error;

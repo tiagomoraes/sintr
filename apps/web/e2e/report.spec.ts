@@ -62,12 +62,19 @@ async function writeDiary(page: Page) {
 }
 
 async function configureTherapy(page: Page, therapistEmail: string) {
-  const sessionDay = WEEKDAYS[new Date(Date.now() + 2 * DAY).getUTCDay()]!;
+  // The sessions: every week from two days ahead, at 18:00, added to the calendar in one move.
+  const first = new Date(Date.now() + 2 * DAY);
+  const sessionDay = WEEKDAYS[first.getUTCDay()]!;
   await page.goto("/therapy");
-  // Therapy opens on sentences; each part opens to change it.
-  await page.getByText("Your sessions", { exact: true }).click();
-  await page.getByRole("radio", { name: `${sessionDay}s`, exact: true }).check();
-  await page.getByLabel("Time", { exact: true }).fill("18:00");
+  await page.getByRole("link", { name: "Add a session", exact: true }).click();
+  const sheet = page.getByRole("dialog", { name: "Add a session" });
+  await sheet.getByLabel("Day", { exact: true }).fill(first.toISOString().slice(0, 10));
+  await sheet.getByLabel("Time", { exact: true }).fill("18:00");
+  await expect(sheet.getByRole("radio", { name: `Every week on ${sessionDay}` })).toBeChecked();
+  await sheet.getByRole("button", { name: "Add the session" }).click();
+  await expect(page.getByText("Added to your calendar.")).toBeVisible();
+  await expect(page.getByText(`Every week on ${sessionDay} at 18:00.`)).toBeVisible();
+  // The therapist, in the form below the calendar; it opens on a sentence.
   await page.getByText("Your therapist", { exact: true }).click();
   await page.getByLabel("Name", { exact: true }).fill("Dr. Example");
   await page.getByLabel("Email", { exact: true }).fill(therapistEmail);
@@ -76,7 +83,7 @@ async function configureTherapy(page: Page, therapistEmail: string) {
   await expect(page.getByText("Saved.", { exact: true })).toBeVisible();
   await page.reload();
   await expect(page.getByText(/The next report will be prepared on/)).toBeVisible();
-  await expect(page.getByText(`${sessionDay}s at 18:00, in UTC time.`)).toBeVisible();
+  await expect(page.getByText(`Every week on ${sessionDay} at 18:00.`)).toBeVisible();
   await expect(page.getByText(`Dr. Example, at ${therapistEmail}.`, { exact: false })).toBeVisible();
   await expect(page.getByText("Every report waits for your approval.", { exact: false })).toBeVisible();
 }
@@ -111,7 +118,6 @@ test.describe("the weekly report", () => {
     expect(await scope.therapySettings.get()).toMatchObject({
       therapistName: "Dr. Example",
       therapistContact: therapist,
-      sessionTime: "18:00",
       reportLeadMinutes: 60,
       deliveryChannel: "email",
       requireApproval: true,

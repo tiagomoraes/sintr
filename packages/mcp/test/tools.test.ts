@@ -1,4 +1,11 @@
-import { API_TOKEN_ACCESS, upcomingSession, type ApiTokenScope } from "@sintr/core";
+import {
+  API_TOKEN_ACCESS,
+  addDays,
+  localDay,
+  nextSeriesDay,
+  upcomingSession,
+  type ApiTokenScope,
+} from "@sintr/core";
 import { beforeAll, describe, expect, it } from "vitest";
 import { LIMITS, Refusal, TOOLS, answerTool, callTool, findTool, permits, type SintrTool } from "../src";
 import { contextFor, logged, person, type Person } from "./support";
@@ -339,20 +346,45 @@ describe("the tools", () => {
     await dana.scope.therapySettings.update({
       therapistName: "Dr. Secret",
       therapistContact: "secret@example.test",
-      sessionDay: 2,
-      sessionTime: "18:00",
     });
+    // Tuesdays at 18:00 (1 September 2026 was a Tuesday), with the next one moved to Wednesday at 09:00.
+    const tuesdays = await dana.scope.sessions.add({
+      startsOn: "2026-09-01",
+      time: "18:00",
+      repeat: "weekly",
+    });
+    // The rhythm's session this week or next, even if today's already began: it moves to the day after.
+    const nextTuesday = nextSeriesDay(tuesdays, localDay(new Date(), "America/Sao_Paulo"))!;
+    await dana.scope.sessions.move(
+      { seriesId: tuesdays.id, occursOn: nextTuesday },
+      { on: addDays(nextTuesday, 1), time: "09:00" },
+    );
     await dana.scope.therapyNotes.create({ kind: "to_bring", body: "falar da reunião de terça" });
     const task = await dana.scope.therapyNotes.create({ kind: "task", body: "anotar os pensamentos" });
     await dana.scope.therapyNotes.setDone(task.id, true);
     const overview = (await callTool(tool("therapy_overview"), {}, contextFor(dana.scope))) as {
-      sessions: { weekly: string; next: { local: string } };
+      sessions: {
+        weekly: string;
+        rhythms: string[];
+        next: { local: string };
+        upcoming: { local: string; moved?: true }[];
+      };
       hasTherapist: boolean;
       toBringUp: { body: string }[];
       tasks: unknown[];
     };
     expect(overview.sessions.weekly).toBe("Tuesday at 18:00");
-    expect(overview.sessions.next.local).toMatch(/^Tuesday .* 18:00$/);
+    expect(overview.sessions.rhythms).toEqual(["Every week on Tuesday at 18:00"]);
+    // The real next one: the session moved on its own, said as moved; the rhythm goes on after it.
+    expect(overview.sessions.next.local).toBe(`Wednesday ${addDays(nextTuesday, 1)} 09:00`);
+    expect(overview.sessions.upcoming[0]).toMatchObject({
+      local: `Wednesday ${addDays(nextTuesday, 1)} 09:00`,
+      moved: true,
+    });
+    expect(overview.sessions.upcoming[1]).toEqual(
+      expect.objectContaining({ local: `Tuesday ${addDays(nextTuesday, 7)} 18:00` }),
+    );
+    expect(overview.sessions.upcoming[1]).not.toHaveProperty("moved");
     expect(overview.hasTherapist).toBe(true);
     expect(overview.toBringUp.map((n) => n.body)).toEqual(["falar da reunião de terça"]);
     expect(overview.tasks).toEqual([]);
@@ -361,9 +393,10 @@ describe("the tools", () => {
 
   it("prepare for the session from the diary, and change and send nothing", async () => {
     const erin = await person("erin");
-    await erin.scope.therapySettings.update({
-      sessionDay: (new Date().getUTCDay() + 2) % 7,
-      sessionTime: "18:00",
+    await erin.scope.sessions.add({
+      startsOn: addDays(localDay(new Date(), "America/Sao_Paulo"), 2),
+      time: "18:00",
+      repeat: "weekly",
     });
     await erin.scope.entries.create({
       occurredAt: new Date(Date.now() - DAY),
@@ -394,7 +427,7 @@ describe("the tools", () => {
     expect(await erin.scope.reports.list()).toEqual([]);
 
     // With a draft for that session, it is named with its status and its page.
-    const session = upcomingSession(await erin.scope.therapySettings.get(), "America/Sao_Paulo", new Date());
+    const session = upcomingSession(await erin.scope.sessions.schedule(), "America/Sao_Paulo", new Date());
     const draft = await erin.scope.reports.createDraft({
       periodStart: new Date(Date.now() - 5 * DAY),
       periodEnd: new Date(Date.now() - 60_000),

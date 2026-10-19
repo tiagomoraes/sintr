@@ -65,7 +65,7 @@ export const welcome = {
     sessions: (day: string, time: string) =>
       `Your sessions are on ${day} at ${time}. An hour before each one, your week will be waiting on one page.`,
     noSessions:
-      "Whenever you want your week on one page, you can prepare it from Reports. If you tell Therapy when your sessions are, it is prepared before each one.",
+      "Whenever you want your week on one page, you can prepare it from Reports. Add your sessions to the calendar in Therapy, however they fall, and it is prepared before each one.",
     therapist: (who: string) => `Your reports are for ${who}, and go to them only when you say so.`,
     next: "Whenever something happens, tell me, by voice or in writing.",
     go: "Go to my diary",

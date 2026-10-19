@@ -118,7 +118,7 @@ describe("a new account on an installation with a house assistant", () => {
 
     // One report, as "Prepare it now" makes it.
     const plan = planReportNow({
-      schedule: await ana.therapySettings.get(),
+      schedule: await ana.sessions.schedule(),
       timeZone: (await ana.profile.get()).timezone,
       reports: await ana.reports.recent(),
       now: new Date(),
@@ -172,7 +172,8 @@ describe("a new account on an installation with a house assistant", () => {
     // A session nobody else in the test database has, so the scheduler prepares hers alone.
     const ZONE = "Pacific/Chatham";
     await cris.profile.update({ timezone: ZONE });
-    await cris.therapySettings.update({ sessionDay: 4, sessionTime: "03:17", reportLeadMinutes: 60 });
+    await cris.therapySettings.update({ reportLeadMinutes: 60 });
+    await cris.sessions.add({ startsOn: "2026-10-01", time: "03:17", repeat: "weekly" });
     const { assistantMessages, reports } = PERSON_PLANS.free.allowance;
     // A month already used up.
     const now = zonedTime({ year: 2026, month: 10, day: 22, hour: 2, minute: 17 }, ZONE);
@@ -200,7 +201,8 @@ describe("a new account on an installation with a house assistant", () => {
     // Another session nobody else has: Fridays at 04:41 in Chatham.
     const ZONE = "Pacific/Chatham";
     await dani.profile.update({ timezone: ZONE });
-    await dani.therapySettings.update({ sessionDay: 5, sessionTime: "04:41", reportLeadMinutes: 60 });
+    await dani.therapySettings.update({ reportLeadMinutes: 60 });
+    await dani.sessions.add({ startsOn: "2026-10-02", time: "04:41", repeat: "weekly" });
     await dani.checkins.create({
       occurredAt: zonedTime({ year: 2026, month: 10, day: 21, hour: 10, minute: 0 }, ZONE),
       mood: 3,
@@ -209,7 +211,7 @@ describe("a new account on an installation with a house assistant", () => {
     // "Prepare it now" the evening before: the assistant writes it, one unit.
     const early = zonedTime({ year: 2026, month: 10, day: 22, hour: 20, minute: 0 }, ZONE);
     const plan = planReportNow({
-      schedule: await dani.therapySettings.get(),
+      schedule: await dani.sessions.schedule(),
       timeZone: ZONE,
       reports: await dani.reports.recent(),
       now: early,
@@ -242,7 +244,7 @@ describe("a new account on an installation with a house assistant", () => {
     const endpoint = scriptedEndpoint(rehearsalScript);
     const eli = await signUp("house-eli");
     const plan = planReportNow({
-      schedule: await eli.therapySettings.get(),
+      schedule: await eli.sessions.schedule(),
       timeZone: "UTC",
       reports: [],
       now: new Date(),

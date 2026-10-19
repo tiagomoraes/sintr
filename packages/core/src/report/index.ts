@@ -73,7 +73,6 @@ export {
   FIRST_PERIOD_DAYS,
   MAX_PERIOD_DAYS,
   calendarWeek,
-  hasWeeklySchedule,
   inSchedule,
   periodAgain,
   periodStart,
@@ -82,8 +81,8 @@ export {
   preparationTime,
   sessionPeriod,
   upcomingSession,
+  upcomingSessions,
   weekPeriod,
-  weeklySessions,
   type KnownReport,
   type ManualPlan,
   type ReportPeriod,
@@ -91,9 +90,25 @@ export {
   type SessionSchedule,
 } from "./period";
 export { reportSchedules, type PersonSchedule } from "./schedules";
+export {
+  REPEAT_INTERVAL,
+  SESSION_REPEATS,
+  findSession,
+  heldSessions,
+  isSeriesDay,
+  nextSeriesDay,
+  normalizeSeries,
+  seriesDays,
+  sessionsOn,
+  type Session,
+  type SessionCalendar,
+  type SessionChange,
+  type SessionSeries,
+} from "./sessions";
 export { REPORT_STRINGS, type ReportStrings } from "./strings";
 export {
   addDays,
+  dayDiff,
   dayStart,
   daysBetween,
   isTimeZone,

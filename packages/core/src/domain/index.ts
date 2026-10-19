@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { SESSION_REPEATS } from "../report/sessions";
 
 /**
  * Domain shapes, validated at the repository boundary. Content is never
@@ -77,11 +78,6 @@ export const TherapySettingsPatch = z
   .object({
     therapistName: z.string().min(1).max(200).nullable(),
     therapistContact: z.string().min(1).max(320).nullable(),
-    sessionDay: z.number().int().min(0).max(6).nullable(),
-    sessionTime: z
-      .string()
-      .regex(/^([01]\d|2[0-3]):[0-5]\d$/, "must be HH:MM")
-      .nullable(),
     reportLeadMinutes: z.number().int().min(0).max(10_080),
     deliveryChannel: DeliveryChannel,
     reportNoticeEmail: z.boolean(),
@@ -92,13 +88,42 @@ export type TherapySettingsPatch = z.input<typeof TherapySettingsPatch>;
 export interface TherapySettings {
   therapistName: string | null;
   therapistContact: string | null;
-  sessionDay: number | null;
-  sessionTime: string | null;
   reportLeadMinutes: number;
   requireApproval: true;
   deliveryChannel: z.infer<typeof DeliveryChannel>;
   reportNoticeEmail: boolean;
 }
+
+/* The therapy calendar (F11): sessions as days and times, never words */
+
+const SessionDay = z.iso
+  .date()
+  .refine((day) => day >= "2000-01-01" && day <= "2100-12-31", "must be a day between 2000 and 2100");
+const SessionTime = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, "must be HH:MM");
+export const SessionRepeat = z.enum(SESSION_REPEATS);
+export type SessionRepeat = z.infer<typeof SessionRepeat>;
+
+/** A session the person adds, or a rhythm they change from one session on. */
+export const SessionSeriesInput = z
+  .object({
+    startsOn: SessionDay,
+    time: SessionTime,
+    repeat: SessionRepeat,
+    weekdays: z.array(z.number().int().min(0).max(6)).max(7).default([]),
+  })
+  .refine((series) => (series.repeat === "weekdays") === series.weekdays.length > 0, {
+    message: "weekdays are chosen for a rhythm on chosen weekdays, and only for it",
+    path: ["weekdays"],
+  });
+export type SessionSeriesInput = z.input<typeof SessionSeriesInput>;
+
+/** Where one session moves to. */
+export const SessionMove = z.object({ on: SessionDay, time: SessionTime });
+export type SessionMove = z.input<typeof SessionMove>;
+
+/** Names one session: its series and its own day in it. */
+export const SessionRef = z.object({ seriesId: z.uuid(), occursOn: SessionDay });
+export type SessionRef = z.input<typeof SessionRef>;
 
 /* Entries (thought records) */
 

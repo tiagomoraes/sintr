@@ -93,6 +93,22 @@ The owner's decision: leaving Settings with something not saved should warn firs
 
 The reasons are in DECISIONS 113 to 115.
 
+## Therapy as a calendar (F11)
+
+The owner's request: a person may go every fifteen days, twice a week, or on a rhythm a little different from anyone else's, so Therapy should be less linear than one weekly slot, a calendar inspired by Google Calendar, where they create the session at its moment, give it a repeat (every week, every fifteen days), see the next one coming, cancel it, change the day of one in particular.
+
+**Sessions on a calendar.** Therapy opens on the person's rhythm in a sentence ("Every week on Tuesday at 18:00. Every week on Thursday at 08:30."), the next few sessions as they fall, the next one marked first, and the month, a hairline grid with each session's time on its day. Add a session asks for a day, a time and how it repeats: not at all, every week on that day, every two weeks, every fifteen days, or on days of the week they choose. Two sessions in a week are two sessions, each with its report.
+
+**One session on its own.** Any session opens as a sheet (from the bottom of a phone): when it is, what it is part of, when its report is prepared, and Change or Cancel. Changing or cancelling asks, in the form, which sessions: only this one (the rest of the rhythm stays where it is), or this one and the ones after it (the earlier ones stay as they were). A moved session is on its new day and says where it came from; a cancelled one stays on the calendar struck through, so the gap shows; either can be put back.
+
+**Everything after it believes the calendar.** The next session announced in Therapy and Reports is the real next one; the report is prepared before it by the same lead, covering the days since the last one, so periods still meet exactly; the worker prepares on the new shape; an assistant over MCP reads the rhythm and the next sessions. Someone who had the weekly slot finds it as a weekly rhythm, with the same next session and report. Someone with nothing scheduled sees no announcement, and prepares a report by hand from Reports, as before.
+
+**Nothing unsaved is lost on the way.** Leaving Therapy with the therapist or the time zone changed and not saved asks first, as Settings does since F9; moving through the calendar (a month, a day, a session's sheet, the back gesture that closes it) never asks, because it is the same page.
+
+**What did not come back.** "Has a session moved?" stays gone: a moved session is simply a session on another day, chosen on the calendar, never a date that guesses which session it replaces.
+
+The reasons are in DECISIONS 124 to 130.
+
 ## Giving another assistant a key (F12)
 
 The owner's decision: on "Connect another assistant" the button that made the key sat above the name and the choice of what the key may do, and those two were folded away under it, so the page read as a big button first and the real decisions as an afterthought. The whole order was backwards, and the whole flow of managing keys was to be thought about again, with Vercel, GitHub and Anthropic as references.
@@ -105,7 +121,7 @@ The owner's decision: on "Connect another assistant" the button that made the ke
 
 **Without JavaScript** a key is made, shown once and its steps read the same way.
 
-The reasons are in DECISIONS 130 to 135.
+The reasons are in DECISIONS 131 to 136.
 
 ## Voice and users
 
@@ -145,7 +161,7 @@ sintr-app/
 
 - **Auth**: `users`, `sessions`, `accounts`, `verification_tokens`
 - **Profile**: `profiles` (the name on reports, the name the person goes by, the language they chose, the language sintr last spoke to them in, their report's language, timezone, when the welcome was done)
-- **Therapy**: `therapy_settings` (therapist, contact, `session_day`, `session_time`, `report_lead`, `require_approval`, delivery channel)
+- **Therapy**: `therapy_settings` (therapist, contact, `report_lead`, `require_approval`, delivery channel); the sessions as a calendar since F11: `therapy_series` (a first day, a time and how it repeats) and `therapy_series_changes` (one session of a rhythm moved or cancelled)
 - **Ledger**: `entries` (full CBT), `checkins`, `therapy_notes`, `insights`
 - **Reports**: `reports` (period, `status` draft/reviewed/sent, recipient, `sent_at`, content + PDF)
 - **Agent**: `conversations`, `messages` (configurable retention)
@@ -175,7 +191,7 @@ Columns holding sensitive content are flagged for **application-layer encryption
 2. Record over MCP inside the agent you already use (Claude, ChatGPT, Gemini, Hermes).
 3. Quick check-in (mood, energy, anxiety, sleep).
 4. Pre-session report: automatic digest, review, PDF, approved send to the therapist.
-5. Configure therapy (session day/time, therapist contact, channel).
+5. Configure therapy (the sessions on the calendar, therapist contact, channel).
 6. Connect an external agent (MCP token flow).
 7. Review history and insights.
 8. Export / delete data (LGPD).
@@ -206,6 +222,7 @@ Columns holding sensitive content are flagged for **application-layer encryption
 - **F7 Languages**: the app in English and Brazilian Portuguese through configuration, as the site is: one catalog folder per language, the person's choice, then the installation's, then the browser's, then English; the help lines, the emails and the report in the same language; parity enforced by a test.
 - **F8 The assistant everywhere**: the home as the assistant's room with the pool of light in the middle; the same conversation on every page of the person's diary, opened beside the page from a corner (a panel, or a sheet on a phone), by voice or in writing, as far as a confirmed entry; one pool that travels between the room and the corner; the welcome again from Settings; and Therapy without the moved session.
 - **F9 Nothing leaves the page unsaved**: a question before leaving Settings with a change not saved, by any way out, in the person's language, with staying as the default; silence after a save and when nothing changed.
+- **F11 Therapy as a calendar**: sessions on a calendar inspired by Google Calendar, each one alone or in a rhythm (every week, every two weeks, every fifteen days, on chosen weekdays), one session moved or cancelled on its own with the app saying which, the planner and the worker on the new shape, the weekly slot carried over as a weekly rhythm.
 - **Later**: the public landing page, multi-tenant hardening, app on the domain and the deploy, LGPD export and delete in the UI, the audit view, MFA.
 
 Each milestone is delivered by an Orca/Claude Code session (`claude-opus-5-5 --effort xhigh`) with its own brief, branch, PR, and verification.

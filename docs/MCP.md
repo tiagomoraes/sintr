@@ -177,7 +177,7 @@ When sintr refuses a request (a wrong or switched-off key), the bridge answers t
 | `read_entry` | One entry in full, in your words. | `entries:read` |
 | `save_entry` | Saves a thought record, after you said yes. | `entries:write` |
 | `save_checkin` | Saves a check-in (mood, energy and anxiety from 0 to 5, sleep, a note), after you said yes. | `checkins:write` |
-| `therapy_overview` | Your session schedule, when the next report will be prepared, your open goals, themes, tasks, what you want to bring up, and your last five session notes. Not your therapist's name or address. | `therapy:read` |
+| `therapy_overview` | Your sessions (their rhythm, the next few, any moved), when the next report will be prepared, your open goals, themes, tasks, what you want to bring up, and your last five session notes. Not your therapist's name or address. | `therapy:read` |
 | `prepare_report` | The material of your next report: the period, its numbers, its entries in your words (at most 40), the check-in notes, what you want to bring up. It changes nothing and sends nothing. | `reports:read`, `entries:read`, `checkins:read` |
 
 "Read and save" holds the four read scopes and the two write scopes; "Read only" the read ones; "Save only" the write ones.

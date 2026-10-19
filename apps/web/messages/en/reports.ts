@@ -30,8 +30,8 @@ export const reports = {
       "The next one is prepared on ",
       `, for your session of ${session}.`,
     ],
-    noSession: "No session day is set, so reports are prepared only when you ask.",
-    setSessions: "Set your sessions",
+    noSession: "No session is in your calendar, so reports are prepared only when you ask.",
+    setSessions: "Add your sessions",
     /** On the included assistant, once this month's reports are used; `next` is the day the month turns. */
     used: (next: string) =>
       `This month's reports written by the assistant are used, so until ${next} sintr prepares them from your own words: the moments, your notes and your topics.`,

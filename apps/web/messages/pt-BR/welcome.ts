@@ -75,7 +75,7 @@ export const welcome = {
     sessions: (day: string, time: string) =>
       `Suas sessões são ${on(day)}, às ${time}. Uma hora antes de cada uma, sua semana vai estar esperando em uma página.`,
     noSessions:
-      "Quando quiser a sua semana em uma página, você pode prepará-la em Relatórios. Se você disser em Terapia quando são as suas sessões, ela é preparada antes de cada uma.",
+      "Quando quiser a sua semana em uma página, você pode prepará-la em Relatórios. Adicione as suas sessões ao calendário em Terapia, do jeito que elas caem, e ela é preparada antes de cada uma.",
     therapist: (who: string) =>
       `Seus relatórios são para ${who} e só vão para essa pessoa quando você quiser.`,
     next: "Sempre que algo acontecer, me conta, por voz ou por escrito.",

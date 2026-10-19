@@ -21,11 +21,15 @@ import {
 import {
   NotFoundError,
   collectDigest,
+  heldSessions,
+  localDay,
+  nextSeriesDay,
   periodAgain,
   periodOf,
   planReportNow,
   preparationTime,
   upcomingSession,
+  weekdayOf,
   type ApiTokenScope,
   type Logger,
   type Report,
@@ -34,7 +38,7 @@ import {
   type UserScope,
 } from "@sintr/core";
 import { z } from "zod";
-import { WEEKDAYS, checkinView, entryTitle, entryView, moment, rounded, wallClock } from "./views";
+import { WEEKDAYS, checkinView, entryTitle, entryView, moment, rhythmOf, rounded, wallClock } from "./views";
 
 const DAY = 24 * 60 * 60 * 1000;
 
@@ -45,6 +49,7 @@ export const LIMITS = {
   recentCheckins: 28,
   notesPerKind: 20,
   sessionNotes: 5,
+  upcomingSessions: 4,
   reportEntries: 40,
   reportFrequencies: 20,
   personWords: 40,
@@ -323,28 +328,36 @@ const therapyOverview = define({
   name: "therapy_overview",
   title: "The therapy, in short",
   description:
-    "When the person's sessions are, when the next report will be prepared, and their open goals, themes, tasks and things they want to bring up, with their last session notes. The therapist's name and contact are not shared.",
+    "When the person's sessions are (their rhythm, the next few, any moved), when the next report will be prepared, and their open goals, themes, tasks and things they want to bring up, with their last session notes. The therapist's name and contact are not shared.",
   needs: { all: ["therapy:read"] },
   readOnly: true,
   input: z.object({}),
   async run(_input, { scope, now }) {
-    const [settings, profile, notes] = await Promise.all([
+    const [schedule, settings, profile, notes] = await Promise.all([
+      scope.sessions.schedule(),
       scope.therapySettings.get(),
       scope.profile.get(),
       scope.therapyNotes.list(),
     ]);
     const timeZone = profile.timezone;
-    const session = upcomingSession(settings, timeZone, now());
-    const prepared = session ? preparationTime(settings, session) : null;
+    const at = now();
+    const today = localDay(at, timeZone);
+    const going = schedule.series.filter((series) => nextSeriesDay(series, today) !== null);
+    const weekly = going.length === 1 && going[0]!.repeat === "weekly" ? going[0]! : null;
+    const coming = heldSessions(schedule, timeZone, at, new Date(at.getTime() + 60 * DAY)).slice(
+      0,
+      LIMITS.upcomingSessions,
+    );
+    const session = upcomingSession(schedule, timeZone, at);
+    const prepared = session ? preparationTime(schedule, session) : null;
     return {
-      now: wallClock(now(), timeZone),
+      now: wallClock(at, timeZone),
       timeZone,
       sessions: {
-        weekly:
-          settings.sessionDay !== null && settings.sessionTime
-            ? `${WEEKDAYS[settings.sessionDay]} at ${settings.sessionTime}`
-            : null,
+        weekly: weekly ? `${WEEKDAYS[weekdayOf(weekly.startsOn)]} at ${weekly.time}` : null,
+        rhythms: going.map(rhythmOf),
         next: session ? moment(session, timeZone) : null,
+        upcoming: coming.map((s) => ({ ...moment(s.at, timeZone), ...(s.moved ? { moved: true } : {}) })),
         nextReportPrepared: prepared ? moment(prepared, timeZone) : null,
       },
       hasTherapist: settings.therapistName !== null || settings.therapistContact !== null,
@@ -379,7 +392,7 @@ const prepareReport = define({
   async run(_input, { scope, scopes, appUrl, now }) {
     const at = now();
     const [settings, profile, known] = await Promise.all([
-      scope.therapySettings.get(),
+      scope.sessions.schedule(),
       scope.profile.get(),
       scope.reports.recent(),
     ]);

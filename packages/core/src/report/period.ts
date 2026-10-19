@@ -9,24 +9,25 @@
  * - The first report covers the 7 days before. After a long pause a period
  *   reaches back at most four weeks.
  * - Without a session, a calendar week (Monday to Sunday) is the period.
- * - A session that moved (a new weekly day or time) moves the preparation
- *   with it. A single session on another day is not a setting: the person
- *   prepares that week's report on the day, from Reports (DECISIONS 111).
+ * - The sessions are the person's calendar (`./sessions`): one date, or a
+ *   rhythm, with any session of it moved or cancelled on its own. Two
+ *   sessions in a week are two reports. A session that moved moves the
+ *   preparation with it, because the calendar says where it is now, never
+ *   because a date looked near it (DECISIONS 111 and 125).
  */
 import type { ReportStatus } from "../domain";
-import { addDays, dayStart, isoWeek, localDay, localParts, weekdayOf, zonedTime } from "./time";
+import { heldSessions, type SessionCalendar } from "./sessions";
+import { addDays, dayStart, isoWeek, localDay, localParts } from "./time";
 
 const MINUTE = 60_000;
 const DAY = 24 * 60 * MINUTE;
 export const FIRST_PERIOD_DAYS = 7;
 export const MAX_PERIOD_DAYS = 28;
+/** How far ahead the next session is looked for: first a few weeks, then a little over a year. */
+const NEAR_DAYS = 42;
+const HORIZON_DAYS = 400;
 
-/** The therapy schedule, as `therapy_settings` holds it. */
-export interface SessionSchedule {
-  /** 0 = Sunday ... 6 = Saturday, in the person's time zone. */
-  sessionDay: number | null;
-  /** `HH:MM`, in the person's time zone. */
-  sessionTime: string | null;
+export interface SessionSchedule extends SessionCalendar {
   reportLeadMinutes: number;
 }
 
@@ -51,53 +52,42 @@ export interface KnownReport {
   editedAt: Date | null;
 }
 
-function clock(value: string | null): { hour: number; minute: number } | null {
-  const match = value ? /^(\d{2}):(\d{2})/.exec(value) : null;
-  if (!match) return null;
-  const hour = Number(match[1]);
-  const minute = Number(match[2]);
-  return hour < 24 && minute < 60 ? { hour, minute } : null;
-}
-
-export function hasWeeklySchedule(schedule: SessionSchedule): boolean {
-  return schedule.sessionDay !== null && clock(schedule.sessionTime) !== null;
-}
-
-/** Weekly sessions in [from, to), in the person's time zone. */
-export function weeklySessions(schedule: SessionSchedule, timeZone: string, from: Date, to: Date): Date[] {
-  const time = clock(schedule.sessionTime);
-  if (schedule.sessionDay === null || !time) return [];
-  const out: Date[] = [];
-  let day = addDays(localDay(from, timeZone), -1);
-  const lastDay = addDays(localDay(to, timeZone), 1);
-  while (weekdayOf(day) !== schedule.sessionDay) day = addDays(day, 1);
-  for (; day <= lastDay; day = addDays(day, 7)) {
-    const [year, month, date] = day.split("-").map(Number) as [number, number, number];
-    const at = zonedTime({ year, month, day: date, ...time }, timeZone);
-    if (at >= from && at < to) out.push(at);
-  }
-  return out;
-}
-
-/** The first session that has not started yet, or null without a schedule. */
-export function upcomingSession(schedule: SessionSchedule, timeZone: string, now: Date): Date | null {
-  const later = weeklySessions(
+/** The moments of the sessions that will be held after `now`, in order, within `days`. */
+export function upcomingSessions(
+  schedule: SessionSchedule,
+  timeZone: string,
+  now: Date,
+  days: number = NEAR_DAYS,
+): Date[] {
+  return heldSessions(
     schedule,
     timeZone,
     new Date(now.getTime() + 1),
-    new Date(now.getTime() + 15 * DAY),
-  );
-  return later[0] ?? null;
+    new Date(now.getTime() + days * DAY),
+  ).map((session) => session.at);
 }
 
-/** Is `at` one of the sessions the schedule holds now? */
+/**
+ * The first session that has not started yet, or null when none is set:
+ * looked for in the next few weeks, and then as far as a year ahead, so a
+ * rhythm of fifteen days with a few sessions cancelled is still found.
+ */
+export function upcomingSession(schedule: SessionSchedule, timeZone: string, now: Date): Date | null {
+  return (
+    upcomingSessions(schedule, timeZone, now)[0] ??
+    upcomingSessions(schedule, timeZone, now, HORIZON_DAYS)[0] ??
+    null
+  );
+}
+
+/** Is `at` one of the sessions the calendar holds now (not moved away, not cancelled)? */
 export function inSchedule(schedule: SessionSchedule, timeZone: string, at: Date): boolean {
-  return weeklySessions(
+  return heldSessions(
     schedule,
     timeZone,
     new Date(at.getTime() - MINUTE),
     new Date(at.getTime() + MINUTE),
-  ).some((session) => session.getTime() === at.getTime());
+  ).some((session) => session.at.getTime() === at.getTime());
 }
 
 /** When the report for `session` is prepared. */
@@ -181,8 +171,11 @@ export type ScheduledPlan =
 
 /**
  * What the scheduler does for one person at `now`. It runs every minute
- * and decides from the schedule as it is now, so a session that moves
- * moves the preparation with it, and a restart loses nothing.
+ * and decides from the calendar as it is now, so a session that moves
+ * moves the preparation with it, and a restart loses nothing. It walks the
+ * sessions still to come in order: each whose preparation time has come
+ * gets its report once, so two sessions in a week, or a lead longer than
+ * the days between two sessions, still give periods that meet exactly.
  */
 export function planScheduledReport(input: {
   schedule: SessionSchedule;
@@ -191,52 +184,49 @@ export function planScheduledReport(input: {
   now: Date;
 }): ScheduledPlan {
   const { schedule, timeZone, reports, now } = input;
-  const session = upcomingSession(schedule, timeZone, now);
-  if (!session) return { action: "wait", until: null };
-  const end = preparationTime(schedule, session);
-  if (now < end) return { action: "wait", until: end };
-
-  const forSession = reports.find((report) => same(report.sessionAt, session));
-  if (forSession) {
-    if (forSession.periodEnd >= end || !untouchedDraft(forSession)) return { action: "wait", until: null };
-    // Prepared early (by hand): bring it up to the preparation time.
-    return {
-      action: "retarget",
-      reportId: forSession.id,
-      period: {
-        kind: "session",
-        label: localDay(session, timeZone),
-        start: forSession.periodStart,
-        end,
-        session,
-      },
-    };
-  }
-
   const latest = latestOf(reports);
-  // A draft prepared for a session that moved: it follows the session.
-  if (
-    latest &&
-    untouchedDraft(latest) &&
-    latest.sessionAt &&
-    latest.sessionAt.getTime() > now.getTime() - FIRST_PERIOD_DAYS * DAY &&
-    (latest.sessionAt > now || !inSchedule(schedule, timeZone, latest.sessionAt)) &&
-    latest.periodStart < end
-  ) {
-    return {
-      action: "retarget",
-      reportId: latest.id,
-      period: {
-        kind: "session",
-        label: localDay(session, timeZone),
-        start: latest.periodStart,
-        end,
-        session,
-      },
-    };
+  // Every session whose preparation can have come is within the lead (a week at most) and a few weeks.
+  const near = upcomingSessions(schedule, timeZone, now);
+  if (near.length === 0) {
+    const later = upcomingSession(schedule, timeZone, now);
+    return { action: "wait", until: later ? preparationTime(schedule, later) : null };
   }
-  if (latest && latest.periodEnd >= end) return { action: "wait", until: null };
-  return { action: "create", period: sessionPeriod(session, end, timeZone, latest?.periodEnd ?? null) };
+  for (const session of near) {
+    const end = preparationTime(schedule, session);
+    if (now < end) return { action: "wait", until: end };
+    const period = (start: Date): ReportPeriod => ({
+      kind: "session",
+      label: localDay(session, timeZone),
+      start,
+      end,
+      session,
+    });
+
+    const forSession = reports.find((report) => same(report.sessionAt, session));
+    if (forSession) {
+      // Prepared early (by hand): brought up to the preparation time, unless a later report already began.
+      if (forSession === latest && untouchedDraft(forSession) && forSession.periodEnd < end) {
+        return { action: "retarget", reportId: forSession.id, period: period(forSession.periodStart) };
+      }
+      continue;
+    }
+
+    // A draft prepared for a session that moved, was cancelled, or now comes after this one: it follows.
+    if (
+      latest &&
+      untouchedDraft(latest) &&
+      latest.sessionAt &&
+      latest.sessionAt.getTime() > now.getTime() - FIRST_PERIOD_DAYS * DAY &&
+      (latest.sessionAt > session || !inSchedule(schedule, timeZone, latest.sessionAt)) &&
+      latest.periodStart < end
+    ) {
+      return { action: "retarget", reportId: latest.id, period: period(latest.periodStart) };
+    }
+    // Everything up to this preparation is already covered: nothing to prepare for this session.
+    if (latest && latest.periodEnd >= end) continue;
+    return { action: "create", period: sessionPeriod(session, end, timeZone, latest?.periodEnd ?? null) };
+  }
+  return { action: "wait", until: null };
 }
 
 export type ManualPlan = { action: "create"; period: ReportPeriod } | { action: "open"; reportId: string };

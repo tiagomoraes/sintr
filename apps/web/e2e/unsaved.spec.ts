@@ -144,12 +144,16 @@ test.describe("leaving Settings with a change not saved", () => {
     await expect(link).toBeFocused();
     await expect(page).toHaveURL(/\/settings$/);
 
-    // Enter on Stay stays; Tab, then Enter, leaves.
+    // Enter on Stay stays; Tab, then Enter, leaves. Each key waits for the question to have the focus.
     await page.keyboard.press("Enter");
+    await expect(asked).toBeVisible();
+    await expect(asked.getByRole("button", { name: "Stay on this page" })).toBeFocused();
     await page.keyboard.press("Enter");
     await expect(asked).toBeHidden();
     await expect(link).toBeFocused();
     await page.keyboard.press("Enter");
+    await expect(asked).toBeVisible();
+    await expect(asked.getByRole("button", { name: "Stay on this page" })).toBeFocused();
     await page.keyboard.press("Tab");
     await expect(asked.getByRole("button", { name: "Leave without saving" })).toBeFocused();
     await page.keyboard.press("Enter");
