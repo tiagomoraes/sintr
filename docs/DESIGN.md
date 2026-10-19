@@ -479,6 +479,8 @@ The app keeps every token above and borrows the site's light, not a new style. T
 - **Idle (F8).** Twenty seconds without input and every animation of the light pauses where it is, never while the assistant listens, writes down or thinks.
 - **Selects (F8).** A native select is drawn like a text field: 48px tall, 16px in on the left and 44px on the right, and the disclosure's 7px border-built chevron 18px from the right edge, Ink Three, turning ink with the border on hover and focus.
 
+- **Memory (F10).** A reading page in the diary's frame, built from parts that exist: before the yes, the offer is a column of terms (Title Small serif) and Ink Two answers on hairlines under one ink rule, as the privacy promises, then the one ink pill and a caption. After it, two sections ("Who you are", "What has been happening"), each a list on hairlines: the memory's sentence in the serif at 1.1875rem (sintr's words, so no highlighter), under it the person's words it rests on as a quotation under the peach highlighter (The Verbatim Rule), then the source as a caption link to its entry, then two outline pills, "Correct it" (a disclosure that takes the whole row while open) and "Forget" (the two-step confirm). Download and Forget everything close the page as Settings' sections do. No card, no colour, no icon: the person's own words carry it.
+
 ### Named Rules
 **The Light Pool Rule.** The pool is the window light gathered, never a pastel blob: only the light's colours, no outline, no face, no gloss, no shape morphing, one in view at a time (it travels between its places rather than appearing twice), and it means something is happening or waiting. The corner's round window is paper around the light, not part of it. The wellness-app blob stays rejected.
 
