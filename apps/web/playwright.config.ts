@@ -86,6 +86,8 @@ export default defineConfig({
   reporter: process.env.CI ? [["list"], ["html", { open: "never" }]] : "list",
   use: {
     baseURL: url,
+    // An English browser, whatever the machine's own language: the earlier suites read English (DECISIONS 98).
+    locale: "en-US",
     trace: "retain-on-failure",
     // A microphone that plays a tone, and no prompt to allow it: speaking can be tested without a person.
     launchOptions: { args: ["--use-fake-ui-for-media-stream", "--use-fake-device-for-media-stream"] },
@@ -95,7 +97,8 @@ export default defineConfig({
     {
       command: `pnpm run build && pnpm exec next start --hostname 127.0.0.1 --port ${port}`,
       url,
-      timeout: 240_000,
+      // The production build comes first; on a busy machine it alone takes several minutes.
+      timeout: 900_000,
       reuseExistingServer: false,
       stdout: "pipe",
       stderr: "pipe",
@@ -106,7 +109,7 @@ export default defineConfig({
       // The same build, started once the first server is up (and so the build is done).
       command: `node e2e/when-up.mjs ${url}/api/health && pnpm exec next start --hostname 127.0.0.1 --port ${housePort}`,
       url: houseUrl,
-      timeout: 300_000,
+      timeout: 960_000,
       reuseExistingServer: false,
       stdout: "pipe",
       stderr: "pipe",
