@@ -5,7 +5,11 @@ import type { ReactNode } from "react";
 import type { AssistantFormState, ConnectionState } from "@/app/(app)/settings/actions";
 import { counted } from "@/lib/plan";
 import type { AssistantState } from "@/lib/server/assistant";
+import type { VoiceView } from "@/lib/voice/view";
+import { t } from "@/messages";
 import { AssistantForm } from "./assistant-form";
+
+const S = t.settings.assistant;
 
 /** "Anthropic", "Google", or the host of an OpenAI-compatible endpoint. */
 function providerName(settings: AgentSettings): string {
@@ -49,7 +53,10 @@ export function AssistantSection({
   test,
   back,
   rehearsal,
+  voice,
 }: {
+  /** Speaking: who writes it down, or why it is not on offer. */
+  voice: VoiceView;
   state: AssistantState;
   settings: AgentSettings;
   /** Arrived through "Use your own key". */
@@ -60,32 +67,33 @@ export function AssistantSection({
   rehearsal: boolean;
 }) {
   const form = <AssistantForm settings={settings} save={save} test={test} rehearsal={rehearsal} />;
-  const keyNote =
-    "The key is encrypted with your own data key before it is stored, is never shown again, and is used only to reach that provider.";
+  const keyNote = S.keyNote;
+  const speaking =
+    voice.kind === "ready"
+      ? t.settings.voice.ready(voice.heardBy)
+      : voice.kind === "limit"
+        ? t.voice.limit(voice.next)
+        : t.voice.unavailable[voice.reason](voice.provider);
+  const voiceLine = speaking ? <p className="mt-3 text-[0.9375rem] text-ink-2">{speaking}</p> : null;
 
   if (state.kind === "house") {
     const { messages, plan } = state;
     return (
       <>
+        <p className="mt-3 text-ink-2">{S.included(state.name)}</p>
+        {voiceLine}
         <p className="mt-3 text-ink-2">
-          The assistant is included. It runs on a model from {state.name}, through sintr&apos;s own account:
-          what you write in a conversation is sent there to be answered, and nowhere else. You do not need a
-          key.
-        </p>
-        <p className="mt-3 text-ink-2">
-          You are on {plan.label}
+          {S.plan(plan.label)}
           {messages.limit === null
-            ? ", with no monthly limit."
-            : `: ${messages.used} of ${counted(messages.limit, "message", "messages")} used this month.`}{" "}
+            ? S.planNoLimit
+            : S.planUsed(messages.used, counted(messages.limit, "message", "messages"))}{" "}
           <Link href="/plan" className={linkStyles}>
-            Your plan
+            {S.planLink}
           </Link>
         </p>
-        <OwnKeyDoor open={openDoor} summary="Use your own key instead">
+        <OwnKeyDoor open={openDoor} summary={S.door}>
           <p className="mb-8 text-[0.9375rem] text-ink-2">
-            Bring a key from a provider you choose, or a model on your own machine. Your conversations and
-            reports then go to that provider, under your own agreement with it, and they do not count toward
-            your plan: it is free here, and the provider bills you. {keyNote}
+            {S.doorBody} {keyNote}
           </p>
           {form}
         </OwnKeyDoor>
@@ -96,20 +104,17 @@ export function AssistantSection({
   if (state.kind === "own") {
     return (
       <>
-        <p className="mt-3 text-ink-2">
-          You are using your own key, with {providerName(settings)} ({state.model}). What you write in a
-          conversation goes to that provider, under your agreement with it
-          {state.house ? ", and it does not count toward any plan." : ", and nowhere else."}
-        </p>
+        <p className="mt-3 text-ink-2">{S.own(providerName(settings), state.model, state.house)}</p>
+        {voiceLine}
         {state.house ? (
           <form action={back} className="mt-5 flex flex-wrap items-center gap-x-5 gap-y-2">
             <Button type="submit" variant="outline" size="sm">
-              Go back to the included assistant
+              {S.back}
             </Button>
-            <span className="text-[0.9375rem] text-ink-3">Your key is removed from sintr.</span>
+            <span className="text-[0.9375rem] text-ink-3">{S.backNote}</span>
           </form>
         ) : null}
-        <OwnKeyDoor open summary="Your own key">
+        <OwnKeyDoor open summary={S.ownDoor}>
           <p className="mb-8 text-[0.9375rem] text-ink-2">{keyNote}</p>
           {form}
         </OwnKeyDoor>
@@ -120,10 +125,9 @@ export function AssistantSection({
   return (
     <>
       <p className="mt-3 text-ink-2">
-        This sintr has no assistant of its own, so it talks to a model you choose, with your own key. What you
-        write in a conversation is sent to that provider, and nowhere else. {keyNote}
+        {S.none} {keyNote}
       </p>
-      <OwnKeyDoor open summary="Your own key">
+      <OwnKeyDoor open summary={S.ownDoor}>
         {form}
       </OwnKeyDoor>
     </>

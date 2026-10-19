@@ -2,6 +2,7 @@ import { checkin } from "./en/checkin";
 import { connect } from "./en/connect";
 import { entry } from "./en/entry";
 import { home } from "./en/home";
+import { plan } from "./en/plan";
 import { settings } from "./en/settings";
 import { shell } from "./en/shell";
 import { therapy } from "./en/therapy";
@@ -14,7 +15,7 @@ import { welcome } from "./en/welcome";
  * the languages milestone adds a catalog beside `en` instead of hunting
  * through the code. A sentence that carries a value is a function of it.
  */
-const en = { checkin, connect, entry, home, settings, shell, therapy, voice, welcome };
+const en = { checkin, connect, entry, home, plan, settings, shell, therapy, voice, welcome };
 
 export type Messages = typeof en;
 

@@ -8,9 +8,10 @@ import { PageHeading } from "@/components/empty-state";
 import { onlyReachableHere } from "@/lib/connect";
 import { workingKeys } from "@/lib/server/keys";
 import { requireScope, runtime } from "@/lib/server/runtime";
+import { t } from "@/messages";
 import { makeKey } from "./actions";
 
-export const metadata: Metadata = { title: "Connect" };
+export const metadata: Metadata = { title: t.connect.title };
 
 export default async function ConnectPage() {
   const { scope } = await requireScope();
@@ -19,16 +20,13 @@ export default async function ConnectPage() {
 
   return (
     <>
-      <PageHeading
-        title="Connect your assistant"
-        lede="Keep using the assistant you already talk to. What you tell it to keep is saved here, in your words."
-      />
+      <PageHeading title={t.connect.title} lede={t.connect.lede} />
       <p className="-mt-4 mb-12 max-w-[36em] text-[0.9688rem] text-ink-2 md:-mt-6">
-        Claude, ChatGPT, Gemini and Hermes can connect. Rather not set anything up?{" "}
-        <Link href="/talk" className={linkStyles}>
-          Talk to sintr here
+        {t.connect.instead}{" "}
+        <Link href="/home" className={linkStyles}>
+          {t.connect.insteadLink}
         </Link>{" "}
-        instead.
+        {t.connect.insteadAfter}
       </p>
 
       <ConnectFlow
