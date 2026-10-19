@@ -69,14 +69,30 @@ The Connect screen makes a key for an assistant you already use and shows its se
 - **The bridge** for local clients is served by your sintr at `/sintr-mcp.mjs`; it needs Node.js 20 or newer on the computer that runs the assistant.
 - The endpoint is `/mcp` on the same address; Caddy passes it through like any other request and keeps no access log, so a key inside an address is never written down.
 
+## Your therapist, and practices
+
+A person can give their therapist access to the reports they approve, inside sintr, from Sharing. A therapist does it the other way round: in Settings, "Are you a therapist?" opens a practice on the same account, with a dashboard where the reports their patients share arrive. Both sides use the same sintr, so on a self-host the therapist needs an account on it (sign-up must be open while they create it). Nothing leaves the machine: invites, links and reports stay in this database, and it all works offline.
+
+- **Invites** are a code (`XXXX-XXXX-XXXX`) and a link (`/join/<code>`) at `SINTR_URL`, so set it to the address people open sintr at. A practice invites a patient from its dashboard; a person invites their therapist from Sharing. Either way, nothing is shared until the person has said yes to that practice by name, and then each report goes only with their approval.
+- **Seats.** A self-hosted practice has unlimited seats, under the plan "Self-hosted". To bound them, set `SINTR_PRACTICE_SEATS` (a number, or `unlimited`) and optionally `SINTR_PRACTICE_PLAN` in `.env`, and run `make selfhost-up` again. To give one practice its own seats:
+
+  ```bash
+  make practice-plan EMAIL=therapist@example.com SEATS=10 PLAN="Practice 10"
+  make practice-plan EMAIL=therapist@example.com SEATS=default   # back to the .env defaults
+  ```
+
+  `make practice-plan` writes to the database in `DATABASE_URL` (the development one, unless you point it elsewhere). Inside the self-host stack the same command is in the image: `docker compose -f docker/compose.yaml --env-file .env exec -e SINTR_PLAN_EMAIL=therapist@example.com -e SINTR_PLAN_SEATS=10 worker node worker/practice-plan.mjs`. Seats are taken by linked patients and held by invites waiting for an answer; lowering them never ends a link.
+- **Email for practices.** With email set up, a therapist can ask, in Practice details, to be told when a report arrives: a link and a count, never who or what. The worker sends it within a minute.
+
 ## Email
 
-Email is optional. Without it, sintr works the same except that nothing is ever emailed: you download a report's PDF and share it yourself, a forgotten password cannot be reset, and Settings says so. With it, sintr sends four kinds of message, and nothing else:
+Email is optional. Without it, sintr works the same except that nothing is ever emailed: you download a report's PDF and share it yourself, a forgotten password cannot be reset, and Settings says so. With it, sintr sends five kinds of message, and nothing else:
 
 - an approved report, as a PDF attachment, to your therapist, when you say "send" for that report;
 - a short note to you that a report is ready, if you ask for it in Therapy (a link, never the report's words);
 - a link to set a new password, when you ask for one;
-- a link to confirm your address, when you create your account or ask again in Settings.
+- a link to confirm your address, when you create your account or ask again in Settings;
+- to a therapist who asked for it, a note that a report was shared with their practice (a link and a count).
 
 Any provider that speaks SMTP works: your mail host, Fastmail, Gmail with an app password, Postmark, Amazon SES, a relay on your network. In `.env`:
 
@@ -160,7 +176,7 @@ Logs are JSON lines with event names, ids, counts and error codes. They never co
 | --- | --- | --- |
 | `caddy` | `caddy:2-alpine` | the edge: HTTP or automatic HTTPS, compression, reverse proxy to the app |
 | `app` | `sintr-app:local` | the Next.js app (UI, API, auth, the MCP endpoint at `/mcp`) on port 3000, inside the network only; prints report PDFs with the Chromium in the image and sends approved reports |
-| `worker` | `sintr-app:local` | background jobs: prepares each report before its session (checked every minute), sends the "report ready" note, removes expired sessions and conversations past their retention (hourly) |
+| `worker` | `sintr-app:local` | background jobs: prepares each report before its session (checked every minute), sends the "report ready" note and the practices' "report shared" note (every minute), removes expired sessions, conversations past their retention and invites a month past use (hourly) |
 | `migrate` | `sintr-app:local` | applies migrations, then exits |
 | `db` | `postgres:16-alpine` | the database, on the `pgdata` volume |
 

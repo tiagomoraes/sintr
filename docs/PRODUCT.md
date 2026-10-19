@@ -6,6 +6,13 @@ sintr is a psychological self-tracking product: a private mood diary you keep wi
 
 Today the sibling repo `tiagomoraes/sintr` ships sintr as an **agent pack**: a portable skill plus a Markdown ledger, for people who already run a filesystem-capable agent. That covers a small, technical slice of the audience. This repo is the product: a real application with a database, reachable by people who do not run agents.
 
+## Two sides
+
+1. **A person for themselves.** Keep the diary, prepare the weekly report, approve it, and hand it to their therapist: as a PDF by email, or by giving the therapist access in sintr to the reports they approve.
+2. **A therapist for their patients.** Any account can open a practice. The practice invites patients by code or link (or accepts a patient's invite), has a number of seats, and gets one calm dashboard over the people who linked back: who accepted, which reports they shared, nothing else.
+
+The unit of trust is one **link between one person and one practice**: accepted on both sides, consented by the person, revocable at once by either side, and audited in both accounts. The person owns the data; the therapist sees only what the person approved and shared. The dashboard centralises access, not analysis: no scores, no trends, nothing across patients.
+
 ## Two offers, one codebase
 
 **Self-host (open source, AGPL-3.0)**
@@ -66,7 +73,8 @@ sintr-app/
 - **Reports**: `reports` (period, `status` draft/reviewed/sent, recipient, `sent_at`, content + PDF)
 - **Agent**: `conversations`, `messages` (configurable retention)
 - **Integration**: `api_tokens` (MCP, scoped and revocable), `audit_log`
-- **Commercial**: `subscriptions`, `usage_counters`, `consents` (versioned consent log)
+- **Sharing (F4)**: `practices` (the professional's names, plan and seats), `invites` (codes both ways, expiring), `links` (one person and one practice, with its own key), `shared_reports` (sealed copies of approved reports), `notifications` (kinds and ids)
+- **Commercial**: `consents` (versioned consent log); seats live on `practices` (granted by configuration until a payment provider); `subscriptions` and `usage_counters` arrive with billing
 
 Columns holding sensitive content are flagged for **application-layer encryption**. Every table carries an indexed, mandatory `user_id` scope.
 
@@ -96,8 +104,10 @@ Columns holding sensitive content are flagged for **application-layer encryption
 8. Export / delete data (LGPD).
 9. Subscribe / manage a plan (later).
 10. Self-host: install, configure BYOK, use.
-11. The therapist receives the report by email (no account in the product).
-12. (future) Mobile app; in-product sharing with the therapist.
+11. The therapist receives the report by email (no account in the product), or in their practice on sintr.
+12. Give your therapist access: invite them, or accept their invite; choose "ask me for each report" or "send what I approve"; see when they opened a report; stop sharing in one action.
+13. A therapist opens a practice, invites patients, accepts a patient's invite, reads shared reports in place and downloads their PDF, and disconnects when needed.
+14. (future) Mobile app.
 
 ## Non-functional requirements
 
@@ -113,8 +123,8 @@ Columns holding sensitive content are flagged for **application-layer encryption
 - **F1 Capture**: embedded agent (BYOK/provider), create/edit entries and check-ins, timeline.
 - **F2 Report**: digest, generation, preview, PDF, approval, email send.
 - **F3 MCP**: MCP server + tokens + connection docs (Claude Desktop, ChatGPT, Gemini).
-- **F4 SaaS**: multi-tenant hardening, free tier limits, onboarding, app on the domain, deploy to the VPS.
-- **F5 Hardening**: LGPD (export/delete), audit, retention, MFA, isolation tests, docs.
+- **F4 The therapist**: practices on one account kind, invites both ways with double opt-in, the link with its consent and revocation, sharing approved reports, the therapist's dashboard, seats by configuration, notifications, audit in both accounts.
+- **F5 Hosted and hardening**: a payment provider for seats, the public landing page, multi-tenant hardening, free tier limits, app on the domain, deploy to the VPS; LGPD (export/delete), the audit view, retention, MFA, docs.
 
 Each milestone is delivered by an Orca/Claude Code session (`claude-opus-5-5 --effort xhigh`) with its own brief, branch, PR, and verification.
 
