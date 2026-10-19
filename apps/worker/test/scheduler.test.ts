@@ -127,4 +127,24 @@ describe("jobs", () => {
     expect(await job!.run(fake as never, new Date())).toEqual({ conversations: 3 });
     expect(calls).toEqual(["purge"]);
   });
+
+  it("purges invites past being usable hourly, at the scheduler's moment", async () => {
+    const job = JOBS.find((j) => j.name === "purge-stale-invites");
+    expect(job?.intervalMs).toBe(60 * 60 * 1000);
+    const asked: Date[] = [];
+    const fake = { purgeStaleInvites: async (now: Date) => (asked.push(now), { invites: 1 }) };
+    const now = new Date("2026-10-19T20:00:00Z");
+    expect(await job!.run(fake as never, now)).toEqual({ invites: 1 });
+    expect(asked).toEqual([now]);
+  });
+
+  it("tells practices about new reports every minute through the runtime", async () => {
+    const job = JOBS.find((j) => j.name === "notify-practices");
+    expect(job?.intervalMs).toBe(60 * 1000);
+    const asked: Date[] = [];
+    const fake = { notifyPractices: async (now: Date) => (asked.push(now), { sent: 2 }) };
+    const now = new Date("2026-10-19T20:00:00Z");
+    expect(await job!.run(fake as never, now)).toEqual({ sent: 2 });
+    expect(asked).toEqual([now]);
+  });
 });

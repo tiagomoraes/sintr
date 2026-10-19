@@ -1,9 +1,13 @@
-// Bundle the worker and the migration runner into self-contained files for
-// the Docker image: no node_modules are needed at runtime.
+// Bundle the worker, the migration runner and the seats admin path into
+// self-contained files for the Docker image: no node_modules are needed at runtime.
 import { build } from "esbuild";
 
 await build({
-  entryPoints: { worker: "src/main.ts", migrate: "src/migrate.ts" },
+  entryPoints: {
+    worker: "src/main.ts",
+    migrate: "src/migrate.ts",
+    "practice-plan": "../../packages/core/src/practice/plan-cli.ts",
+  },
   outdir: "dist",
   outExtension: { ".js": ".mjs" },
   bundle: true,

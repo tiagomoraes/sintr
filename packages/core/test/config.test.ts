@@ -56,4 +56,22 @@ describe("configuration", () => {
       /SINTR_FAKE_AGENT/,
     );
   });
+
+  it("gives practices unlimited seats on a self-host and none on the hosted offer, unless configured", () => {
+    expect(loadConfig(valid()).practice).toEqual({ plan: "Self-hosted", seats: null });
+    expect(loadConfig({ ...valid(), SINTR_MODE: "saas" }).practice).toEqual({ plan: "Hosted", seats: 0 });
+    expect(
+      loadConfig({ ...valid(), SINTR_PRACTICE_SEATS: "12", SINTR_PRACTICE_PLAN: "Practice 12" }).practice,
+    ).toEqual({ plan: "Practice 12", seats: 12 });
+    expect(
+      loadConfig({ ...valid(), SINTR_MODE: "saas", SINTR_PRACTICE_SEATS: "unlimited" }).practice,
+    ).toEqual({
+      plan: "Hosted",
+      seats: null,
+    });
+    // An empty value in .env means "not set".
+    expect(loadConfig({ ...valid(), SINTR_PRACTICE_SEATS: "" }).practice.seats).toBeNull();
+    expect(() => loadConfig({ ...valid(), SINTR_PRACTICE_SEATS: "ten" })).toThrow(/SINTR_PRACTICE_SEATS/);
+    expect(() => loadConfig({ ...valid(), SINTR_PRACTICE_SEATS: "-1" })).toThrow(/SINTR_PRACTICE_SEATS/);
+  });
 });
