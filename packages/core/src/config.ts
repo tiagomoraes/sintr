@@ -219,6 +219,18 @@ function houseFrom(e: Env): HouseAssistant | null {
   if (provider !== "openai_compatible" && !e.SINTR_HOUSE_KEY) {
     throw new ConfigError(`invalid configuration: SINTR_HOUSE_KEY: is required for ${provider}`);
   }
+  // On the hosted offer a gateway must ask for a key (or anyone could point their
+  // own provider at it, uncounted), and people must be told who receives their words.
+  if (provider === "openai_compatible" && e.SINTR_MODE === "saas") {
+    if (!e.SINTR_HOUSE_KEY) {
+      throw new ConfigError("invalid configuration: SINTR_HOUSE_KEY: is required in saas mode");
+    }
+    if (!e.SINTR_HOUSE_NAME) {
+      throw new ConfigError(
+        "invalid configuration: SINTR_HOUSE_NAME: is required for openai_compatible in saas mode",
+      );
+    }
+  }
   const baseUrl = e.SINTR_HOUSE_BASE_URL ? new URL(e.SINTR_HOUSE_BASE_URL) : null;
   if (baseUrl && (baseUrl.username || baseUrl.password)) {
     throw new ConfigError(

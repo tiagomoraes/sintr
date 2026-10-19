@@ -82,9 +82,13 @@ export type AppliedOutcome =
   | "unrelated"
   /** For an account that no longer exists. */
   | "unknown_account"
-  /** For a price this installation does not sell. */
+  /** A new subscription for a price this installation does not sell. */
   | "unknown_price"
-  /** The account already holds another active subscription of this kind, which is kept. */
+  /**
+   * The account already holds another plan of this kind that is kept: an
+   * active paid subscription, or an active grant that a subscription which
+   * is not paid (incomplete, cancelled) must not replace.
+   */
   | "duplicate";
 
 /**
@@ -92,17 +96,18 @@ export type AppliedOutcome =
  * it, to the account it was made for: its plan, status, period and, for a
  * practice, its seats (through the same function as the admin path).
  * Applying the same state twice changes nothing, so a webhook delivered
- * twice is harmless.
+ * twice is harmless. The price is checked for a subscription sintr does not
+ * follow yet; one it already follows keeps being followed (cancelled,
+ * renewed) even after the installation stopped selling its price.
  */
 export async function applyProviderSubscription(
-  db: Database,
+  db: Executor,
   sub: ProviderSubscription,
   prices: Extract<BillingConfig, { kind: "stripe" }>["prices"],
 ): Promise<{ outcome: AppliedOutcome; userId: string | null; kind: SubscriptionKind | null }> {
   const { userId, kind } = sub;
   if (!userId || !kind) return { outcome: "unrelated", userId: null, kind: null };
   const price = kind === "person" ? prices.personal : prices.practiceSeat;
-  if (!price || sub.priceId !== price) return { outcome: "unknown_price", userId, kind };
   try {
     return await inTransaction(db, async (tx) => {
       const [account] = await tx.select({ id: users.id }).from(users).where(eq(users.id, userId));
@@ -112,10 +117,17 @@ export async function applyProviderSubscription(
         .from(subscriptions)
         .where(and(eq(subscriptions.userId, userId), eq(subscriptions.kind, kind)))
         .for("update");
+      const followed = current?.providerSubscriptionId === sub.id;
+      if (!followed && (!price || sub.priceId !== price)) {
+        return { outcome: "unknown_price" as const, userId, kind };
+      }
+      // Another plan of this kind that holds: a paid one is never replaced by a second,
+      // and a grant only by a subscription that is actually paid.
       if (
-        current?.source === "stripe" &&
-        current.providerSubscriptionId !== sub.id &&
-        isEntitling(current.status)
+        current &&
+        !followed &&
+        isEntitling(current.status) &&
+        (current.source === "stripe" || !isEntitling(sub.status))
       ) {
         return { outcome: "duplicate" as const, userId, kind };
       }

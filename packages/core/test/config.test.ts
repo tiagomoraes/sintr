@@ -147,6 +147,21 @@ describe("configuration", () => {
     for (const env of leaky) expect(problem(env)).not.toContain(secret);
   });
 
+  it("asks a gateway on the hosted offer for a key and a name people are told", () => {
+    const gateway = {
+      ...valid(),
+      SINTR_MODE: "saas",
+      SINTR_HOUSE_PROVIDER: "openai_compatible",
+      SINTR_HOUSE_BASE_URL: "http://litellm:4000/v1",
+      SINTR_HOUSE_MODEL: "house",
+    };
+    expect(() => loadConfig(gateway)).toThrow(/SINTR_HOUSE_KEY/);
+    expect(() => loadConfig({ ...gateway, SINTR_HOUSE_KEY: "sk-gateway-key" })).toThrow(/SINTR_HOUSE_NAME/);
+    expect(
+      loadConfig({ ...gateway, SINTR_HOUSE_KEY: "sk-gateway-key", SINTR_HOUSE_NAME: "Anthropic" }).house,
+    ).toMatchObject({ name: "Anthropic", baseUrl: "http://litellm:4000/v1" });
+  });
+
   it("puts a person on Free unless SINTR_PERSON_PLAN says otherwise", () => {
     expect(loadConfig(valid()).personPlan).toBe("free");
     expect(loadConfig({ ...valid(), SINTR_PERSON_PLAN: "unlimited" }).personPlan).toBe("unlimited");

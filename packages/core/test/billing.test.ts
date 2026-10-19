@@ -9,7 +9,8 @@ import {
   verifySignature,
   type BillingConfig,
 } from "../src/billing";
-import { subscriptions } from "../src/db/schema";
+import { setPersonPlan } from "../src/billing/subscriptions";
+import { subscriptions, users } from "../src/db/schema";
 import { createLogger } from "../src/log";
 import { createRepositories, type UserScope } from "../src/repositories";
 import { createUser, openTestDatabase, testMasterKey } from "./support";
@@ -430,7 +431,73 @@ describe("applying a subscription", () => {
   });
 });
 
+describe("following a subscription over time", () => {
+  it("keeps following a subscription after its price stops being sold, so a cancellation still lands", async () => {
+    const dora = await account("pay-dora");
+    const active = readSubscription(
+      stripeSubscription({ id: `sub_old_${dora.userId}`, userId: dora.userId, kind: "person" }),
+    );
+    await applyProviderSubscription(handle.db, active, config.prices);
+    expect((await dora.plans.current(NOW)).plan.id).toBe("personal");
+    // The operator raised the price: Personal is now another price id.
+    const raised = { ...config.prices, personal: "price_personal_2027" };
+    const cancelled = { ...active, status: "canceled" as const };
+    expect((await applyProviderSubscription(handle.db, cancelled, raised)).outcome).toBe("applied");
+    expect((await dora.plans.current(NOW)).plan.id).toBe("free");
+    // A new subscription on the old price is still not one this installation sells.
+    const other = readSubscription(
+      stripeSubscription({ id: `sub_new_${dora.userId}`, userId: dora.userId, kind: "person" }),
+    );
+    expect((await applyProviderSubscription(handle.db, other, raised)).outcome).toBe("unknown_price");
+  });
+
+  it("keeps an active grant against a subscription that was never paid, and lets a paid one replace it", async () => {
+    const enzo = await account("pay-grant");
+    const [row] = await handle.db.select({ email: users.email }).from(users).where(eq(users.id, enzo.userId));
+    await setPersonPlan(handle.db, { email: row!.email, plan: "unlimited" });
+    const sub = (status: string) =>
+      readSubscription(
+        stripeSubscription({ id: `sub_g_${enzo.userId}`, userId: enzo.userId, kind: "person", status }),
+      );
+    expect((await applyProviderSubscription(handle.db, sub("incomplete"), config.prices)).outcome).toBe(
+      "duplicate",
+    );
+    expect((await enzo.plans.current(NOW)).plan).toMatchObject({ id: "unlimited", source: "grant" });
+    expect((await applyProviderSubscription(handle.db, sub("active"), config.prices)).outcome).toBe(
+      "applied",
+    );
+    expect((await enzo.plans.current(NOW)).plan).toMatchObject({ id: "personal", source: "subscription" });
+  });
+});
+
 describe("the webhook, end to end inside the core", () => {
+  it("applies overlapping deliveries one at a time, so a slow stale read cannot win", async () => {
+    const fia = await account("hook-race");
+    const id = `sub_race_${fia.userId}`;
+    let reads = 0;
+    const fetch = (async () => {
+      reads += 1;
+      // The first read sees the subscription before payment and answers slowly; the second sees it paid.
+      const status = reads === 1 ? "incomplete" : "active";
+      if (reads === 1) await new Promise((resolve) => setTimeout(resolve, 300));
+      return Response.json(stripeSubscription({ id, userId: fia.userId, kind: "person", status }));
+    }) as typeof globalThis.fetch;
+    const provider = createStripe(config, { fetch });
+    const quiet = createLogger({ level: "error", write: () => undefined });
+    const deliver = (type: string) => {
+      const payload = JSON.stringify({ id: `evt_${type}`, type, data: { object: { id } } });
+      return handlePaymentWebhook(
+        { db: handle.db, provider, prices: config.prices, log: quiet },
+        payload,
+        signPayload(payload, config.webhookSecret),
+      );
+    };
+    const first = deliver("customer.subscription.created");
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    await Promise.all([first, deliver("customer.subscription.updated")]);
+    expect((await fia.plans.current(NOW)).plan.id).toBe("personal");
+  });
+
   const log = createLogger({ level: "error", write: () => undefined });
 
   it("verifies, reads the subscription back from Stripe, and flips the plan", async () => {
