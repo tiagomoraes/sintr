@@ -5,6 +5,7 @@ import { Button, Checkbox, FieldError, FieldHint, Input, cn } from "@sintr/ui";
 import { useActionState, useEffect, useRef, useState } from "react";
 import type { AssistantFormState, ConnectionState } from "@/app/(app)/settings/actions";
 import { submitWith } from "@/lib/use-form-action";
+import { useHydrated } from "@/lib/use-hydrated";
 import { useMessages } from "@/components/language";
 import { useUnsaved } from "@/components/unsaved";
 
@@ -43,6 +44,7 @@ export function AssistantForm({
   const { form: F, test: T, unsaved: U } = useMessages().settings;
   const connectionProblems: Record<string, string> = T.problems;
   const [state, saveAction, saving] = useActionState(save, { saved: false, problems: {} });
+  const hydrated = useHydrated();
   const [connection, testAction, testing] = useActionState(test, {
     tested: false,
     ok: false,
@@ -67,7 +69,15 @@ export function AssistantForm({
 
   return (
     <div className="space-y-10">
-      <form ref={formRef} onSubmit={submitWith(saveAction)} className="space-y-8" aria-label={F.label}>
+      {/* A post, and a Save that waits for the page to be alive: the key never travels in an address. */}
+      <form
+        ref={formRef}
+        method="post"
+        action="/settings"
+        onSubmit={submitWith(saveAction)}
+        className="space-y-8"
+        aria-label={F.label}
+      >
         <fieldset className="min-w-0 border-0 p-0">
           <legend className="p-0 text-label font-medium text-ink">{F.provider}</legend>
           <div className="mt-3 inline-flex max-w-full flex-wrap gap-1 rounded-[26px] border border-rule bg-paper p-1">
@@ -180,7 +190,7 @@ export function AssistantForm({
         </div>
 
         <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
-          <Button type="submit" disabled={saving}>
+          <Button type="submit" disabled={!hydrated || saving}>
             {F.save}
           </Button>
           {state.saved ? (

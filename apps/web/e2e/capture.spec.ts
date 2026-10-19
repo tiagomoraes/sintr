@@ -7,6 +7,7 @@ import {
   core,
   currentUserId,
   newEmail,
+  newKey,
   say,
   setUpAssistant,
   signUp,
@@ -77,6 +78,100 @@ test.describe("bring your own key", () => {
 
     await page.getByRole("button", { name: "Test the connection" }).click();
     await expect(page.getByText("The rehearsal assistant answered.")).toBeVisible();
+  });
+
+  test("no field of a Settings form reaches an address, not even before the page is alive", async ({
+    page,
+    browser,
+  }) => {
+    await signUpQuietly(page, newEmail("no-address"));
+    const key = newKey();
+    // Every address the browser asks for or lands on, from here on.
+    const addresses: string[] = [];
+    page.on("request", (request) => addresses.push(request.url()));
+    page.on("framenavigated", (frame) => addresses.push(frame.url()));
+
+    // Every form of Settings that holds a field posts it: in the server's own HTML, before any script, and once alive.
+    const bare = await browser.newContext({ javaScriptEnabled: false });
+    await bare.addCookies(await page.context().cookies());
+    const html = await bare.newPage();
+    for (const view of [html, page]) {
+      await view.goto("/settings");
+      const forms = await view.locator("form").evaluateAll((all) =>
+        (all as HTMLFormElement[])
+          .filter((form) => [...form.elements].some((field) => (field as HTMLInputElement).name))
+          .map((form) => ({
+            form: form.getAttribute("aria-label") ?? form.getAttribute("action"),
+            method: form.method,
+            gets: form.querySelectorAll('[formmethod="get" i]').length,
+          })),
+      );
+      expect(forms.map((form) => form.form)).toEqual(
+        expect.arrayContaining(["The assistant", "Time zone and conversations"]),
+      );
+      for (const form of forms) expect(form, String(form.form)).toMatchObject({ method: "post", gets: 0 });
+    }
+    // Without JavaScript the two Saves that need it wait, rather than send anything.
+    await expect(html.getByRole("button", { name: "Save the assistant" })).toBeDisabled();
+    await expect(
+      html.getByRole("form", { name: "Time zone and conversations" }).getByRole("button", { name: "Save" }),
+    ).toBeDisabled();
+    await bare.close();
+
+    // Before the page is alive, as on a slow phone: its HTML is there, its scripts are held.
+    let release: () => void = () => undefined;
+    const held = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    await page.route("**/_next/static/chunks/**", async (route) => {
+      await held;
+      await route.continue();
+    });
+    await page.goto("/settings", { waitUntil: "commit" });
+    const assistant = page.getByRole("form", { name: "The assistant" });
+    const keyField = assistant.getByLabel("API key", { exact: true });
+    await assistant.getByLabel("Model", { exact: true }).fill("vendor/model");
+    await keyField.fill(key);
+    await page.getByLabel("Your time zone").selectOption("Asia/Tokyo");
+    await expect(assistant.getByRole("button", { name: "Save the assistant" })).toBeDisabled();
+    await expect(
+      page.getByRole("form", { name: "Time zone and conversations" }).getByRole("button", { name: "Save" }),
+    ).toBeDisabled();
+    // Enter in a field sends nothing while its Save waits.
+    const anything = page.waitForRequest((request) => request.isNavigationRequest(), { timeout: 1500 });
+    await keyField.press("Enter");
+    await assistant.getByLabel("Model", { exact: true }).press("Enter");
+    expect(
+      await anything.then(
+        () => "sent",
+        () => "nothing",
+      ),
+    ).toBe("nothing");
+    // Even a submission forced past the held Save is a post to Settings, the key in its body.
+    const forced = page.waitForRequest((request) => request.isNavigationRequest());
+    await page.evaluate(() =>
+      document.querySelector<HTMLFormElement>('form[aria-label="The assistant"]')!.requestSubmit(),
+    );
+    const sent = await forced;
+    expect(sent.method()).toBe("POST");
+    expect(new URL(sent.url()).search).toBe("");
+    expect(sent.postData()).toContain("apiKey=");
+
+    // Alive, the form saves as it always has, and the page stays at its own address.
+    release();
+    await page.waitForLoadState("networkidle");
+    await expect(assistant.getByRole("button", { name: "Save the assistant" })).toBeEnabled();
+    await assistant.getByRole("button", { name: "OpenRouter" }).click();
+    await assistant.getByLabel("Model", { exact: true }).fill("vendor/model");
+    await keyField.fill(key);
+    await assistant.getByRole("button", { name: "Save the assistant" }).click();
+    await expect(page.getByText(`A key is saved, ending in ${key.slice(-4)}.`)).toBeVisible();
+    await expect(page).toHaveURL(/\/settings$/);
+
+    for (const address of addresses) {
+      expect(address).not.toContain(key);
+      expect(address).not.toMatch(/[?&](provider|baseUrl|model|apiKey|removeKey|timezone|retention)=/u);
+    }
   });
 
   test("a conversation waits for a provider, but a crisis is answered without one", async ({ page }) => {

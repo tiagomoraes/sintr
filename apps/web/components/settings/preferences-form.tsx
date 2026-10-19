@@ -4,6 +4,7 @@ import { Button, FieldError, FieldHint, Select, cn } from "@sintr/ui";
 import { useActionState, useRef, useState, useSyncExternalStore } from "react";
 import type { PreferencesState } from "@/app/(app)/settings/actions";
 import { submitWith } from "@/lib/use-form-action";
+import { useHydrated } from "@/lib/use-hydrated";
 import { useMessages } from "@/components/language";
 import { useUnsaved } from "@/components/unsaved";
 
@@ -25,6 +26,7 @@ export function PreferencesForm({
 }) {
   const { time: T, unsaved: U } = useMessages().settings;
   const [state, action, pending] = useActionState(save, { saved: false, problems: {} });
+  const hydrated = useHydrated();
   const form = useRef<HTMLFormElement>(null);
   useUnsaved(form, { timezone: U.timezone, retention: U.retention }, state.saved ? state : null);
   const [zone, setZone] = useState(timezone);
@@ -38,7 +40,15 @@ export function PreferencesForm({
   const retention = retentionDays === null ? "keep" : String(retentionDays);
 
   return (
-    <form ref={form} onSubmit={submitWith(action)} className="space-y-10" aria-label={T.label}>
+    // A post, and a Save that waits for the page to be alive: no field ever travels in an address.
+    <form
+      ref={form}
+      method="post"
+      action="/settings"
+      onSubmit={submitWith(action)}
+      className="space-y-10"
+      aria-label={T.label}
+    >
       <div>
         <label htmlFor="settings-timezone" className="block text-label font-medium text-ink">
           {T.zone}
@@ -93,7 +103,7 @@ export function PreferencesForm({
       </fieldset>
 
       <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
-        <Button type="submit" disabled={pending}>
+        <Button type="submit" disabled={!hydrated || pending}>
           {T.save}
         </Button>
         {state.saved ? (
