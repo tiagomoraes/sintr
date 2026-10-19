@@ -83,6 +83,26 @@ export async function apiScope(request: Request) {
   if (request.method !== "GET" && origin !== null && origin !== runtime().config.url.origin) {
     return apiError(403, "origin_refused");
   }
+  return signedInScope(request);
+}
+
+/**
+ * The gate of a route that takes a plain form post from sintr's own pages,
+ * so the form works without JavaScript. Under `Referrer-Policy: no-referrer`
+ * a browser sends `Origin: null` on such a post, so the check is
+ * `Sec-Fetch-Site`, which no page can set, and the origin only where a
+ * browser sends no such header (as for /api/language, DECISIONS 98).
+ */
+export async function formScope(request: Request) {
+  const site = request.headers.get("sec-fetch-site");
+  const sameOrigin = site
+    ? site === "same-origin"
+    : request.headers.get("origin") === runtime().config.url.origin;
+  if (!sameOrigin) return apiError(403, "origin_refused");
+  return signedInScope(request);
+}
+
+async function signedInScope(request: Request) {
   const session = await runtime().auth.api.getSession({ headers: request.headers });
   if (!session) return apiError(401, "signed_out");
   const scope = await runtime().repositories.forUser(session.user.id);

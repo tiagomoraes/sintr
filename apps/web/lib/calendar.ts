@@ -124,3 +124,21 @@ export function calendarHref(state: Partial<CalendarState>): string {
   const search = query.toString();
   return `/therapy${search ? `?${search}` : ""}`;
 }
+
+/** Why a calendar form could not be kept, as a code the sheet says in a sentence (`therapy.calendar.problems`). */
+export const SESSION_PROBLEMS = [
+  "day",
+  "time",
+  "repeat",
+  "weekdays",
+  "which",
+  "gone",
+  "passed",
+  "timezone",
+  "form",
+] as const;
+export type SessionProblem = (typeof SESSION_PROBLEMS)[number];
+
+export function parseProblem(value: string | null | undefined): SessionProblem | null {
+  return (SESSION_PROBLEMS as readonly string[]).includes(value ?? "") ? (value as SessionProblem) : null;
+}

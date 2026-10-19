@@ -1,12 +1,15 @@
 "use client";
 
-import { Select, buttonVariants, cn } from "@sintr/ui";
+import { FieldError, Select, buttonVariants, cn } from "@sintr/ui";
+import { useActionState } from "react";
 import { saveTimeZone } from "@/app/(app)/therapy/sessions";
 import { useMessages } from "@/components/language";
+import { submitWith } from "@/lib/use-form-action";
 
 /**
  * Under the calendar: the zone its days and times are read in, said in a
- * line, and changed behind it. A plain form, so it works without JavaScript.
+ * line, and changed behind it. A plain post to the calendar's route without
+ * JavaScript, the server action with it.
  */
 export function ZoneForm({
   zone,
@@ -18,6 +21,7 @@ export function ZoneForm({
   timezones: readonly string[];
 }) {
   const T = useMessages().therapy.calendar;
+  const [result, action, pending] = useActionState(saveTimeZone, { problem: null });
   const place = (zone.split("/").at(-1) ?? zone).replaceAll("_", " ");
   return (
     <details className="group mt-8 border-t border-rule pt-5">
@@ -27,7 +31,13 @@ export function ZoneForm({
           {T.changeZone}
         </span>
       </summary>
-      <form action={saveTimeZone} className="sintr-rise mt-5 max-w-md">
+      <form
+        method="post"
+        action="/api/therapy/sessions"
+        onSubmit={submitWith(action)}
+        className="sintr-rise mt-5 max-w-md"
+      >
+        <input type="hidden" name="intent" value="zone" />
         <input type="hidden" name="month" value={month} />
         <label htmlFor="therapy-timezone" className="block text-label font-medium text-ink">
           {T.zoneLabel}
@@ -40,7 +50,12 @@ export function ZoneForm({
           ))}
         </Select>
         <p className="mt-2 text-caption text-ink-3">{T.zoneHint}</p>
-        <button type="submit" className={cn(buttonVariants({ variant: "outline", size: "sm" }), "mt-4")}>
+        {result.problem ? <FieldError>{T.problems.timezone}</FieldError> : null}
+        <button
+          type="submit"
+          disabled={pending}
+          className={cn(buttonVariants({ variant: "outline", size: "sm" }), "mt-4")}
+        >
           {T.saveZone}
         </button>
       </form>

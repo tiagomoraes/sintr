@@ -3,15 +3,17 @@
 import type { SessionRepeat } from "@sintr/core";
 import { Button, FieldError, Input, buttonVariants, cn } from "@sintr/ui";
 import { useActionState, useEffect, useRef, useState, type ReactNode } from "react";
-import {
-  addSession,
-  cancelSession,
-  changeSession,
-  restoreSession,
-  type SessionFormState,
-} from "@/app/(app)/therapy/sessions";
+import { useSearchParams } from "next/navigation";
+import { addSession, cancelSession, changeSession, restoreSession } from "@/app/(app)/therapy/sessions";
 import { useMessages } from "@/components/language";
-import { calendarHref, weekdayOf, type CalendarState } from "@/lib/calendar";
+import {
+  calendarHref,
+  parseProblem,
+  weekdayOf,
+  type CalendarState,
+  type SessionProblem,
+} from "@/lib/calendar";
+import { submitWith } from "@/lib/use-form-action";
 import {
   CalendarLink,
   sheetClosed,
@@ -19,8 +21,6 @@ import {
   type CalendarView,
   type SessionView,
 } from "./calendar-nav";
-
-const NONE: SessionFormState = { problems: {} };
 
 const dayChip =
   "pointer-events-none flex min-h-11 items-center justify-center rounded-pill border border-rule bg-paper text-[0.875rem] font-medium text-ink-2 transition-colors duration-300 peer-hover:border-rule-strong peer-checked:border-ink peer-checked:bg-ink peer-checked:text-paper peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-ink";
@@ -75,13 +75,42 @@ function Actions({ children }: { children: ReactNode }) {
   );
 }
 
-function Hidden({ state, session }: { state: CalendarState; session?: SessionView }) {
+/**
+ * A form of the sheet. Without JavaScript it is a plain post to the
+ * calendar's route, which comes back to this page; with it, `action` (a
+ * server action through useActionState) keeps the same thing.
+ */
+function SheetForm({
+  intent,
+  action,
+  state,
+  session,
+  className,
+  children,
+}: {
+  intent: "add" | "change" | "cancel" | "restore";
+  action: (form: FormData) => void;
+  state: CalendarState;
+  session?: SessionView;
+  className?: string;
+  children: ReactNode;
+}) {
   return (
-    <>
+    <form method="post" action="/api/therapy/sessions" onSubmit={submitWith(action)} className={className}>
+      <input type="hidden" name="intent" value={intent} />
       <input type="hidden" name="month" value={state.month} />
+      <input type="hidden" name="return" value={calendarHref(state)} />
       {session ? <input type="hidden" name="session" value={session.key} /> : null}
-    </>
+      {children}
+    </form>
   );
+}
+
+/** A problem's sentence. */
+function useProblem() {
+  const T = useMessages().therapy.calendar;
+  return (code: SessionProblem | null): string | null =>
+    code === null ? null : code === "which" ? T.form.onlyThisRhythm : T.problems[code];
 }
 
 /** Adding a session, or changing one: a day, a time and how it repeats; for a rhythm, which sessions. */
@@ -90,22 +119,25 @@ function SessionForm({
   state,
   session,
   day: firstDay,
+  problem,
 }: {
   view: CalendarView;
   state: CalendarState;
   session?: SessionView;
   day: string;
+  problem: SessionProblem | null;
 }) {
   const T = useMessages().therapy.calendar;
   const F = T.form;
-  const [result, action, pending] = useActionState(session ? changeSession : addSession, NONE);
+  const say = useProblem();
+  const [result, action, pending] = useActionState(session ? changeSession : addSession, { problem });
   const [day, setDay] = useState(firstDay);
   const [repeat, setRepeat] = useState<SessionRepeat>(session?.repeat ?? "weekly");
   // The chosen weekdays: the rhythm's own, or, until the person picks some, the chosen day's.
   const [picked, setWeekdays] = useState<number[] | null>(session?.weekdays.length ? session.weekdays : null);
   const weekdays = picked ?? (/^\d{4}-\d{2}-\d{2}$/.test(day) ? [weekdayOf(day)] : [weekdayOf(firstDay)]);
   const [which, setWhich] = useState<"only" | "following">("only");
-  const p = result.problems;
+  const p = result.problem;
   const inRhythm = session !== undefined && session.repeat !== "once";
   // Moving only this one keeps the rhythm's own day; a rhythm changed from here takes the chosen day's.
   const named = inRhythm && which === "only" ? session.occursOn : day;
@@ -123,8 +155,13 @@ function SessionForm({
   ];
 
   return (
-    <form action={action} className="sintr-session-form">
-      <Hidden state={state} session={session} />
+    <SheetForm
+      intent={session ? "change" : "add"}
+      action={action}
+      state={state}
+      session={session}
+      className="sintr-session-form"
+    >
       <div className="grid grid-cols-[minmax(0,1fr)_8.5rem] gap-4">
         <div>
           <label htmlFor="session-day" className="block text-label font-medium text-ink">
@@ -137,7 +174,7 @@ function SessionForm({
             required
             value={day}
             onChange={(event) => setDay(event.target.value)}
-            aria-invalid={p.day ? true : undefined}
+            aria-invalid={p === "day" ? true : undefined}
             className="mt-2 tabular-nums"
           />
         </div>
@@ -151,13 +188,12 @@ function SessionForm({
             type="time"
             required
             defaultValue={session?.time ?? view.usualTime}
-            aria-invalid={p.time ? true : undefined}
+            aria-invalid={p === "time" ? true : undefined}
             className="mt-2 tabular-nums"
           />
         </div>
       </div>
-      {p.day ? <FieldError>{p.day}</FieldError> : null}
-      {p.time ? <FieldError>{p.time}</FieldError> : null}
+      {p === "day" || p === "time" ? <FieldError>{say(p)}</FieldError> : null}
 
       <fieldset className="mt-7 min-w-0 border-0 p-0">
         <legend className="p-0 text-label font-medium text-ink">{F.repeat}</legend>
@@ -173,7 +209,7 @@ function SessionForm({
             />
           ))}
         </div>
-        {p.repeat ? <FieldError>{p.repeat}</FieldError> : null}
+        {p === "repeat" ? <FieldError>{say(p)}</FieldError> : null}
       </fieldset>
 
       {/* Shown with the choice that needs them; without JavaScript, the stylesheet shows them by the checked radio. */}
@@ -203,7 +239,7 @@ function SessionForm({
             </label>
           ))}
         </div>
-        {p.weekdays ? <FieldError>{p.weekdays}</FieldError> : null}
+        {p === "weekdays" ? <FieldError>{say(p)}</FieldError> : null}
       </fieldset>
 
       {inRhythm ? (
@@ -228,11 +264,11 @@ function SessionForm({
               hint={F.fromThisHint}
             />
           </div>
-          {p.which ? <FieldError>{p.which}</FieldError> : null}
+          {p === "which" ? <FieldError>{say(p)}</FieldError> : null}
         </fieldset>
       ) : null}
 
-      {p.form ? <FieldError>{p.form}</FieldError> : null}
+      {p === "gone" || p === "passed" || p === "form" ? <FieldError>{say(p)}</FieldError> : null}
       <Actions>
         <Button type="submit" disabled={pending}>
           {session ? F.save : F.add}
@@ -249,18 +285,26 @@ function SessionForm({
           {F.back}
         </CalendarLink>
       </Actions>
-    </form>
+    </SheetForm>
   );
 }
 
 /** Cancelling: only this session, or the rhythm from it on. A session that does not repeat leaves the calendar. */
-function CancelForm({ state, session }: { state: CalendarState; session: SessionView }) {
+function CancelForm({
+  state,
+  session,
+  problem,
+}: {
+  state: CalendarState;
+  session: SessionView;
+  problem: SessionProblem | null;
+}) {
   const C = useMessages().therapy.calendar.cancel;
-  const [result, action, pending] = useActionState(cancelSession, NONE);
+  const say = useProblem();
+  const [result, action, pending] = useActionState(cancelSession, { problem });
   const [which, setWhich] = useState<"only" | "following">("only");
   return (
-    <form action={action}>
-      <Hidden state={state} session={session} />
+    <SheetForm intent="cancel" action={action} state={state} session={session}>
       {session.repeat === "once" ? (
         <p className="text-[0.9688rem] text-ink-2">{C.once}</p>
       ) : (
@@ -284,7 +328,7 @@ function CancelForm({ state, session }: { state: CalendarState; session: Session
           />
         </fieldset>
       )}
-      {result.problems.form ? <FieldError>{result.problems.form}</FieldError> : null}
+      {result.problem ? <FieldError>{say(result.problem)}</FieldError> : null}
       <Actions>
         <Button type="submit" disabled={pending}>
           {C.confirm}
@@ -297,15 +341,24 @@ function CancelForm({ state, session }: { state: CalendarState; session: Session
           {C.keep}
         </CalendarLink>
       </Actions>
-    </form>
+    </SheetForm>
   );
 }
 
 /** One session: when it is, what it is part of, and what can be done with it. */
-function SessionDetails({ state, session }: { state: CalendarState; session: SessionView }) {
+function SessionDetails({
+  state,
+  session,
+  problem,
+}: {
+  state: CalendarState;
+  session: SessionView;
+  problem: SessionProblem | null;
+}) {
   const T = useMessages().therapy.calendar;
   const S = T.session;
-  const [result, restore, restoring] = useActionState(restoreSession, NONE);
+  const say = useProblem();
+  const [result, restore, restoring] = useActionState(restoreSession, { problem });
   const caption =
     session.repeat === "weekdays" ? T.caption.weekdays(session.weekdays) : T.caption[session.repeat];
   const open = !session.passed;
@@ -317,7 +370,7 @@ function SessionDetails({ state, session }: { state: CalendarState; session: Ses
         {session.passed ? <p>{S.passed}</p> : null}
         {session.report && !session.cancelled ? <p>{S.report(session.report)}</p> : null}
       </div>
-      {result.problems.form ? <FieldError>{result.problems.form}</FieldError> : null}
+      {result.problem ? <FieldError>{say(result.problem)}</FieldError> : null}
       <Actions>
         {open && !session.cancelled ? (
           <>
@@ -338,12 +391,11 @@ function SessionDetails({ state, session }: { state: CalendarState; session: Ses
           </>
         ) : null}
         {open && (session.moved || session.cancelled) ? (
-          <form action={restore} className="contents">
-            <Hidden state={state} session={session} />
+          <SheetForm intent="restore" action={restore} state={state} session={session} className="contents">
             <Button type="submit" variant="outline" size="sm" disabled={restoring}>
               {S.putBack(session.from ?? session.when)}
             </Button>
-          </form>
+          </SheetForm>
         ) : null}
       </Actions>
       <p className="sr-only">{caption}</p>
@@ -365,6 +417,8 @@ export function SessionSheet({ view, state }: { view: CalendarView; state: Calen
     ? view.sessions.find((candidate) => candidate.key === state.session)
     : undefined;
   const opened = state.add ?? state.session;
+  // What a form posted without JavaScript could not keep comes back in the address.
+  const problem = parseProblem(useSearchParams().get("problem"));
 
   // Opened: the modal sheet, its title in focus. Gone: focus back where it was, and the next sheet opens afresh.
   useEffect(() => {
@@ -390,7 +444,9 @@ export function SessionSheet({ view, state }: { view: CalendarView; state: Calen
   let body: ReactNode;
   if (state.add) {
     title = T.form.addTitle;
-    body = <SessionForm key={`add-${state.add}`} view={view} state={state} day={state.add} />;
+    body = (
+      <SessionForm key={`add-${state.add}`} view={view} state={state} day={state.add} problem={problem} />
+    );
   } else if (!session) {
     title = T.title;
     body = <p className="text-[0.9688rem] text-ink-2">{T.problems.gone}</p>;
@@ -411,14 +467,15 @@ export function SessionSheet({ view, state }: { view: CalendarView; state: Calen
           state={state}
           session={session}
           day={session.on}
+          problem={problem}
         />
       );
     } else if (state.doing === "cancel" && !session.passed && !session.cancelled) {
       title = T.cancel.title;
       subtitle = session.when;
-      body = <CancelForm key={`cancel-${session.key}`} state={state} session={session} />;
+      body = <CancelForm key={`cancel-${session.key}`} state={state} session={session} problem={problem} />;
     } else {
-      body = <SessionDetails state={state} session={session} />;
+      body = <SessionDetails state={state} session={session} problem={problem} />;
     }
   }
 

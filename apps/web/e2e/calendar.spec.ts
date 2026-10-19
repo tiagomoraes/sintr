@@ -168,7 +168,9 @@ test.describe("the therapy calendar", () => {
     // Reports believe it: the next session is the moved one, and "Prepare it now" is for it.
     await page.goto("/reports");
     await expect(
-      page.getByText(`The next report will be prepared on ${when(day(2), "08:00")}`),
+      page.getByText(
+        `The next one is prepared on ${when(day(2), "08:00")}, for your session of ${when(day(2), "09:00")}.`,
+      ),
     ).toBeVisible();
     await page.getByRole("button", { name: "Prepare it now" }).click();
     await expect(page).toHaveURL(/\/reports\/[0-9a-f-]{36}$/, REPORT);
@@ -303,6 +305,15 @@ test.describe("the therapy calendar", () => {
         await expect(
           plain.page.getByText("Cancelled. Only that session: the rest of the rhythm goes on."),
         ).toBeVisible();
+        // The plain post is for sintr's own pages: another site's form keeps nothing.
+        for (const headers of [{ "sec-fetch-site": "cross-site" }, { origin: "https://elsewhere.example" }]) {
+          const refused = await page.request.post("/api/therapy/sessions", {
+            form: { intent: "add", day: day(6), time: "10:00", repeat: "once" },
+            headers,
+            maxRedirects: 0,
+          });
+          expect(refused.status()).toBe(403);
+        }
         const calendar = await scope.sessions.calendar();
         expect(calendar.series).toEqual([
           expect.objectContaining({ startsOn: day(5), time: "19:30", repeat: "weekly" }),
