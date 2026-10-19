@@ -67,6 +67,22 @@ The owner's decision: the platform is multi-language through configuration, like
 
 The reasons are in DECISIONS 98 to 105.
 
+## The assistant everywhere (F8)
+
+The owner's decision: the home already was the simplest way to talk to the assistant, by voice or in writing; now it should look like an assistant's own screen, the assistant should be present on every screen like an assistant, the pool of light should travel to a corner when the person goes elsewhere, with motion worth watching, and the welcome should be there to run again.
+
+**The home is the assistant's room.** The pool of light rests in the middle of the page, large and calm, with "Good evening, Bia. Tell me what happened." under it and the box under that, Speak where the thumb rests. A check-in, this week's report and what they kept are one quiet line under the box; earlier conversations are further down.
+
+**The assistant is everywhere.** On every other page of the person's diary, a small round window of the same light waits in the corner. A tap opens the same conversation beside the page, a panel on a wide screen and a sheet on a phone: Speak is there, what was said comes back to read, sending it starts the conversation, a draft is confirmed there and lands in the diary (the list under it shows it at once), and closing it leaves the person exactly where they were. Words not yet sent go with them from page to page; the conversation begun beside Entries is the one the home shows. When the person goes home, the light travels back to the middle of the room; when they go elsewhere, it travels to its corner. With reduced motion it is simply there in both places.
+
+**The welcome, again.** One line in Settings takes the person back through the welcome with every answer filled in and every question skippable; skipping keeps the answer, and nothing they wrote is erased.
+
+**What stays as it was.** The crisis lines are on every page that carries the assistant, and the screen for risk runs before any model, typed or spoken, wherever the conversation is. The microphone is open only while a conversation is in view. Nothing becomes an entry without the person's yes.
+
+**What went.** Therapy no longer asks "Has a session moved?": when a session moves, the person prepares that week's report on the day, from Reports.
+
+The reasons are in DECISIONS 106 to 112.
+
 ## Voice and users
 
 People in regular therapy who want their self-observations documented between sessions but do not want another app to open, or who already live inside an AI assistant. They value privacy and plain language. Typical moment of use: right after a difficult situation ("preciso falar do que aconteceu"), or right before a session ("gera o report da semana"). They already have a therapist; they are not looking for an AI therapist.
@@ -164,6 +180,7 @@ Columns holding sensitive content are flagged for **application-layer encryption
 - **F5 The house model and the plan**: the house assistant configured on the server and used by default, bring your own key behind a small door, plans and entitlements for both sides with a monthly meter, the plan screen, the subscription modelled with Stripe behind configuration, limits that never hold the diary hostage.
 - **F6 The first five minutes**: the narrative welcome, the home as the input (voice and text, the pool of light), the light that follows the person's time of day, less form on the secondary screens, mobile first, and the app's strings in one catalog.
 - **F7 Languages**: the app in English and Brazilian Portuguese through configuration, as the site is: one catalog folder per language, the person's choice, then the installation's, then the browser's, then English; the help lines, the emails and the report in the same language; parity enforced by a test.
+- **F8 The assistant everywhere**: the home as the assistant's room with the pool of light in the middle; the same conversation on every page of the person's diary, opened beside the page from a corner (a panel, or a sheet on a phone), by voice or in writing, as far as a confirmed entry; one pool that travels between the room and the corner; the welcome again from Settings; and Therapy without the moved session.
 - **Later**: the public landing page, multi-tenant hardening, app on the domain and the deploy, LGPD export and delete in the UI, the audit view, MFA.
 
 Each milestone is delivered by an Orca/Claude Code session (`claude-opus-5-5 --effort xhigh`) with its own brief, branch, PR, and verification.
