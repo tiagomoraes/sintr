@@ -50,6 +50,13 @@ export const shell = {
     weeklyReady: "Your weekly report is ready to read.",
     readIt: "Read it",
   },
+  /** Asked before leaving a page with changes that are not saved. */
+  unsaved: {
+    /** `what` names them, as the page's language joins a list ("the time zone and the assistant"). */
+    changes: (what: string) => `Your changes to ${what} are not saved yet, and leaving now would lose them.`,
+    stay: "Stay on this page",
+    leave: "Leave without saving",
+  },
   /** Under a practice's pages, where a person's pages have the help lines. */
   practiceNote:
     "Reports arrive when a person approves and shares them, never in real time, and sintr does not watch over them: it is a diary people keep for themselves, not a clinical record, a monitoring tool or a crisis service. If something in a report worries you, reach the person the way you usually do.",

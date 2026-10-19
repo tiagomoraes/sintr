@@ -5,7 +5,9 @@ import { Button, Checkbox, FieldError, FieldHint, Input, cn } from "@sintr/ui";
 import { useActionState, useEffect, useRef, useState } from "react";
 import type { AssistantFormState, ConnectionState } from "@/app/(app)/settings/actions";
 import { submitWith } from "@/lib/use-form-action";
+import { useHydrated } from "@/lib/use-hydrated";
 import { useMessages } from "@/components/language";
+import { useUnsaved } from "@/components/unsaved";
 
 /** The providers offered; the one that is not a name is said in the catalog. */
 const PROVIDERS: { kind: ProviderKind; name: string | null }[] = [
@@ -22,6 +24,9 @@ const PRESETS = [
   { label: "LiteLLM", url: "http://localhost:4000" },
 ];
 
+/** Emptied once saved: a saved key is never shown again, and the box to remove it starts unticked. */
+const EMPTIED_ONCE_SAVED = ["apiKey", "removeKey"] as const;
+
 const segmentedOption =
   "pointer-events-none flex min-h-10 items-center rounded-pill px-4 text-[0.9375rem] font-medium text-ink-2 transition-colors duration-300 peer-hover:bg-wash peer-checked:bg-ink peer-checked:text-paper peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-ink";
 
@@ -36,9 +41,10 @@ export function AssistantForm({
   test: (state: ConnectionState) => Promise<ConnectionState>;
   rehearsal: boolean;
 }) {
-  const { form: F, test: T } = useMessages().settings;
+  const { form: F, test: T, unsaved: U } = useMessages().settings;
   const connectionProblems: Record<string, string> = T.problems;
   const [state, saveAction, saving] = useActionState(save, { saved: false, problems: {} });
+  const hydrated = useHydrated();
   const [connection, testAction, testing] = useActionState(test, {
     tested: false,
     ok: false,
@@ -49,6 +55,7 @@ export function AssistantForm({
   const [baseUrl, setBaseUrl] = useState(settings.baseUrl ?? "");
   const label = (option: (typeof PROVIDERS)[number]) => option.name ?? F.compatible;
   const current = PROVIDERS.find((p) => p.kind === provider)!;
+  const formRef = useRef<HTMLFormElement>(null);
   const keyRef = useRef<HTMLInputElement>(null);
   const removeRef = useRef<HTMLInputElement>(null);
   // A saved key leaves the page: the field is emptied once it is stored.
@@ -57,10 +64,20 @@ export function AssistantForm({
     if (keyRef.current) keyRef.current.value = "";
     if (removeRef.current) removeRef.current.checked = false;
   }, [state]);
+  // After the effect above, so the guard reads the form as a save leaves it.
+  useUnsaved(formRef, U.assistant, state.saved ? state : null, EMPTIED_ONCE_SAVED);
 
   return (
     <div className="space-y-10">
-      <form onSubmit={submitWith(saveAction)} className="space-y-8" aria-label={F.label}>
+      {/* A post, and a Save that waits for the page to be alive: the key never travels in an address. */}
+      <form
+        ref={formRef}
+        method="post"
+        action="/settings"
+        onSubmit={submitWith(saveAction)}
+        className="space-y-8"
+        aria-label={F.label}
+      >
         <fieldset className="min-w-0 border-0 p-0">
           <legend className="p-0 text-label font-medium text-ink">{F.provider}</legend>
           <div className="mt-3 inline-flex max-w-full flex-wrap gap-1 rounded-[26px] border border-rule bg-paper p-1">
@@ -173,7 +190,7 @@ export function AssistantForm({
         </div>
 
         <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
-          <Button type="submit" disabled={saving}>
+          <Button type="submit" disabled={!hydrated || saving}>
             {F.save}
           </Button>
           {state.saved ? (

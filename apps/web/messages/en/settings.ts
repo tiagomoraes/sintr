@@ -129,6 +129,13 @@ export const settings = {
     save: "Save",
     saved: "Saved.",
   },
+  /** What is not saved yet, as the question before leaving names it inside `shell.unsaved.changes`. */
+  unsaved: {
+    timezone: "the time zone",
+    retention: "how long to keep conversations",
+    assistant: "the assistant",
+    language: "the language",
+  },
   /** Said by the forms when something they were given cannot be kept. */
   problems: {
     provider: "Choose a provider.",
