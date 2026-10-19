@@ -38,7 +38,7 @@ export function middleware(request: NextRequest) {
   // A form posted without JavaScript carries `Origin: null` under `Referrer-Policy: no-referrer`, and
   // Next's server actions refuse a post whose origin they cannot read. When the browser's own
   // Sec-Fetch-Site, which no page can set, says the post came from this site, it is given this site's
-  // origin, the host Next compares it with: the check of the language route (DECISIONS 98 and 121).
+  // origin, the host Next compares it with: the check of the language route (DECISIONS 98 and 135).
   if (request.headers.get("origin") === "null" && request.headers.get("sec-fetch-site") === "same-origin") {
     const host =
       request.headers.get("x-forwarded-host")?.split(",")[0]?.trim() || request.headers.get("host");

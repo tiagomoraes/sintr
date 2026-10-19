@@ -105,7 +105,7 @@ The owner's decision: on "Connect another assistant" the button that made the ke
 
 **Without JavaScript** a key is made, shown once and its steps read the same way.
 
-The reasons are in DECISIONS 116 to 121.
+The reasons are in DECISIONS 130 to 135.
 
 ## Voice and users
 
