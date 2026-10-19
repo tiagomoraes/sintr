@@ -5,6 +5,7 @@ import type { ReactNode } from "react";
 import type { AssistantFormState, ConnectionState } from "@/app/(app)/settings/actions";
 import { counted, formatNext } from "@/lib/plan";
 import type { AssistantState } from "@/lib/server/assistant";
+import type { MemoryState } from "@/lib/server/memory";
 import type { VoiceView } from "@/lib/voice/view";
 import { currentLanguage, getMessages } from "@/lib/server/language";
 import { AssistantForm } from "./assistant-form";
@@ -52,9 +53,12 @@ export async function AssistantSection({
   back,
   rehearsal,
   voice,
+  memory,
 }: {
   /** Speaking: who writes it down, or why it is not on offer. */
   voice: VoiceView;
+  /** Whether the assistant remembers the person (Memory says the rest). */
+  memory: MemoryState["kind"];
   state: AssistantState;
   settings: AgentSettings;
   /** Arrived through "Use your own key". */
@@ -75,6 +79,15 @@ export async function AssistantSection({
         ? t.voice.limit(formatNext(voice.next, (await currentLanguage()).code))
         : t.voice.unavailable[voice.reason](voice.provider);
   const voiceLine = speaking ? <p className="mt-3 text-[0.9375rem] text-ink-2">{speaking}</p> : null;
+  const memoryLine =
+    memory === "unavailable" ? null : (
+      <p className="mt-3 text-[0.9375rem] text-ink-2">
+        {t.settings.memory[memory]}{" "}
+        <Link href="/memory" className={linkStyles}>
+          {t.settings.memory.link}
+        </Link>
+      </p>
+    );
 
   if (state.kind === "house") {
     const { messages, plan } = state;
@@ -82,6 +95,7 @@ export async function AssistantSection({
       <>
         <p className="mt-3 text-ink-2">{S.included(state.name)}</p>
         {voiceLine}
+        {memoryLine}
         <p className="mt-3 text-ink-2">
           {S.plan(S.plans[plan.id])}
           {messages.limit === null
@@ -108,6 +122,7 @@ export async function AssistantSection({
           {S.own(providerName(settings, S.endpoint), state.model, state.house)}
         </p>
         {voiceLine}
+        {memoryLine}
         {state.house ? (
           <form action={back} className="mt-5 flex flex-wrap items-center gap-x-5 gap-y-2">
             <Button type="submit" variant="outline" size="sm">

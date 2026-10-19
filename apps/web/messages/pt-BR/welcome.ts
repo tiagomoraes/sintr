@@ -23,7 +23,7 @@ export const welcome = {
   },
   name: {
     heading: "Como devo chamar você?",
-    body: "Só para cumprimentar você aqui. Isso nunca é enviado ao assistente e nunca aparece em um relatório.",
+    body: "Para cumprimentar você aqui e, se você ligar a memória, para o seu assistente chamar você assim. Nunca aparece em um relatório.",
     label: "Seu nome, ou o nome que você prefere",
     placeholder: "Seu nome",
     tooLong: "Use no máximo 80 caracteres.",

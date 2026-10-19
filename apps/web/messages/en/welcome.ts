@@ -14,7 +14,7 @@ export const welcome = {
   },
   name: {
     heading: "What should I call you?",
-    body: "Only to greet you here. It is never sent to the assistant and never printed on a report.",
+    body: "To greet you here, and for your assistant to call you by it if you turn on its memory. It is never printed on a report.",
     label: "Your name, or what you like to be called",
     placeholder: "Your name",
     tooLong: "Use at most 80 characters.",

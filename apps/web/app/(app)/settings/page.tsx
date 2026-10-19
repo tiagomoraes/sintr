@@ -9,6 +9,7 @@ import { LanguageSection } from "@/components/settings/language-section";
 import { PreferencesForm } from "@/components/settings/preferences-form";
 import { assistantState } from "@/lib/server/assistant";
 import { workingKeys } from "@/lib/server/keys";
+import { memoryStateFor } from "@/lib/server/memory";
 import { requireScope, runtime } from "@/lib/server/runtime";
 import { voiceView } from "@/lib/server/voice";
 import { getMessages } from "@/lib/server/language";
@@ -29,7 +30,7 @@ export default async function SettingsPage({
   const S = t.settings;
   const { scope } = await requireScope();
   // Only what may be shown: the key is reduced to a hint on the server.
-  const [settings, assistant, profile, account, params, keys, practice, voice] = await Promise.all([
+  const [settings, assistant, profile, account, params, keys, practice, voice, memory] = await Promise.all([
     scope.agentSettings.get(),
     assistantState(scope),
     scope.profile.get(),
@@ -38,6 +39,7 @@ export default async function SettingsPage({
     workingKeys(scope),
     scope.practice.get(),
     voiceView(scope),
+    memoryStateFor(scope),
   ]);
   const timezones = TIMEZONES.includes(profile.timezone) ? TIMEZONES : [profile.timezone, ...TIMEZONES];
 
@@ -56,6 +58,7 @@ export default async function SettingsPage({
         </h2>
         <AssistantSection
           voice={voice}
+          memory={memory.kind}
           state={assistant}
           settings={settings}
           openDoor={params.key === "own"}
