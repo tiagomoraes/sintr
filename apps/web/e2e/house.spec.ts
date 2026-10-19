@@ -1,7 +1,18 @@
 import { expect, test, type Page } from "@playwright/test";
 import postgres from "postgres";
 import { startFakeStripe, type FakeStripe } from "./fake-stripe";
-import { closeCore, core, currentUserId, newEmail, newKey, say, signUp, signUpQuietly } from "./support";
+import {
+  ASSISTANT,
+  REPORT,
+  closeCore,
+  core,
+  currentUserId,
+  newEmail,
+  newKey,
+  say,
+  signUp,
+  signUpQuietly,
+} from "./support";
 
 /**
  * F5, end to end, on a server configured as the hosted app runs: a house
@@ -82,12 +93,12 @@ test.describe("the house assistant", () => {
       .getByRole("article", { name: "Draft entry, waiting for you" })
       .getByRole("button", { name: "Confirm" })
       .click();
-    await expect(page.getByRole("article", { name: "Saved entry" })).toBeVisible();
+    await expect(page.getByRole("article", { name: "Saved entry" })).toBeVisible(ASSISTANT);
 
     // The report, written by the assistant from that entry.
     await page.getByRole("link", { name: "Reports", exact: true }).click();
     await page.getByRole("button", { name: "Prepare this week's report" }).click();
-    await expect(page).toHaveURL(/\/reports\/[0-9a-f-]{36}$/);
+    await expect(page).toHaveURL(/\/reports\/[0-9a-f-]{36}$/, REPORT);
     await expect(page.getByText("I am going to let everyone down").first()).toBeVisible();
     await expect(page.getByText(/sintr prepared what it can on its own/)).toHaveCount(0);
 
@@ -177,11 +188,11 @@ test.describe("the house assistant", () => {
     await expect(box).toHaveAttribute("placeholder", "Write what happened");
     await box.fill(SITUATION);
     await box.press("Enter");
-    await expect(page.getByText(/so I cannot answer this one\. Your words are kept/)).toBeVisible();
+    await expect(page.getByText(/so I cannot answer this one\. Your words are kept/)).toBeVisible(ASSISTANT);
     const card = page.getByRole("article", { name: "Draft entry, waiting for you" });
-    await expect(card.getByText(SITUATION)).toBeVisible();
+    await expect(card.getByText(SITUATION)).toBeVisible(ASSISTANT);
     await card.getByRole("button", { name: "Confirm" }).click();
-    await expect(page.getByRole("article", { name: "Saved entry" })).toBeVisible();
+    await expect(page.getByRole("article", { name: "Saved entry" })).toBeVisible(ASSISTANT);
     const scope = await core().repositories.forUser(userId);
     expect((await scope.entries.list())[0]).toMatchObject({ situation: SITUATION });
     expect(await usage(userId)).toEqual({ messages: 100, reports: 0 });
@@ -197,7 +208,7 @@ test.describe("the house assistant", () => {
     await page.goto("/reports");
     await expect(page.getByText(/This month's reports written by the assistant are used/)).toBeVisible();
     await page.getByRole("button", { name: "Prepare this week's report" }).click();
-    await expect(page).toHaveURL(/\/reports\/[0-9a-f-]{36}$/);
+    await expect(page).toHaveURL(/\/reports\/[0-9a-f-]{36}$/, REPORT);
     await expect(page.getByText(/reports written by the assistant are used on your plan/)).toBeVisible();
     await expect(page.getByText(SITUATION).first()).toBeVisible();
   });

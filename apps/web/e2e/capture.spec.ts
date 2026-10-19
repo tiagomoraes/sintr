@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { expect, test, type Page } from "@playwright/test";
 import postgres from "postgres";
 import {
+  ASSISTANT,
   closeCore,
   core,
   currentUserId,
@@ -138,7 +139,7 @@ test.describe("the capture conversation", () => {
 
     await card.getByRole("button", { name: "Confirm" }).click();
     const saved = page.getByRole("article", { name: "Saved entry" });
-    await expect(saved.getByText("Saved to your entries.")).toBeVisible();
+    await expect(saved.getByText("Saved to your entries.")).toBeVisible(ASSISTANT);
     expect(await scope.entries.count()).toBe(1);
     const [entry] = await scope.entries.list();
     expect(entry).toMatchObject({
@@ -152,7 +153,7 @@ test.describe("the capture conversation", () => {
 
     // The conversation and its decision survive a reload.
     await page.reload();
-    await expect(page.getByRole("article", { name: "Saved entry" })).toBeVisible();
+    await expect(page.getByRole("article", { name: "Saved entry" })).toBeVisible(ASSISTANT);
 
     // The timeline lists it and opens it.
     await page.getByRole("link", { name: "Entries", exact: true }).click();
@@ -224,7 +225,7 @@ test.describe("the capture conversation", () => {
     await say(page, "salva", "Saved. It is in your diary now");
     await expect(
       page.getByRole("article", { name: "Saved check-in" }).getByText("Saved to your check-ins."),
-    ).toBeVisible();
+    ).toBeVisible(ASSISTANT);
     expect(await scope.checkins.list()).toEqual([
       expect.objectContaining({ mood: 3, energy: 2, anxiety: null, sleepHours: 6.5 }),
     ]);

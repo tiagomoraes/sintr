@@ -77,12 +77,23 @@ export async function setUpAssistant(page: Page, key: string = newKey()): Promis
   return key;
 }
 
+/**
+ * How long a step that waits on the assistant may take: a reply, a draft (two model steps and the
+ * draft's checks before it is stored), a transcript, a confirmed draft being saved. Playwright's
+ * default is 5 s, meant for a change on the screen; on a busy runner the rehearsal model's round trip
+ * alone can take longer, and the test would fail while only waiting.
+ */
+export const ASSISTANT = { timeout: 30_000 } as const;
+
+/** Preparing a report: the digest, the model's draft and its checks, the page. */
+export const REPORT = { timeout: 60_000 } as const;
+
 /** Send one message in the conversation and wait for the assistant's reply. */
 export async function say(page: Page, text: string, reply: string | RegExp): Promise<void> {
   const box = page.getByLabel("Your message");
   await box.fill(text);
   await box.press("Enter");
-  await expect(page.getByRole("log").getByText(reply).last()).toBeVisible();
+  await expect(page.getByRole("log").getByText(reply).last()).toBeVisible(ASSISTANT);
 }
 
 /**

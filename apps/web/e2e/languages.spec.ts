@@ -1,7 +1,9 @@
 import { parseContent } from "@sintr/core";
 import { expect, test, type Browser, type Page } from "@playwright/test";
 import {
+  ASSISTANT,
   PASSWORD,
+  REPORT,
   closeCore,
   core,
   currentUserId,
@@ -92,14 +94,14 @@ test.describe("in Portuguese, from the browser", () => {
     const box = page.getByLabel("Sua mensagem");
     await box.fill("Na reunião de segunda, meu chefe perguntou do prazo na frente de todo mundo.");
     await box.press("Enter");
-    await expect(page.getByRole("log").getByText(/What went through your mind/u)).toBeVisible();
+    await expect(page.getByRole("log").getByText(/What went through your mind/u)).toBeVisible(ASSISTANT);
     await box.fill("Pensei: vou decepcionar todo mundo. Ansiedade 80, vergonha 60.");
     await box.press("Enter");
     const draft = page.getByRole("article", { name: "Rascunho de registro, esperando por você" });
-    await expect(draft.getByText("vou decepcionar todo mundo")).toBeVisible();
+    await expect(draft.getByText("vou decepcionar todo mundo")).toBeVisible(ASSISTANT);
     await expect(draft.getByText("80 de 100")).toBeVisible();
     await draft.getByRole("button", { name: "Confirmar" }).click();
-    await expect(page.getByRole("article", { name: "Registro salvo" })).toBeVisible();
+    await expect(page.getByRole("article", { name: "Registro salvo" })).toBeVisible(ASSISTANT);
 
     const userId = await currentUserId(page);
     const scope = await core().repositories.forUser(userId);
@@ -120,7 +122,7 @@ test.describe("in Portuguese, from the browser", () => {
     await page.goto("/reports");
     await expect(page.getByRole("heading", { level: 1, name: "Relatórios" })).toBeVisible();
     await page.getByRole("button", { name: "Preparar agora" }).click();
-    await expect(page).toHaveURL(/\/reports\/[0-9a-f-]+$/u, { timeout: 30_000 });
+    await expect(page).toHaveURL(/\/reports\/[0-9a-f-]+$/u, REPORT);
     const paper = page.getByRole("article", { name: "O relatório" });
     await expect(paper.getByRole("heading", { name: "Como foi a semana" })).toBeVisible();
     const [report] = await scope.reports.recent();
@@ -150,7 +152,7 @@ test.describe("the person's own choice", () => {
     const box = page.getByLabel("Sua mensagem");
     await box.fill("eu quero morrer");
     await box.press("Enter");
-    await expect(page.getByRole("log").getByText(/Que bom que você me contou/u)).toBeVisible();
+    await expect(page.getByRole("log").getByText(/Que bom que você me contou/u)).toBeVisible(ASSISTANT);
     const help = page.getByRole("region", { name: "Ajuda de uma pessoa, agora" });
     await expect(
       help.getByRole("link", { name: "Ligar para CVV, Centro de Valorização da Vida, 188" }),

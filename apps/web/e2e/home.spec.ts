@@ -2,6 +2,7 @@ import { expect, test, type Page } from "@playwright/test";
 import postgres from "postgres";
 import { startFakeStripe, type FakeStripe } from "./fake-stripe";
 import {
+  ASSISTANT,
   closeCore,
   core,
   currentUserId,
@@ -76,7 +77,7 @@ test.describe("the home, by writing", () => {
       .getByRole("article", { name: "Draft entry, waiting for you" })
       .getByRole("button", { name: "Confirm" })
       .click();
-    await expect(page.getByRole("article", { name: "Saved entry" })).toBeVisible();
+    await expect(page.getByRole("article", { name: "Saved entry" })).toBeVisible(ASSISTANT);
     await expect(mood(page)).toHaveAttribute("data-mood", "resting");
     const [entry] = await (await core().repositories.forUser(await currentUserId(page))).entries.list();
     expect(entry).toMatchObject({ situation: "The meeting on Monday went badly." });
@@ -115,7 +116,9 @@ test.describe("the home, by voice", () => {
     });
     // While it listens, it says who will write it down.
     await speak(page, "What you say is written down by OpenRouter");
-    await expect(page.getByText("Here is what I heard. Change anything, then send it.")).toBeVisible();
+    await expect(page.getByText("Here is what I heard. Change anything, then send it.")).toBeVisible(
+      ASSISTANT,
+    );
     const box = page.getByLabel("Your message");
     await expect(box).toHaveValue(HEARD);
     await expect(mood(page)).toHaveAttribute("data-mood", "resting");
@@ -128,13 +131,13 @@ test.describe("the home, by voice", () => {
     // The person reads it, changes a word, and sends it: from here it is a conversation like any other.
     await box.fill(HEARD.replace("Monday", "Monday morning"));
     await box.press("Enter");
-    await expect(page.getByRole("log").getByText(QUESTION).last()).toBeVisible();
+    await expect(page.getByRole("log").getByText(QUESTION).last()).toBeVisible(ASSISTANT);
     await say(page, THOUGHTS, DRAFTED);
     await page
       .getByRole("article", { name: "Draft entry, waiting for you" })
       .getByRole("button", { name: "Confirm" })
       .click();
-    await expect(page.getByRole("article", { name: "Saved entry" })).toBeVisible();
+    await expect(page.getByRole("article", { name: "Saved entry" })).toBeVisible(ASSISTANT);
     const [entry] = await scope.entries.list();
     expect(entry?.situation).toBe(HEARD.replace("Monday", "Monday morning"));
   });
@@ -238,7 +241,7 @@ test.describe("speaking on the house", () => {
     const userId = await currentUserId(page);
     await page.goto("/home");
     await speak(page);
-    await expect(page.getByLabel("Your message")).toHaveValue(HEARD);
+    await expect(page.getByLabel("Your message")).toHaveValue(HEARD, ASSISTANT);
     // Written down on the house's own transcription endpoint (its key never on a page), and counted.
     const seconds = await spokenSeconds(userId);
     expect(seconds).toBeGreaterThan(0);
