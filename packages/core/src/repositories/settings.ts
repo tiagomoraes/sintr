@@ -59,7 +59,10 @@ export function profileRepository({ db, userId, cipher }: ScopeContext) {
         .values({ userId, onboardedAt: now })
         .onConflictDoUpdate({
           target: profiles.userId,
-          set: { onboardedAt: sql`coalesce(${profiles.onboardedAt}, excluded.onboarded_at)`, updatedAt: new Date() },
+          set: {
+            onboardedAt: sql`coalesce(${profiles.onboardedAt}, excluded.onboarded_at)`,
+            updatedAt: new Date(),
+          },
         })
         .returning();
       return decode(row!);
