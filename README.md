@@ -15,11 +15,13 @@ There is no filesystem dependency: the ledger lives in Postgres, encrypted per p
 
 ## Where it is today
 
-Milestones **F0, the foundation**, **F1, capture**, **F2, the weekly report**, **F3, connect your agent**, and **F4, the therapist** (see [`docs/PRODUCT.md`](docs/PRODUCT.md) for the milestones). What works:
+Milestones **F0, the foundation**, **F1, capture**, **F2, the weekly report**, **F3, connect your agent**, **F4, the therapist**, and **F5, the house model and the plan** (see [`docs/PRODUCT.md`](docs/PRODUCT.md) for the milestones). What works:
 
 - sign up (email, password and the health data consent) and sign in, with Argon2id passwords and sliding sessions;
 - **talking to the assistant inside sintr**: tell it what happened, it acknowledges, asks a question or two and drafts a thought record in your own words, which you confirm, edit or discard. Nothing becomes an entry until you say so (the Confirm button, or "salva");
-- **bring your own key**: an OpenAI-compatible endpoint (OpenAI, OpenRouter, a local Ollama or LiteLLM), Anthropic or Google, with the key encrypted like your diary and never shown again;
+- **the house assistant**: an installation can run on its own provider, model and key (`SINTR_HOUSE_*`), so a new person signs up, talks and gets a report without ever opening Settings; Settings says the assistant is included and who receives the words;
+- **bring your own key**, behind a small door in Settings ("Use your own key instead"), or as the way in on a self-host without a house assistant: an OpenAI-compatible endpoint (OpenAI, OpenRouter, a local Ollama or LiteLLM), Anthropic or Google, with the key encrypted like your diary and never shown again, and nothing of it counted toward a plan;
+- **plans**: Free (100 messages with the assistant and 4 reports written by it a month) and Personal (600 and 12) for a person, seats for a practice, with a calm plan screen that says what you have and what you used this month. At the limit nothing is lost: what you write is kept as a draft entry in your words, check-ins and the report keep working, and the help lines never depend on a plan. Plans are given by configuration and `make person-plan`, or bought through Stripe once it is configured ([`docs/OPS.md`](docs/OPS.md));
 - **the crisis protocol**: a message that signals acute risk stops the diary and points to human help (CVV 188, SAMU 192), before any model is called;
 - **quick check-ins** (mood, energy, anxiety, sleep, a note) without the conversation;
 - **the timeline** of entries and check-ins, with a detail view; changing a saved record keeps a dated correction with what it said before;
@@ -35,7 +37,7 @@ Milestones **F0, the foundation**, **F1, capture**, **F2, the weekly report**, *
 - the full data model in Postgres, every sensitive field encrypted before it is stored, and tests that prove one person cannot read another's data;
 - the self-host stack (Caddy, app, worker, Postgres) behind one command.
 
-Not yet: the hosted offer with payments and the public landing page, export, deletion and the audit view in the UI (F5), and OAuth for MCP clients.
+Not yet: real charges (Stripe is written and off until configured; [`docs/OPS.md`](docs/OPS.md) lists what is missing), the public landing page, export, deletion and the audit view in the UI, and OAuth for MCP clients.
 
 ## Self-host
 
@@ -47,7 +49,7 @@ cd sintr-app
 make selfhost-up
 ```
 
-The first run writes `.env` with fresh secrets, builds the image and starts the stack. Open `http://localhost:3000`, create your account, and choose your assistant's provider and key in Settings. To send reports by email, fill in the `SINTR_SMTP_*` lines of `.env` and run `make selfhost-up` again. `make selfhost-down` stops it and keeps your data.
+The first run writes `.env` with fresh secrets, builds the image and starts the stack. Open `http://localhost:3000`, create your account, and choose your assistant's provider and key in Settings (or give the installation a house assistant in `.env`: see [`docs/SELFHOST.md`](docs/SELFHOST.md)). To send reports by email, fill in the `SINTR_SMTP_*` lines of `.env` and run `make selfhost-up` again. `make selfhost-down` stops it and keeps your data.
 
 Back up `SINTR_MASTER_KEY` from `.env` somewhere other than the database backup: without it nothing can be read, and with it next to the database the encryption protects nothing. [`docs/SELFHOST.md`](docs/SELFHOST.md) covers a public domain with TLS, closing sign-up, backups and upgrades.
 
@@ -67,12 +69,13 @@ make db-generate  # write a new SQL migration after a schema change (NAME=...)
 make report-assets # re-embed the report's fonts and light after changing them
 make mcp-bridge   # bundle the stdio bridge for local MCP clients (also part of make build)
 make practice-plan EMAIL=... SEATS=10  # give one practice its seats (unlimited by default on a self-host)
+make person-plan EMAIL=... PLAN=personal  # give one person a plan (with a house assistant)
 make help         # everything else
 ```
 
 The app serves `http://localhost:3000`. Each checkout gets its own dev database container on `127.0.0.1`, at the port in `SINTR_DEV_DB_PORT`, so worktrees do not share data.
 
-The assistant talks to the provider saved in Settings. To try the app without a key, set `SINTR_FAKE_AGENT=1` in `.env` and run `make dev`: replies (and reports) then come from a scripted, offline assistant, and the page says so. `make test` always runs that way; no test reaches a real model or a mail server: email goes to an in-memory transport or an outbox directory, and the report PDF is printed by the Chromium that `make setup` installs.
+The assistant talks to the provider saved in Settings, or to the house assistant when `SINTR_HOUSE_*` is set. To try the app without a key, set `SINTR_FAKE_AGENT=1` in `.env` and run `make dev`: replies (and reports) then come from a scripted, offline assistant, and the page says so. `make test` always runs that way; no test reaches a real model, Stripe or a mail server: email goes to an in-memory transport or an outbox directory, payments to a fake Stripe on the machine, and the report PDF is printed by the Chromium that `make setup` installs.
 
 ## Repository
 
@@ -89,17 +92,20 @@ packages/
   core/       domain (Zod), Postgres schema and migrations (Drizzle), envelope
               encryption, user-scoped repositories, Better Auth, the redacting
               logger, the report (periods, digest, checks, the document and its
-              PDF), the email transport, practices, invites, links and sharing
+              PDF), the email transport, practices, invites, links and sharing,
+              plans, the assistant's monthly meter and payments (Stripe)
   ui/         the sintr design system: tokens, fonts, shadcn/ui components
   agent/      the embedded assistant: the capture conversation and the report
               writer (Vercel AI SDK), bring-your-own-key providers, the crisis
-              protocol, the checks that keep drafts in the person's words, an
-              offline test model
+              protocol, the checks that keep drafts in the person's words, the
+              choice between the house assistant and the person's key, the
+              monthly meter, an offline test model and a fake endpoint
   mcp/        the MCP server: six tools, the instructions given to a connected
               agent, the stateless HTTP endpoint the app mounts at /mcp,
               and the stdio bridge for local clients (sintr-mcp.mjs)
 docker/       the self-host stack (compose, Caddy) and the dev database
-docs/         product, conventions, design, self-host, privacy, decisions
+docs/         product, conventions, design, self-host, operations, privacy,
+              decisions
 ```
 
 Conventions for anyone (or any agent) working here are in [`docs/CONVENTIONS.md`](docs/CONVENTIONS.md); the visual system is [`docs/DESIGN.md`](docs/DESIGN.md); the trade-offs taken so far are in [`docs/DECISIONS.md`](docs/DECISIONS.md).

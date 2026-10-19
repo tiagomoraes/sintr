@@ -17,18 +17,31 @@ The unit of trust is one **link between one person and one practice**: accepted 
 
 **Self-host (open source, AGPL-3.0)**
 - Install with one command (Docker Compose: app + Postgres).
-- Bring your own LLM key (Anthropic, OpenAI, Google, OpenRouter) or run a local model via Ollama.
+- Bring your own LLM key (Anthropic, OpenAI, Google, OpenRouter) or run a local model via Ollama; or give the installation a house assistant (one provider, model and key in the environment) that everyone on it uses.
 - Talk to the assistant inside the app and/or connect your own agent over MCP.
 - Data stays on the person's machine. Our infrastructure cost: zero.
 - Same code as the SaaS, differentiated by environment flags. Nothing is rebuilt separately.
 
 **Hosted (SaaS)**
 - Login, multi-tenant, database encrypted at the application layer.
-- Free and Pro tiers (billing added later; not in the first milestones).
+- The assistant is included: the installation runs on its own key (the house assistant), so a person never has to paste one. Bringing your own key stays possible, behind a small door in Settings.
+- Plans pay for it: Free and Personal for a person, the Practice plan (seats) for a therapist. Payments through Stripe, behind configuration.
 - The person submits as they go (web or MCP inside the agent they already use); we store it; at the end of the period we generate the report and send it to the therapist with approval.
 - Zero-data-retention providers on the managed path.
 - Two entry surfaces: **MCP** into the agent they already use, and an **embedded agent** inside the app.
 - Web first; mobile later.
+
+## The house model and the plan (F5)
+
+The owner's decision: nobody should have to paste an API key to use sintr. The installation runs on its own key, the house assistant, and the subscription pays for it. Bringing your own key stays possible as a small door for whoever wants it (free here, private to their provider, at their own risk); it is never the main path. A self-host without a house key works as before, on the person's own key.
+
+**What a person does in their first five minutes.** They sign up with an email, a password and the consent, and land in their diary, which offers one thing: "Talk it through". Talk opens on "Tell me what happened." with one line under the box: the assistant is included in their plan. They write what happened; the assistant answers, asks a narrow question or two and drafts an entry in their own words; they confirm it. If they tell Therapy when their sessions are, the report is prepared before each one; otherwise "Prepare this week's report" makes one now. Nothing in those five minutes asks for a provider, a key or a card, and nothing needs Settings.
+
+**What the plan screen says to someone who never pays.** That their diary is the same on every plan, and a plan is only about how much of the assistant they can use. "You are on Free. 100 messages with the assistant and 4 reports written by it, each month." Then this month in two plain lines (23 of 100, 1 of 4) and what happens when they run out: nothing is lost; they can still write in Talk, and what they write is kept as a draft entry in their own words; check-ins and the report keep working, made from what they wrote; the count starts again on the first of the month. Then, once: Personal, its numbers and its price, and the other way on, their own key. No feature matrix, no countdown, no colour, no email. Someone who never pays keeps a diary for as long as they want, with a little of the assistant every month, and nothing they wrote is ever behind the plan.
+
+**What the therapist's plan means.** Seats: one for each patient linked to the practice, or invite waiting for an answer, as F4 counted them. A hosted practice starts with one free seat, to try sintr with one patient. The Practice plan is as many seats as the therapist chooses, paid per seat, and it includes the assistant for the therapist's own diary, as Personal does. It does not pay for the patients' plans and shows nobody's use: what a person has never depends on sharing with their therapist, so stopping sharing never costs them anything.
+
+The numbers, and why, are in DECISIONS 72; the limit's behaviour in 76 to 78; the practice plan in 79.
 
 ## Voice and users
 
@@ -74,7 +87,7 @@ sintr-app/
 - **Agent**: `conversations`, `messages` (configurable retention)
 - **Integration**: `api_tokens` (MCP, scoped and revocable), `audit_log`
 - **Sharing (F4)**: `practices` (the professional's names, plan and seats), `invites` (codes both ways, expiring), `links` (one person and one practice, with its own key), `shared_reports` (sealed copies of approved reports), `notifications` (kinds and ids)
-- **Commercial**: `consents` (versioned consent log); seats live on `practices` (granted by configuration until a payment provider); `subscriptions` and `usage_counters` arrive with billing
+- **Commercial**: `consents` (versioned consent log); seats live on `practices` (from configuration, a grant or a subscription); `subscriptions` (a person's plan and a practice's, granted or paid, with the payment provider's ids); `usage_counters` (the house assistant's messages, reports and audio minutes, per person and month)
 
 Columns holding sensitive content are flagged for **application-layer encryption**. Every table carries an indexed, mandatory `user_id` scope.
 
@@ -102,7 +115,7 @@ Columns holding sensitive content are flagged for **application-layer encryption
 6. Connect an external agent (MCP token flow).
 7. Review history and insights.
 8. Export / delete data (LGPD).
-9. Subscribe / manage a plan (later).
+9. See your plan and this month's use of the assistant; subscribe, change seats or cancel on Stripe's pages.
 10. Self-host: install, configure BYOK, use.
 11. The therapist receives the report by email (no account in the product), or in their practice on sintr.
 12. Give your therapist access: invite them, or accept their invite; choose "ask me for each report" or "send what I approve"; see when they opened a report; stop sharing in one action.
@@ -112,7 +125,7 @@ Columns holding sensitive content are flagged for **application-layer encryption
 ## Non-functional requirements
 
 - One codebase for self-host and SaaS (environment flags).
-- Free tier bounded (to define when billing arrives).
+- Free tier bounded: 100 messages and 4 reports by the assistant a month (DECISIONS 72), never a limit on the diary itself.
 - Future vision: optional E2EE with a user-held key (zero-knowledge). Recorded, not built now.
 - App i18n (the site already carries 8 languages).
 - Accessibility and light performance.
@@ -124,7 +137,9 @@ Columns holding sensitive content are flagged for **application-layer encryption
 - **F2 Report**: digest, generation, preview, PDF, approval, email send.
 - **F3 MCP**: MCP server + tokens + connection docs (Claude Desktop, ChatGPT, Gemini).
 - **F4 The therapist**: practices on one account kind, invites both ways with double opt-in, the link with its consent and revocation, sharing approved reports, the therapist's dashboard, seats by configuration, notifications, audit in both accounts.
-- **F5 Hosted and hardening**: a payment provider for seats, the public landing page, multi-tenant hardening, free tier limits, app on the domain, deploy to the VPS; LGPD (export/delete), the audit view, retention, MFA, docs.
+- **F5 The house model and the plan**: the house assistant configured on the server and used by default, bring your own key behind a small door, plans and entitlements for both sides with a monthly meter, the plan screen, the subscription modelled with Stripe behind configuration, limits that never hold the diary hostage.
+- **F6 The narrative home** (next): the narrative onboarding and the agentic home, built on F5.
+- **Later**: the public landing page, multi-tenant hardening, app on the domain and the deploy, LGPD export and delete in the UI, the audit view, MFA.
 
 Each milestone is delivered by an Orca/Claude Code session (`claude-opus-5-5 --effort xhigh`) with its own brief, branch, PR, and verification.
 
@@ -132,7 +147,7 @@ Each milestone is delivered by an Orca/Claude Code session (`claude-opus-5-5 --e
 
 1. **Domain**: `app.sintr.tiagomoraes.cloud` now; a dedicated sintr domain later.
 2. **Hosting**: this VPS for now; keep it deployable to Railway or AWS (Terraform) later.
-3. **Billing**: none in the first milestones. Self-host + free, subscription later.
+3. **Billing**: none in the first milestones; from F5, the house assistant is paid by plans (Free, Personal, Practice), with Stripe behind configuration. Self-host stays free, on the person's own key or a house assistant of its own.
 4. **Licence**: AGPL-3.0 for the app; the pack stays MIT.
 5. **Repository**: a new repo `tiagomoraes/sintr-app`; the pack stays isolated and the app talks to it over MCP.
 
@@ -140,5 +155,5 @@ Each milestone is delivered by an Orca/Claude Code session (`claude-opus-5-5 --e
 
 - **Scope**: a full SaaS is big; mitigate with incremental-value milestones (self-host + F1/F2 is already a useful product).
 - **Sensitive data**: application-layer encryption complicates search and aggregation; mitigate by encrypting free text and keeping aggregable metadata (dates, 0-100 scales) in the clear.
-- **LLM cost**: the free tier needs a ceiling; BYOK when self-hosted removes that cost.
+- **LLM cost**: the house key pays for every conversation that does not bring its own; the monthly meter bounds it per person (DECISIONS 72 and 75), and BYOK removes it.
 - **Pack vs app divergence**: keep the pack as an optional MCP client so the two do not fragment.
