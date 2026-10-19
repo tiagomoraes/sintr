@@ -110,6 +110,58 @@ test.describe("the welcome", () => {
     await expect(page.getByText("Dr. Lima. Reports stay with you, to download and bring.")).toBeVisible();
   });
 
+  test("runs again from Settings over the answers given, and skipping erases nothing", async ({ page }) => {
+    await createDiary(page, newEmail("welcome-again"));
+    const scope = await core().repositories.forUser(await currentUserId(page));
+    await page.getByRole("button", { name: "Begin" }).click();
+    await page.getByLabel("Your name, or what you like to be called").fill("Bia");
+    await page.getByRole("button", { name: "Continue" }).click();
+    await page.getByLabel("Your therapist's name").fill("Dr. Lima");
+    await page.getByRole("button", { name: "Continue" }).click();
+    await page.getByRole("radio", { name: "Tuesdays" }).check();
+    await page.getByLabel("Time").fill("18:00");
+    await page.getByRole("button", { name: "Continue" }).click();
+    await page.getByRole("button", { name: "Go to my diary" }).click();
+    await expect(page).toHaveURL(/\/home$/);
+    await scope.entries.create({ situation: "Something I wrote before running the welcome again." });
+
+    // One line in Settings, in the welcome's own voice.
+    await page.goto("/settings");
+    await expect(page.getByText(/nothing you have written is erased/)).toBeVisible();
+    await page.getByRole("link", { name: "Go through the welcome again" }).click();
+    await expect(page.getByRole("heading", { level: 1, name: "Here is the welcome again." })).toBeVisible();
+    // Not now goes back where the person came from.
+    await page.getByRole("button", { name: "Not now, back to Settings" }).click();
+    await expect(page).toHaveURL(/\/settings$/);
+    await page.getByRole("link", { name: "Go through the welcome again" }).click();
+    await page.getByRole("button", { name: "Begin" }).click();
+
+    // Every answer is in its field; Skip keeps it, even after a change in the field.
+    const name = page.getByLabel("Your name, or what you like to be called");
+    await expect(name).toHaveValue("Bia");
+    await name.fill("Somebody else");
+    await page.getByRole("button", { name: "Skip" }).click();
+    await expect(page.getByLabel("Your therapist's name")).toHaveValue("Dr. Lima");
+    await page.getByRole("button", { name: "Skip" }).click();
+    await expect(page.getByRole("heading", { level: 1, name: "When do you see Dr. Lima?" })).toBeVisible();
+    await expect(page.getByRole("radio", { name: "Tuesdays" })).toBeChecked();
+    await expect(page.getByLabel("Time")).toHaveValue("18:00");
+    await page.getByRole("button", { name: "Skip" }).click();
+    await expect(page.getByRole("heading", { level: 1, name: "You are set, Bia." })).toBeVisible();
+    await expect(page.getByText("Your sessions are on Tuesdays at 18:00.", { exact: false })).toBeVisible();
+    await page.getByRole("button", { name: "Go to my diary" }).click();
+    await expect(page).toHaveURL(/\/home$/);
+
+    // Nothing was erased or changed.
+    expect(await scope.profile.get()).toMatchObject({ preferredName: "Bia" });
+    expect(await scope.therapySettings.get()).toMatchObject({
+      therapistName: "Dr. Lima",
+      sessionDay: 2,
+      sessionTime: "18:00",
+    });
+    expect(await scope.entries.count()).toBe(1);
+  });
+
   test("lets every question wait, and offers the way back without insisting", async ({ page }) => {
     await createDiary(page, newEmail("welcome-later"));
     const scope = await core().repositories.forUser(await currentUserId(page));
