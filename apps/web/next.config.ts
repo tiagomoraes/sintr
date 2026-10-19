@@ -9,8 +9,9 @@ const securityHeaders = [
   { key: "Cross-Origin-Opener-Policy", value: "same-origin" },
   { key: "Cross-Origin-Resource-Policy", value: "same-origin" },
   {
+    // The microphone is for sintr's own pages (speaking on the home), never for anything they embed.
     key: "Permissions-Policy",
-    value: "camera=(), microphone=(), geolocation=(), payment=(), usb=(), browsing-topics=()",
+    value: "camera=(), microphone=(self), geolocation=(), payment=(), usb=(), browsing-topics=()",
   },
 ];
 

@@ -19,6 +19,7 @@
  */
 import type { HouseAssistant, Logger, ProviderCredentials } from "@sintr/core";
 import { checkBaseUrl, DEFAULT_BASE_URLS } from "./providers";
+import type { VoiceUnavailable } from "./shapes";
 
 /** One recording: at most five minutes, and a little over what that weighs on a phone. */
 export const MAX_AUDIO_SECONDS = 300;
@@ -52,15 +53,7 @@ const KNOWN_SERVICES: { host: string; service: WhisperService; model: string }[]
 
 export type WhisperService = "openrouter" | "openai" | "groq" | "gateway";
 
-export type VoiceUnavailable =
-  /** No assistant at all yet: no house, no key of the person's own. */
-  | "not_configured"
-  /** Whoever runs this sintr turned speaking off (SINTR_HOUSE_STT_MODEL=off). */
-  | "off"
-  /** The provider takes no audio (Anthropic). */
-  | "provider_has_no_audio"
-  /** An endpoint sintr does not know how to ask for a transcription. */
-  | "provider_unknown";
+export type { VoiceUnavailable };
 
 /** How one recording becomes text. */
 export type VoiceRoute =
