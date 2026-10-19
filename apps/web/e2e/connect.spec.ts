@@ -40,7 +40,7 @@ const initialize = {
 
 async function makeKey(page: Page): Promise<string> {
   await page.goto("/connect");
-  await expect(page.getByRole("heading", { level: 1, name: "Connect your assistant" })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: "Your other assistants" })).toBeVisible();
   await page.getByRole("button", { name: "Make a key" }).click();
   await expect(page.getByText("Copy it now: sintr shows it only this once.")).toBeVisible();
   const key = (await page
@@ -56,7 +56,8 @@ test("make a key, connect an agent, see it connected, find the entry, disconnect
   await page.goto("/connect");
   await expect(
     page.getByText(
-      "Keep using the assistant you already talk to. What you tell it to keep is saved here, in your words.",
+      "If you already talk to ChatGPT, Claude, Gemini or Hermes, they can keep your diary here",
+      { exact: false },
     ),
   ).toBeVisible();
   // Before a key exists the steps show a placeholder, never a real key.
@@ -105,7 +106,7 @@ test("make a key, connect an agent, see it connected, find the entry, disconnect
 
   // Settings shows the same keys.
   await page.goto("/settings");
-  await expect(page.getByRole("heading", { name: "Assistants you connected" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Your other assistants" })).toBeVisible();
   await expect(
     page.getByRole("list", { name: "Connected assistants" }).getByText("My assistant"),
   ).toBeVisible();

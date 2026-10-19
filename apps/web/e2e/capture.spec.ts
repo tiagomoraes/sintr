@@ -197,6 +197,9 @@ test.describe("the capture conversation", () => {
 
     const card = await draftAnEntry(page);
     await card.getByRole("button", { name: "Edit" }).click();
+    // What happened, the thoughts and the feelings come first; the rest is a tap away.
+    await expect(card.getByLabel("In the body")).toBeHidden();
+    await card.getByText("More about it, if you want").click();
     await card.getByLabel("In the body").fill("a tight chest");
     await card.getByRole("button", { name: "Save entry" }).click();
     await expect(page.getByText("Saved with your changes.")).toBeVisible();
@@ -271,9 +274,20 @@ test.describe("the quick check-in", () => {
     await signUpQuietly(page, newEmail("checkin"));
     await page.getByRole("link", { name: "Check-ins", exact: true }).click();
     await page.getByRole("link", { name: "New check-in" }).click();
-    await page.getByRole("group", { name: "Mood" }).getByRole("radio", { name: "4", exact: true }).check();
-    await page.getByRole("group", { name: "Anxiety" }).getByRole("radio", { name: "2", exact: true }).check();
+    // One question at a time: a tap on a number is the answer and moves on; a question can be skipped.
+    await page
+      .getByRole("group", { name: "How is your mood?" })
+      .getByRole("radio", { name: "4", exact: true })
+      .click();
+    await expect(page.getByRole("group", { name: "How much energy do you have?" })).toBeVisible();
+    await expect(page.getByRole("group", { name: "How is your mood?" })).toBeHidden();
+    await page.getByRole("button", { name: "Skip", exact: true }).click();
+    await page
+      .getByRole("group", { name: "How anxious do you feel?" })
+      .getByRole("radio", { name: "2", exact: true })
+      .click();
     await page.getByLabel("Hours of sleep").fill("7,5");
+    await page.getByRole("button", { name: "Next", exact: true }).click();
     await page.getByLabel("Note").fill("a quieter day, the walk helped");
     await page.getByRole("button", { name: "Save check-in" }).click();
 

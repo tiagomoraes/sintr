@@ -37,14 +37,20 @@ export function newEmail(label: string): string {
   return `${label}-${randomUUID()}@example.test`;
 }
 
-/** Sign up through the real form, consent included, and land in the diary. */
+/**
+ * Sign up through the real form, consent included, and land on the home. A
+ * new diary opens on the welcome; these tests set it aside (welcome.spec.ts
+ * walks through it).
+ */
 export async function signUp(page: Page, email: string): Promise<void> {
   await page.goto("/sign-up");
   await page.getByLabel("Email").fill(email);
   await page.getByLabel("Password").fill(PASSWORD);
   await page.getByRole("checkbox").check();
   await page.getByRole("button", { name: "Create your diary" }).click();
-  await expect(page).toHaveURL(/\/entries$/);
+  await expect(page).toHaveURL(/\/welcome$/);
+  await page.getByRole("button", { name: "Not now, take me to my diary" }).click();
+  await expect(page).toHaveURL(/\/home$/);
 }
 
 /** The signed-in user's id, as the server sees it. */

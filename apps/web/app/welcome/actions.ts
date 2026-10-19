@@ -108,7 +108,8 @@ export async function acceptInWelcome(code: string, form: FormData): Promise<Ste
     }
     throw error;
   }
-  revalidatePath("/", "layout");
+  // No revalidation here: it would render the welcome again from its first question. The
+  // diary's frame is fresh when the welcome ends (finishWelcome).
   return OK;
 }
 

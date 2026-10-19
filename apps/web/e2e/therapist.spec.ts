@@ -226,16 +226,31 @@ test.describe("a practice invites a patient and receives a report", () => {
     await v.getByLabel("Password").fill(PASSWORD);
     await v.getByRole("checkbox").check();
     await v.getByRole("button", { name: "Create your diary" }).click();
-    await expect(v).toHaveURL(new RegExp(`/join/${code.toLowerCase()}$`));
+    // The invite is part of the welcome: the person is asked about it on the way to their diary.
+    await expect(v).toHaveURL(/\/welcome\?next=/);
+    await v.getByRole("button", { name: "Begin" }).click();
+    await v.getByLabel("Your name, or what you like to be called").fill("Ana");
+    await v.getByRole("button", { name: "Continue" }).click();
+    await expect(v.getByRole("heading", { level: 1 })).toHaveText(
+      "Dr. Marina Costa invited you to share your reports.",
+    );
 
-    // The person's yes: a name, how reports go, and the consent.
-    await v.getByLabel("How they will see you").fill("Ana");
+    // The person's yes: a name, how reports go, and the consent, as on the invite's own page.
+    await expect(v.getByLabel("How they will see you")).toHaveValue("Ana");
     await v.getByRole("radio", { name: "Send what I approve" }).check({ force: true });
     await v.getByRole("button", { name: "Accept and link" }).click();
     await expect(v.getByText("Tick the box to give your consent, or leave it for now.")).toBeVisible();
     await v.getByLabel(/I agree to share the reports I approve with Dr. Marina Costa/).check();
     await v.getByRole("button", { name: "Accept and link" }).click();
-    await expect(v).toHaveURL(/\/sharing$/);
+    await expect(v.getByText("You are linked with Dr. Marina Costa.", { exact: false })).toBeVisible();
+    await v.getByRole("button", { name: "Continue" }).click();
+    // The therapist is already named, from the invite.
+    await expect(v.getByLabel("Your therapist's name")).toHaveValue("Dr. Marina Costa");
+    await v.getByRole("button", { name: "Continue" }).click();
+    await v.getByRole("button", { name: "It changes from week to week" }).click();
+    await v.getByRole("button", { name: "Go to my diary" }).click();
+    await expect(v).toHaveURL(/\/home$/);
+    await v.goto("/sharing");
     await expect(v.getByText("Every report you approve goes to them as you approve it.")).toBeVisible();
     // The invite was used.
     await v.goto(`/join/${code}`);
