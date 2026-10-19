@@ -47,6 +47,12 @@ export const shell = {
     weeklyReady: "Seu relatório da semana está pronto para você ler.",
     readIt: "Ler",
   },
+  unsaved: {
+    changes: (what: string) =>
+      `As mudanças ${what} ainda não foram salvas e, se você sair agora, elas se perdem.`,
+    stay: "Ficar nesta página",
+    leave: "Sair sem salvar",
+  },
   practiceNote:
     "Os relatórios chegam quando uma pessoa os aprova e compartilha, nunca em tempo real, e o sintr não acompanha ninguém: é um diário que as pessoas mantêm para si mesmas, não um prontuário clínico, uma ferramenta de monitoramento ou um serviço de crise. Se algo em um relatório preocupar você, procure a pessoa do jeito que você costuma fazer.",
 } satisfies Messages["shell"];
