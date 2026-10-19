@@ -35,6 +35,15 @@ export function middleware(request: NextRequest) {
   headers.set("content-security-policy", csp);
   // Lets a server-side redirect to sign in come back to the same page.
   headers.set("x-sintr-path", `${request.nextUrl.pathname}${request.nextUrl.search}`);
+  // A form posted without JavaScript carries `Origin: null` under `Referrer-Policy: no-referrer`, and
+  // Next's server actions refuse a post whose origin they cannot read. When the browser's own
+  // Sec-Fetch-Site, which no page can set, says the post came from this site, it is given this site's
+  // origin, the host Next compares it with: the check of the language route (DECISIONS 98 and 121).
+  if (request.headers.get("origin") === "null" && request.headers.get("sec-fetch-site") === "same-origin") {
+    const host =
+      request.headers.get("x-forwarded-host")?.split(",")[0]?.trim() || request.headers.get("host");
+    if (host) headers.set("origin", `${https ? "https" : "http"}://${host}`);
+  }
 
   const response = NextResponse.next({ request: { headers } });
   response.headers.set("Content-Security-Policy", csp);
