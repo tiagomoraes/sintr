@@ -81,6 +81,10 @@ export function useVoice({
   // Once the month's speaking time is used, the Speak button goes until the page is opened again.
   const [spent, setSpent] = useState(false);
   const session = useRef<Session | null>(null);
+  // Each tap on Speak is one attempt; Cancel, leaving the page or a newer attempt ends it, even while
+  // the browser is still asking for the microphone, so a late yes never starts a recording nobody wants.
+  const attempt = useRef(0);
+  const asking = useRef(false);
   const levelTargets = useRef(new Set<HTMLElement>());
   const heard = useRef(onHeard);
   useEffect(() => {
@@ -135,7 +139,9 @@ export function useVoice({
   }, []);
 
   const start = useCallback(async () => {
-    if (session.current) return;
+    if (session.current || asking.current) return;
+    const mine = (attempt.current += 1);
+    asking.current = true;
     dispatch({ type: "ask" });
     // Made inside the tap, so iOS lets it run; it only measures the level.
     const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -152,13 +158,27 @@ export function useVoice({
       });
     } catch (error) {
       void audio?.close().catch(() => undefined);
-      dispatch({ type: "refused", problem: problemOf(error) });
+      if (attempt.current === mine) {
+        asking.current = false;
+        dispatch({ type: "refused", problem: problemOf(error) });
+      }
       return;
     }
+    if (attempt.current !== mine) {
+      // Cancelled (or the page left) while the browser asked: close the microphone, record nothing.
+      for (const track of stream.getTracks()) track.stop();
+      void audio?.close().catch(() => undefined);
+      return;
+    }
+    asking.current = false;
     let recorder: MediaRecorder;
     try {
       const type = container();
-      recorder = new MediaRecorder(stream, type ? { mimeType: type } : undefined);
+      // 64 kbit/s is plenty for speech, and keeps the upload small over mobile data.
+      recorder = new MediaRecorder(stream, {
+        audioBitsPerSecond: 64_000,
+        ...(type ? { mimeType: type } : {}),
+      });
     } catch {
       for (const track of stream.getTracks()) track.stop();
       void audio?.close().catch(() => undefined);
@@ -188,10 +208,15 @@ export function useVoice({
       const type = recorder.mimeType || current.chunks[0]?.type || "audio/webm";
       void send(new Blob(current.chunks, { type }), duration);
     };
+    recorder.start();
+    const allowed = Math.min(MAX_RECORDING_SECONDS, secondsLeft ?? MAX_RECORDING_SECONDS);
+    current.limit = setTimeout(stop, Math.max(1, allowed) * 1000);
+    dispatch({ type: "granted", at: current.startedAt });
     // The pool follows the voice: the loudness of the last frame, smoothed, without re-rendering.
+    // Recording never waits on it (an interrupted audio session on iOS may never resume).
     if (audio) {
       try {
-        await audio.resume();
+        void audio.resume().catch(() => undefined);
         const analyser = audio.createAnalyser();
         analyser.fftSize = 512;
         audio.createMediaStreamSource(stream).connect(analyser);
@@ -211,14 +236,12 @@ export function useVoice({
         // The level is only a reflection; recording goes on without it.
       }
     }
-    recorder.start();
-    const allowed = Math.min(MAX_RECORDING_SECONDS, secondsLeft ?? MAX_RECORDING_SECONDS);
-    current.limit = setTimeout(stop, Math.max(1, allowed) * 1000);
-    dispatch({ type: "granted", at: current.startedAt });
   }, [release, send, secondsLeft, stop]);
 
   const cancel = useCallback(() => {
     const current = session.current;
+    attempt.current += 1;
+    asking.current = false;
     dispatch({ type: "cancel" });
     if (!current) return;
     current.cancelled = true;
@@ -239,6 +262,7 @@ export function useVoice({
   // Leaving the page closes the microphone and keeps nothing.
   useEffect(
     () => () => {
+      attempt.current += 1;
       const current = session.current;
       if (!current) return;
       current.cancelled = true;
