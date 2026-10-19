@@ -73,7 +73,9 @@ test.describe("the memory", () => {
     await expect(page.getByText("To keep it, your diary goes to OpenRouter.")).toBeVisible();
     await expect(page.getByText("You go by Lia.")).toBeVisible();
     const about = page.getByRole("region", { name: "Who you are" });
-    await expect(about.getByText("I work as a nurse on the night shift at the hospital")).toBeVisible();
+    await expect(
+      about.getByRole("listitem").filter({ hasText: "I work as a nurse on the night shift at the hospital" }),
+    ).toHaveCount(1);
     const moments = page.getByRole("region", { name: "What has been happening" });
     const meeting = moments.getByRole("listitem").filter({ hasText: "At the Monday meeting" });
     await expect(meeting).toHaveCount(1);

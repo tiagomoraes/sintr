@@ -42,7 +42,7 @@ function CorrectForm({
     if (state.done && details.current) details.current.open = false;
   }, [state]);
   return (
-    <details ref={details} className="group">
+    <details ref={details} className="group open:w-full">
       <summary className="inline-flex min-h-10 cursor-pointer list-none items-center rounded-pill border border-rule bg-paper px-[18px] text-label font-medium text-ink-2 transition-colors duration-300 hover:border-rule-strong hover:text-ink [&::-webkit-details-marker]:hidden">
         {M.open}
       </summary>
@@ -88,7 +88,6 @@ export function MemoryItem({
   source,
   correct,
   forget,
-  children,
 }: {
   text: ReactNode;
   quote: string | null;
@@ -97,11 +96,10 @@ export function MemoryItem({
   /** Absent for the name, which is changed in the welcome. */
   correct?: { text: string; action: (state: CorrectState, form: FormData) => Promise<CorrectState> };
   forget: () => Promise<void>;
-  children?: ReactNode;
 }) {
   const M = useMessages().memory;
   return (
-    <li className="border-b border-rule py-6 last:border-b-0">
+    <li className="group/memory border-b border-rule py-6 last:border-b-0">
       <p className="max-w-[36em] font-serif text-[1.1875rem] leading-[1.45] text-ink">{text}</p>
       {quote ? (
         <p className="mt-2 max-w-[36em] font-serif text-[1rem] leading-[1.5] text-ink-2">
@@ -118,18 +116,20 @@ export function MemoryItem({
           source.label
         )}
         {source.extra ? <> {source.extra}</> : null}
-        {source.corrected ? ` ${M.corrected}` : null}
+        {source.corrected ? `. ${M.corrected}` : null}
       </p>
-      {children}
       <div className="mt-4 flex flex-wrap items-start gap-x-4 gap-y-3">
         {correct ? <CorrectForm text={correct.text} correct={correct.action} /> : null}
-        <ConfirmButton
-          label={M.forget.label}
-          confirmLabel={M.forget.confirm}
-          pendingLabel={M.forget.pending}
-          explanation={M.forget.explanation}
-          action={forget}
-        />
+        {/* While the person corrects it, the form is the only thing in the row. */}
+        <div className="group-has-[details[open]]/memory:hidden">
+          <ConfirmButton
+            label={M.forget.label}
+            confirmLabel={M.forget.confirm}
+            pendingLabel={M.forget.pending}
+            explanation={M.forget.explanation}
+            action={forget}
+          />
+        </div>
       </div>
     </li>
   );
