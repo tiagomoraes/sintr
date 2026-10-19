@@ -3,6 +3,7 @@ import { sql } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { HEALTH_DATA_CONSENT_VERSION, MEMORY_CONSENT_VERSION, type EmbeddingSpace } from "../src/domain";
 import { ValidationError } from "../src/errors";
+import { MissingExtensionError, isMissingPgvector } from "../src/db/migrate";
 import { createRotation } from "../src/memory/rotation";
 import { memoryWork } from "../src/memory/work";
 import { createRepositories, type UserScope } from "../src/repositories";
@@ -67,6 +68,24 @@ describe("the rotation", () => {
     expect(() => rotation.turn([random(7)])).toThrow(RangeError);
     expect(() => rotation.turn([new Array(8).fill(0)])).toThrow(RangeError);
     expect(() => createRotation(randomBytes(16), 8)).toThrow(RangeError);
+  });
+});
+
+describe("migration 0009 on a Postgres without pgvector", () => {
+  it("is told apart by its own check, so the log can say it with a code", () => {
+    const raised = Object.assign(
+      new Error("sintr 0009 needs the pgvector extension (vector) in this Postgres"),
+      {
+        code: "P0001",
+      },
+    );
+    // Drizzle wraps the driver's error, which carries the SQLSTATE.
+    expect(isMissingPgvector(new Error("Failed query", { cause: raised }))).toBe(true);
+    expect(isMissingPgvector(Object.assign(new Error("relation does not exist"), { code: "42P01" }))).toBe(
+      false,
+    );
+    expect(isMissingPgvector(Object.assign(new Error("something else"), { code: "P0001" }))).toBe(false);
+    expect(new MissingExtensionError().code).toBe("pgvector_missing");
   });
 });
 

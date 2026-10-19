@@ -7,7 +7,7 @@ export {
   type Schema,
   type Transaction,
 } from "./client";
-export { MIGRATIONS_FOLDER, runMigrations } from "./migrate";
+export { MIGRATIONS_FOLDER, MissingExtensionError, isMissingPgvector, runMigrations } from "./migrate";
 export {
   KEY_MATERIAL,
   ROTATED,
