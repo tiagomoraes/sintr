@@ -296,3 +296,119 @@ export const rehearsalScript: Script = (call) => {
 export function rehearsalModel(): ScriptedModel {
   return scriptedModel(rehearsalScript, "rehearsal");
 }
+
+/* A fake provider at the HTTP boundary */
+
+interface ChatRequestBody {
+  model?: string;
+  stream?: boolean;
+  messages?: {
+    role: string;
+    content?: string | { type: string; text?: string }[] | null;
+    tool_calls?: { id: string; function: { name: string } }[];
+    tool_call_id?: string;
+  }[];
+  tools?: { function: { name: string } }[];
+}
+
+/** What the fake endpoint received: the address, the headers (the key among them) and the body. */
+export interface EndpointRequest {
+  url: string;
+  headers: Headers;
+  body: ChatRequestBody;
+}
+
+function contentText(content: NonNullable<ChatRequestBody["messages"]>[number]["content"]): string {
+  if (typeof content === "string") return content;
+  return (content ?? [])
+    .filter((part) => part.type === "text")
+    .map((part) => part.text ?? "")
+    .join("\n");
+}
+
+function parsedOutput(content: string): unknown {
+  try {
+    return JSON.parse(content) as unknown;
+  } catch {
+    return content;
+  }
+}
+
+/** The request as a script sees it, as `scriptedModel` would show it. */
+function endpointView(body: ChatRequestBody, index: number): CallView {
+  const messages = body.messages ?? [];
+  const names = new Map<string, string>();
+  for (const message of messages) {
+    for (const call of message.tool_calls ?? []) names.set(call.id, call.function.name);
+  }
+  const trailing: typeof messages = [];
+  for (let i = messages.length - 1; i >= 0 && messages[i]!.role === "tool"; i -= 1)
+    trailing.unshift(messages[i]!);
+  return {
+    index,
+    instructions: messages
+      .filter((m) => m.role === "system")
+      .map((m) => contentText(m.content))
+      .join("\n"),
+    userTexts: messages.filter((m) => m.role === "user").map((m) => contentText(m.content)),
+    toolResults: trailing.map((m) => ({
+      toolName: names.get(m.tool_call_id ?? "") ?? "",
+      output: parsedOutput(contentText(m.content)),
+    })),
+    tools: (body.tools ?? []).map((t) => t.function.name),
+    options: { prompt: [] },
+  };
+}
+
+/**
+ * An OpenAI-compatible chat endpoint, as a `fetch` that never touches the
+ * network: each request is answered from `script`, streamed or not, the way
+ * the real API answers. It exercises the whole path a real provider takes
+ * (the adapter, the address, the key in the headers), which the scripted
+ * model skips. Every request is kept for the test to inspect.
+ */
+export function scriptedEndpoint(script: Script): { fetch: typeof fetch; requests: EndpointRequest[] } {
+  const requests: EndpointRequest[] = [];
+  let calls = 0;
+  const fetch = (async (input: string | URL | Request, init?: RequestInit) => {
+    const request = new Request(input, init);
+    const body = JSON.parse(await request.text()) as ChatRequestBody;
+    requests.push({ url: request.url, headers: request.headers, body });
+    const reply = script(endpointView(body, calls));
+    calls += 1;
+    if (reply.error !== undefined) {
+      return new Response(JSON.stringify({ error: { message: "scripted failure" } }), { status: 500 });
+    }
+    const toolCalls = (reply.toolCalls ?? []).map((call, i) => ({
+      index: i,
+      id: `call_${calls}_${i}`,
+      type: "function",
+      function: { name: call.toolName, arguments: JSON.stringify(call.input) },
+    }));
+    const finish = toolCalls.length > 0 ? "tool_calls" : "stop";
+    const usage = { prompt_tokens: 10, completion_tokens: 10, total_tokens: 20 };
+    const base = { id: `chatcmpl-${calls}`, created: 1, model: body.model ?? "scripted" };
+    if (!body.stream) {
+      const message = {
+        role: "assistant",
+        content: reply.text ?? null,
+        ...(toolCalls.length ? { tool_calls: toolCalls.map(({ index: _i, ...call }) => call) } : {}),
+      };
+      return Response.json({
+        ...base,
+        object: "chat.completion",
+        choices: [{ index: 0, message, finish_reason: finish }],
+        usage,
+      });
+    }
+    const chunk = (delta: unknown, finishReason: string | null = null, extra: object = {}) =>
+      `data: ${JSON.stringify({ ...base, object: "chat.completion.chunk", choices: [{ index: 0, delta, finish_reason: finishReason }], ...extra })}\n\n`;
+    const events = [chunk({ role: "assistant", content: "" })];
+    for (const piece of reply.text?.match(/\S+\s*|\s+/gu) ?? []) events.push(chunk({ content: piece }));
+    if (toolCalls.length) events.push(chunk({ tool_calls: toolCalls }));
+    events.push(chunk({}, finish, { usage }));
+    events.push("data: [DONE]\n\n");
+    return new Response(events.join(""), { headers: { "content-type": "text/event-stream" } });
+  }) as typeof globalThis.fetch;
+  return { fetch, requests };
+}

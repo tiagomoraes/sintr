@@ -13,29 +13,27 @@ import {
   type UserScope,
 } from "@sintr/core";
 import type { LanguageModel } from "ai";
-import { ProviderSetupError, createLanguageModel } from "../providers";
-import { rehearsalModel } from "../testing";
+import { metered, resolveAssistant, type AssistantConfig, type Metered } from "../assistant";
 import { writeReport } from "./driver";
 
 /**
- * The person's model for writing their report: their own provider and key,
- * or the offline rehearsal model when SINTR_FAKE_AGENT is on (tests). Null,
- * with a code, when there is none to use: the report is then prepared by
- * sintr alone.
+ * The model that writes a person's report: their own key, or the house
+ * assistant within their plan (with its meter), or the offline rehearsal
+ * model when SINTR_FAKE_AGENT is on (tests). Null, with a code, when there
+ * is none to use: the report is then prepared by sintr alone.
  */
 export async function reportModel(
   scope: UserScope,
-  config: { mode: "selfhost" | "saas"; fakeAgent: boolean },
-): Promise<{ model: LanguageModel | null; problem: string | null }> {
-  const credentials = await scope.agentSettings.credentials();
-  if (!credentials) return { model: null, problem: "not_configured" };
-  if (config.fakeAgent) return { model: rehearsalModel(), problem: null };
-  try {
-    return { model: createLanguageModel(credentials, { mode: config.mode }), problem: null };
-  } catch (error) {
-    if (error instanceof ProviderSetupError) return { model: null, problem: error.code };
-    throw error;
-  }
+  config: AssistantConfig,
+  options: { fetch?: typeof fetch } = {},
+): Promise<{ model: LanguageModel | null; problem: string | null; metered: Metered | null }> {
+  const assistant = await resolveAssistant(scope, config, options);
+  if (!assistant.ok) return { model: null, problem: assistant.problem, metered: null };
+  return {
+    model: assistant.model,
+    problem: null,
+    metered: assistant.source === "house" ? metered(scope, "reports") : null,
+  };
 }
 
 export interface PrepareReport {
@@ -49,6 +47,8 @@ export interface PrepareReport {
   model: LanguageModel | null;
   /** Why there is no model, as a code. */
   modelProblem?: string | null;
+  /** The house assistant's meter of reports; absent for a person's own key. */
+  metered?: Metered | null;
   log: Logger;
   abortSignal?: AbortSignal;
 }
@@ -67,7 +67,7 @@ function isDuplicate(error: unknown): boolean {
 
 /**
  * Prepare one report: the digest of the period, the six sections (written
- * by the person's model and checked, or the parts sintr can make alone),
+ * by the assistant and checked, or the parts sintr can make alone),
  * stored as a draft that waits for the person. Nothing is sent. Returns
  * null when another preparation of the same period got there first.
  */
@@ -86,7 +86,11 @@ export async function prepareReport(input: PrepareReport): Promise<PreparedRepor
 
   let content: ReportContent;
   let problems: ReportProblem[] = [];
-  if (input.model) {
+  // This month's reports on the person's plan are used: sintr prepares it alone, in their words.
+  const taken = input.model && input.metered ? await input.metered.take() : null;
+  if (taken && !taken.ok) {
+    content = draftContent({ digest, language, toBring, problem: "limit_reached" });
+  } else if (input.model) {
     const written = await writeReport({
       model: input.model,
       digest,
@@ -101,6 +105,8 @@ export async function prepareReport(input: PrepareReport): Promise<PreparedRepor
       content = written.content;
       problems = written.problems;
     } else {
+      // A report the assistant could not write is not counted against the month.
+      await input.metered?.giveBack();
       content = draftContent({ digest, language, toBring, problem: written.problem });
     }
   } else {

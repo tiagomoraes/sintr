@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import type { Logger } from "@sintr/core";
+import type { Logger, ProposalKind } from "@sintr/core";
 import {
   createUIMessageStream,
   hasToolCall,
@@ -9,6 +9,7 @@ import {
   type LanguageModel,
   type UIMessageStreamWriter,
 } from "ai";
+import type { Metered } from "./assistant";
 import { crisisLanguage, crisisMessage, screenForRisk, type CrisisLanguage } from "./crisis";
 import { smoothDashes } from "./dashes";
 import { hasContent, isInCrisis, personTexts, textOf, toModelMessages } from "./messages";
@@ -38,6 +39,11 @@ export interface CaptureTurn {
   prelude?: readonly SintrUIMessageChunk[];
   /** Persist the assistant's reply. Not called for an empty reply. */
   onResponse?(message: SintrUIMessage): Promise<void> | void;
+  /**
+   * The house assistant's monthly meter. Absent for a person's own key,
+   * which is never counted. A message that signals risk never touches it.
+   */
+  metered?: Metered;
 }
 
 type Writer = UIMessageStreamWriter<SintrUIMessage>;
@@ -47,6 +53,25 @@ function writeText(writer: Writer, text: string): void {
   writer.write({ type: "text-start", id });
   writer.write({ type: "text-delta", id, delta: text });
   writer.write({ type: "text-end", id });
+}
+
+/**
+ * The person's message as a draft entry, word for word, when the assistant
+ * cannot answer it: capture never waits for a plan. Null if it could not be
+ * stored; the message itself is kept in the conversation either way.
+ */
+async function keepWords(
+  turn: CaptureTurn,
+  text: string,
+): Promise<{ proposalId: string; draft: { situation: string; occurredAt: string } } | null> {
+  const draft = { situation: text, occurredAt: (turn.now ?? new Date()).toISOString() };
+  try {
+    const { id } = await turn.ports.createProposal({ kind: "entry", payload: draft });
+    return { proposalId: id, draft };
+  } catch (error) {
+    turn.log.warn("agent.keep_failed", { error });
+    return null;
+  }
 }
 
 /** Stop the diary: the fixed message, then the help lines on screen. */
@@ -67,6 +92,12 @@ function writeCrisis(writer: Writer, source: SintrDataParts["crisis"]["source"],
  * 3. Otherwise the model talks, and may only propose drafts. Drafts are
  *    checked against the person's words before they are stored, and none
  *    becomes a record until the person confirms it.
+ *
+ * On the house assistant, one unit of the person's monthly meter is taken
+ * right before the model runs and given back if the reply fails. When the
+ * month's messages are used, the model does not run, and nothing is lost:
+ * the person's words are kept and offered back as a draft entry, a "salva"
+ * still saves, and a paused conversation still gets the help lines.
  */
 export function runCaptureTurn(turn: CaptureTurn): ReadableStream<SintrUIMessageChunk> {
   const messages = turn.message ? [...turn.history, turn.message] : [...turn.history];
@@ -105,6 +136,7 @@ export function runCaptureTurn(turn: CaptureTurn): ReadableStream<SintrUIMessage
       // Only a new message can say yes: retrying a failed reply to "salva"
       // must not confirm the next older draft.
       let turnNote: string | undefined;
+      let saved: ProposalKind | null = null;
       if (!inCrisis && turn.message && text && isSaveCommand(text)) {
         const pending = await turn.ports.pendingProposal();
         if (pending) {
@@ -115,10 +147,43 @@ export function runCaptureTurn(turn: CaptureTurn): ReadableStream<SintrUIMessage
               id: `proposal-${pending.id}`,
               data: { proposalId: pending.id, status: "saved", recordId },
             });
+            saved = pending.kind;
             turnNote = `the person told you to save their ${pending.kind === "entry" ? "entry" : "check-in"} draft, and it is now saved. Acknowledge it in one short line and do not propose it again.`;
           } catch (error) {
             log.warn("agent.save_failed", { error });
           }
+        }
+      }
+
+      if (turn.metered) {
+        const taken = await turn.metered.take();
+        if (!taken.ok) {
+          if (inCrisis) {
+            // The diary stays paused, and the help lines never depend on a plan.
+            writeText(writer, crisisMessage(crisisLanguage(person.language)));
+          } else {
+            writer.write({
+              type: "data-limit",
+              id: "limit",
+              data: {
+                used: taken.used,
+                limit: taken.limit,
+                next: taken.period.next,
+                kept: saved || !text || isSaveCommand(text) ? null : await keepWords(turn, text),
+                saved,
+              },
+            });
+          }
+          log.info("agent.turn_done", { durationMs: Date.now() - started, code: "limit_reached" });
+          writer.write({ type: "finish" });
+          return;
+        }
+        if (taken.limit !== null) {
+          writer.write({
+            type: "data-usage",
+            data: { used: taken.used, limit: taken.limit, next: taken.period.next },
+            transient: true,
+          });
         }
       }
 
@@ -189,6 +254,8 @@ export function runCaptureTurn(turn: CaptureTurn): ReadableStream<SintrUIMessage
         keepReply = false;
         await withdraw();
       }
+      // A reply that failed is not counted against the month.
+      if (failed) await turn.metered?.giveBack();
       if (signal.crisis) {
         // A stopped diary is always stored, so the next turn stays stopped.
         keepReply = true;
