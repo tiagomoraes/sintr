@@ -1,41 +1,72 @@
 import "server-only";
 import {
-  ProviderSetupError,
-  createLanguageModel,
+  metered,
   parseStoredMessage,
+  resolveAssistant,
+  type AssistantProblem,
+  type Metered,
   type SintrUIMessage,
 } from "@sintr/agent";
-import { rehearsalModel } from "@sintr/agent/testing";
-import type { Proposal, UserScope } from "@sintr/core";
+import type { PersonPlan, Proposal, ProviderKind, UserScope } from "@sintr/core";
 import type { LanguageModel } from "ai";
 import type { ProposalView } from "@/lib/proposals";
 import { runtime } from "./runtime";
 
-export type AssistantProblem = "not_configured" | ProviderSetupError["code"];
-
 /**
- * The model behind this person's conversation: their own provider and key.
- * With SINTR_FAKE_AGENT (tests) the settings are still required, and only
- * the call is replaced by the offline rehearsal model.
+ * The model behind this person's conversation: their own key if they saved
+ * one, otherwise the house assistant with its monthly meter. With
+ * SINTR_FAKE_AGENT (tests) the same choice is made, and only the call is
+ * replaced by the offline rehearsal model.
  */
 export async function assistantFor(
   scope: UserScope,
-): Promise<{ model: LanguageModel; rehearsal: boolean } | { problem: AssistantProblem }> {
-  const { config } = runtime();
-  const credentials = await scope.agentSettings.credentials();
-  if (!credentials) return { problem: "not_configured" };
-  if (config.fakeAgent) return { model: rehearsalModel(), rehearsal: true };
-  try {
-    return { model: createLanguageModel(credentials, { mode: config.mode }), rehearsal: false };
-  } catch (error) {
-    if (error instanceof ProviderSetupError) return { problem: error.code };
-    throw error;
-  }
+): Promise<
+  { ok: true; model: LanguageModel; metered: Metered | null } | { ok: false; problem: AssistantProblem }
+> {
+  const resolved = await resolveAssistant(scope, runtime().config);
+  if (!resolved.ok) return { ok: false, problem: resolved.problem };
+  return {
+    ok: true,
+    model: resolved.model,
+    metered: resolved.source === "house" ? metered(scope, "assistantMessages") : null,
+  };
 }
 
-/** Is there an assistant to talk to? */
-export async function assistantReady(scope: UserScope): Promise<boolean> {
-  return (await scope.agentSettings.credentials()) !== null;
+/** This month's messages with the house assistant: used, the plan's limit (null for none), and when it starts again. */
+export interface MessageMeter {
+  used: number;
+  limit: number | null;
+  next: string;
+}
+
+/**
+ * What the screens say about the assistant, never a key: the person's own
+ * provider, the house assistant within their plan, or none yet (a self-host
+ * without a house assistant, before the person brings a key).
+ */
+export type AssistantState =
+  | { kind: "own"; provider: ProviderKind; model: string; house: boolean }
+  | { kind: "house"; name: string; plan: PersonPlan; messages: MessageMeter }
+  | { kind: "none" };
+
+export async function assistantState(scope: UserScope): Promise<AssistantState> {
+  const { house } = runtime().config;
+  const settings = await scope.agentSettings.get();
+  if (settings.provider && settings.model) {
+    return { kind: "own", provider: settings.provider, model: settings.model, house: house !== null };
+  }
+  if (!house) return { kind: "none" };
+  const month = await scope.plans.current();
+  return {
+    kind: "house",
+    name: house.name,
+    plan: month.plan,
+    messages: {
+      used: month.used.assistantMessages,
+      limit: month.plan.allowance.assistantMessages,
+      next: month.period.next,
+    },
+  };
 }
 
 export async function loadMessages(scope: UserScope, conversationId: string): Promise<SintrUIMessage[]> {

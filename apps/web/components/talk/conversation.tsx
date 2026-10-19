@@ -7,8 +7,10 @@ import { DefaultChatTransport } from "ai";
 import Link from "next/link";
 import { useEffect, useRef, useState, type FormEvent, type KeyboardEvent } from "react";
 import { MAX_MESSAGE_LENGTH, needsSetup, problemCopy } from "@/lib/chat";
+import { atTheLimit, limitReplyText, type MeterView } from "@/lib/plan";
 import type { ProposalView } from "@/lib/proposals";
 import { CrisisPanel } from "./crisis-panel";
+import { LimitNotice, PlanLine } from "./plan-notes";
 import { ProposalCard } from "./proposal-card";
 import { SupportStrip } from "./support-strip";
 
@@ -20,8 +22,12 @@ interface Props {
   locale: { language: string; timezone: string };
   /** The offline, scripted assistant of the tests (SINTR_FAKE_AGENT). */
   rehearsal: boolean;
-  /** False while no provider is saved: the conversation can be read, not continued. */
+  /** False while there is no assistant: the conversation can be read, not continued. */
   ready?: boolean;
+  /** Who answers: the person's own key, or the house assistant within their plan. */
+  source?: "own" | "house";
+  /** This month's messages with the house assistant; null on the person's own key, which is never counted. */
+  meter?: MeterView | null;
 }
 
 function textOf(message: SintrUIMessage): string {
@@ -97,8 +103,11 @@ export function Conversation({
   locale,
   rehearsal,
   ready = true,
+  source = "own",
+  meter: initialMeter = null,
 }: Props) {
   const [serverId, setServerId] = useState<string | null>(conversationId);
+  const [meter, setMeter] = useState<MeterView | null>(initialMeter);
   const [proposals, setProposals] = useState(initialProposals);
   const [input, setInput] = useState("");
   // Read out once a reply is complete, instead of every streamed word.
@@ -114,7 +123,24 @@ export function Conversation({
       if (message.role === "assistant") setAnnouncement(`sintr: ${textOf(message)}`);
     },
     onData: (part) => {
-      if (part.type === "data-conversation") {
+      if (part.type === "data-usage") {
+        setMeter(part.data);
+      } else if (part.type === "data-limit") {
+        setMeter({ used: part.data.limit ?? part.data.used, limit: part.data.limit, next: part.data.next });
+        const kept = part.data.kept;
+        if (kept) {
+          setProposals((current) => ({
+            ...current,
+            [kept.proposalId]: current[kept.proposalId] ?? {
+              kind: "entry",
+              status: "proposed",
+              recordId: null,
+              edited: false,
+              payload: null,
+            },
+          }));
+        }
+      } else if (part.type === "data-conversation") {
         setServerId(part.data.conversationId);
         window.history.replaceState(null, "", `/talk/${part.data.conversationId}`);
       } else if (part.type === "data-proposal") {
@@ -138,7 +164,11 @@ export function Conversation({
     (m) => m.role === "assistant" && m.parts.some((p) => p.type === "data-crisis"),
   );
   const last = messages.at(-1);
-  const waiting = busy && (last?.role !== "assistant" || textOf(last).length === 0);
+  const waiting =
+    busy &&
+    (last?.role !== "assistant" ||
+      (textOf(last).length === 0 && !last.parts.some((p) => p.type === "data-limit")));
+  const limited = meter !== null && atTheLimit(meter);
 
   useEffect(() => {
     if (messages.length === 0) return;
@@ -203,6 +233,28 @@ export function Conversation({
                     </div>
                   );
                 }
+                if (part.type === "data-limit") {
+                  const kept = part.data.kept;
+                  return (
+                    <div key={key} className="flex flex-col gap-3">
+                      <Bubble from="assistant">{limitReplyText(part.data)}</Bubble>
+                      {kept ? (
+                        <div className="py-2">
+                          <ProposalCard
+                            proposalId={kept.proposalId}
+                            kind="entry"
+                            draft={kept.draft}
+                            view={proposals[kept.proposalId]}
+                            onView={(view) =>
+                              setProposals((current) => ({ ...current, [kept.proposalId]: view }))
+                            }
+                            locale={locale}
+                          />
+                        </div>
+                      ) : null}
+                    </div>
+                  );
+                }
                 if (
                   (part.type === "tool-propose_entry" || part.type === "tool-propose_checkin") &&
                   part.state === "output-available" &&
@@ -233,7 +285,7 @@ export function Conversation({
         {waiting ? <Writing /> : null}
         {error ? (
           <div className="rounded-file border border-rule px-5 py-4" role="alert">
-            <p className="text-[0.9375rem] text-ink">{problemCopy(error.message)}</p>
+            <p className="text-[0.9375rem] text-ink">{problemCopy(error.message, source)}</p>
             <div className="mt-3 flex flex-wrap items-center gap-x-6 gap-y-2">
               {needsSetup(error.message) ? null : (
                 <Button
@@ -247,12 +299,14 @@ export function Conversation({
                   Try again
                 </Button>
               )}
-              <Link
-                href="/settings"
-                className="text-[0.9375rem] text-ink-2 underline decoration-rule-strong underline-offset-[0.28em] hover:text-ink"
-              >
-                Check the assistant in Settings
-              </Link>
+              {source === "own" ? (
+                <Link
+                  href="/settings"
+                  className="text-[0.9375rem] text-ink-2 underline decoration-rule-strong underline-offset-[0.28em] hover:text-ink"
+                >
+                  Check the assistant in Settings
+                </Link>
+              ) : null}
             </div>
           </div>
         ) : null}
@@ -278,9 +332,9 @@ export function Conversation({
         </p>
         {ready ? null : (
           <p className="mb-3 text-[0.9375rem] text-ink-2">
-            Set up the assistant in{" "}
+            This sintr has no assistant of its own. Use your own key in{" "}
             <Link
-              href="/settings"
+              href="/settings?key=own#own-key"
               className="text-ink underline decoration-rule-strong underline-offset-[0.28em] hover:decoration-ink"
             >
               Settings
@@ -288,6 +342,7 @@ export function Conversation({
             to continue this conversation.
           </p>
         )}
+        {ready && limited && !stopped && meter ? <LimitNotice meter={meter} /> : null}
         <form onSubmit={submit} className={cn("flex items-end gap-3", !ready && "hidden")}>
           <label htmlFor="talk-message" className="sr-only">
             Your message
@@ -300,7 +355,9 @@ export function Conversation({
             onKeyDown={onKeyDown}
             rows={2}
             maxLength={MAX_MESSAGE_LENGTH}
-            placeholder={messages.length === 0 ? "What happened?" : "Write here"}
+            placeholder={
+              limited ? "Write what happened" : messages.length === 0 ? "What happened?" : "Write here"
+            }
             className="block max-h-56 min-h-[52px] w-full flex-1 resize-none rounded-[22px] border border-rule-strong bg-paper px-[18px] py-3 font-sans text-[1rem] leading-[1.5] text-ink placeholder:text-ink-3 transition-[border-color] duration-300 [field-sizing:content] hover:border-ink-soft focus-visible:border-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
           />
           <Button type="submit" disabled={busy || input.trim() === ""} className="shrink-0">
@@ -313,6 +370,7 @@ export function Conversation({
             Enter sends. Shift and Enter for a new line.
           </p>
         </div>
+        {ready && source === "house" && meter ? <PlanLine meter={meter} /> : null}
         {rehearsal ? (
           <p className="mt-2 text-caption text-ink-3">
             Rehearsal mode: replies come from a scripted, offline assistant (SINTR_FAKE_AGENT). Nothing is

@@ -5,18 +5,27 @@ import Link from "next/link";
 import { EmptyState, PageHeading } from "@/components/empty-state";
 import { PrepareButton } from "@/components/reports/prepare-button";
 import { formatDay, formatMoment } from "@/lib/format";
+import { formatNext } from "@/lib/plan";
 import { STATUS } from "@/lib/reports";
+import { assistantState } from "@/lib/server/assistant";
 import { requireScope } from "@/lib/server/runtime";
 
 export const metadata: Metadata = { title: "Reports" };
 
 export default async function ReportsPage() {
   const { scope } = await requireScope();
-  const [reports, profile, settings] = await Promise.all([
+  const [reports, profile, settings, assistant, month] = await Promise.all([
     scope.reports.list(),
     scope.profile.get(),
     scope.therapySettings.get(),
+    assistantState(scope),
+    scope.plans.current(),
   ]);
+  // On the house assistant, once this month's reports are used, the next ones come from the person's own words.
+  const reportsUsed =
+    assistant.kind === "house" &&
+    month.plan.allowance.reports !== null &&
+    month.used.reports >= month.plan.allowance.reports;
   const locale = { language: "en", timezone: profile.timezone };
   const session = upcomingSession(settings, profile.timezone, new Date());
   const prepared = session ? preparationTime(settings, session) : null;
@@ -44,6 +53,16 @@ export default async function ReportsPage() {
             </>
           )}
         </p>
+        {reportsUsed ? (
+          <p className="max-w-[36em] text-[0.9375rem] text-ink-3">
+            This month&apos;s reports written by the assistant are used, so until{" "}
+            {formatNext(month.period.next)} sintr prepares them from your own words: the moments, your notes
+            and your topics.{" "}
+            <Link href="/plan" className={linkStyles}>
+              Your plan
+            </Link>
+          </p>
+        ) : null}
         <PrepareButton label={session ? "Prepare it now" : "Prepare this week's report"} />
       </div>
       {reports.length === 0 ? (

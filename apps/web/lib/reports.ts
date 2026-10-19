@@ -57,6 +57,8 @@ export function authorInWords(problem: string | null): string {
   switch (problem) {
     case "not_configured":
       return "There is no assistant set up, so sintr prepared what it can on its own: the moments, your notes and your topics, in your own words. How the week went and the reading of the numbers are yours to write.";
+    case "limit_reached":
+      return "This month's reports written by the assistant are used on your plan, so sintr prepared what it can on its own: the moments, your notes and your topics, in your own words. How the week went is yours to write, or the assistant can prepare it again next month.";
     case "no_report":
       return "Your assistant answered without writing the report, so sintr prepared what it can on its own. You can write the rest, or prepare it again.";
     case null:

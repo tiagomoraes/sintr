@@ -17,6 +17,7 @@ export const SECTIONS = [
 ] as const;
 
 const PRACTICE = { href: "/practice", label: "Practice" } as const;
+const PLAN = { href: "/plan", label: "Plan" } as const;
 
 function NavLink({
   href,
@@ -66,13 +67,17 @@ function NavLink({
  * The contents list of the diary: links on one left hairline, the current
  * one in ink with a dot on the line. Under 900px it becomes a row of tabs
  * on a hairline baseline. An account that opened a practice gets a second
- * group for it; anything new shows as a small dot beside the section.
+ * group for it; anything new shows as a small dot beside the section. Plan
+ * follows Settings where there is a plan to see (a house assistant, or
+ * payments).
  */
 export function ShellNav({
   practice = false,
+  plan = false,
   dots = { sharing: false, practice: false },
 }: {
   practice?: boolean;
+  plan?: boolean;
   dots?: { sharing: boolean; practice: boolean };
 }) {
   const pathname = usePathname();
@@ -102,6 +107,9 @@ export function ShellNav({
             className={section.href === "/settings" ? "min-[900px]:mt-5" : undefined}
           />
         ))}
+        {plan ? (
+          <NavLink href={PLAN.href} label={PLAN.label} current={isCurrent(PLAN.href)} dot={false} />
+        ) : null}
         {practice ? (
           <NavLink
             href={PRACTICE.href}

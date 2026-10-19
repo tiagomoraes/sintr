@@ -5,6 +5,7 @@ import {
   screenForRisk,
   serializeMessage,
   unavailableModel,
+  type Metered,
   type SintrUIMessage,
   type SintrUIMessageChunk,
 } from "@sintr/agent";
@@ -39,15 +40,17 @@ export async function POST(request: Request) {
   // A retry continues a stored conversation; there is nothing to retry without one.
   if (trigger === "regenerate-message" && !conversationId) return apiError(409, "nothing_to_retry");
 
-  // Without a provider the crisis screen still answers a message that
+  // Without an assistant the crisis screen still answers a message that
   // signals risk; it runs before any model is called.
   const assistant = await assistantFor(scope);
   let model: LanguageModel;
-  if ("problem" in assistant) {
+  let metered: Metered | null = null;
+  if (!assistant.ok) {
     if (trigger !== "submit-message" || !screenForRisk(text).risk) return apiError(409, assistant.problem);
     model = unavailableModel();
   } else {
     model = assistant.model;
+    metered = assistant.metered;
   }
 
   const existing = conversationId ? await scope.conversations.get(conversationId) : null;
@@ -79,6 +82,8 @@ export async function POST(request: Request) {
     ports: scopePorts(scope, conversation.id, person),
     log: runtime().log.child({ userId: user.id }),
     prelude,
+    // The house assistant's monthly meter; a person's own key is never counted.
+    ...(metered ? { metered } : {}),
     onResponse: async (response) => {
       await scope.conversations.append(conversation.id, serializeMessage(response));
     },

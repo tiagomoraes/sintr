@@ -102,6 +102,14 @@ export default async function ReportPage({ params }: { params: Promise<{ id: str
       {view.content.author === "sintr" ? (
         <div className="mb-8 max-w-[44rem] rounded-file border border-rule bg-wash px-[22px] py-5 text-[0.9688rem] text-ink-2">
           {authorInWords(view.content.problem)}
+          {view.content.problem === "limit_reached" ? (
+            <>
+              {" "}
+              <Link href="/plan" className={linkStyles}>
+                See your plan
+              </Link>
+            </>
+          ) : null}
         </div>
       ) : null}
       {view.check.problems.length > 0 && report.status !== "sent" ? (
