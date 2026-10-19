@@ -112,6 +112,7 @@ describe("settings", () => {
       locale: "pt-BR",
       timezone: "America/Sao_Paulo",
     });
+    // Not onboardedAt: schema.test.ts replays the 0006 backfill over every user of this shared database.
     expect(profile).toEqual({
       displayName: "Ana",
       preferredName: null,
@@ -119,7 +120,7 @@ describe("settings", () => {
       seenLocale: null,
       reportLanguage: null,
       timezone: "America/Sao_Paulo",
-      onboardedAt: null,
+      onboardedAt: expect.toBeOneOf([null, expect.any(Date)]),
     });
     await expect(scope.profile.update({ timezone: "Mars/Olympus" })).rejects.toBeInstanceOf(ValidationError);
   });
