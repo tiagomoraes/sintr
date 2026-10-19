@@ -22,7 +22,7 @@ import {
 } from "@sintr/core";
 import { IntensityChip, NotebookCard, NotebookHead, NotebookRow, Verbatim, cn } from "@sintr/ui";
 import type { ReactNode } from "react";
-import { getMessages } from "@/lib/server/language";
+import { currentLanguage, getMessages } from "@/lib/server/language";
 
 /**
  * A report as the person reads it before approving it (or as a practice
@@ -36,8 +36,8 @@ import { getMessages } from "@/lib/server/language";
 interface Quotes {
   check: PaperView["check"];
   unverified: string;
-  /** Between two intensities, for a screen reader. */
-  to: string;
+  /** Between two intensities, for a screen reader, in the page's language (`lang`). */
+  to: { word: string; lang: string };
 }
 
 function Prose({ text, quotes }: { text: string; quotes: Quotes }) {
@@ -91,7 +91,7 @@ function Feelings({
   /** "of 100" in the report's language. */
   of100: string;
   /** Said to a screen reader between the two intensities; the eye sees the PDF's arrow. */
-  to: string;
+  to: { word: string; lang: string };
 }) {
   const was = new Map((before ?? []).map((e) => [e.name.toLocaleLowerCase(), e.intensity]));
   return (
@@ -111,7 +111,7 @@ function Feelings({
                 >
                   <path d="M1 4h9.2M7.2 1.2 10 4 7.2 6.8" />
                 </svg>
-                <span className="sr-only">{` ${to} `}</span>
+                <span className="sr-only" lang={to.lang}>{` ${to.word} `}</span>
                 {emotion.intensity}
               </span>
             ) : emotion.intensity !== null ? (
@@ -367,7 +367,11 @@ export async function ReportPaper({ view }: { view: PaperView }) {
   const s = REPORT_STRINGS[content.language];
   // The app's words around the report, in the page's language; the report's own are in its language.
   const { paper } = (await getMessages()).reports;
-  const quotes: Quotes = { check, unverified: paper.unverified, to: paper.to };
+  const quotes: Quotes = {
+    check,
+    unverified: paper.unverified,
+    to: { word: paper.to, lang: (await currentLanguage()).code },
+  };
   const name = view.person.name?.trim() || null;
   const first = numbers.days[0]?.day ?? period.label;
   const last = numbers.days.at(-1)?.day ?? period.label;

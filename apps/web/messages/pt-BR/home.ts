@@ -4,6 +4,9 @@ import type { Messages } from "../types";
 
 const PARTS = { morning: "Bom dia", afternoon: "Boa tarde", evening: "Boa noite" } as const;
 
+/** "na terça-feira", "no sábado": the article of the day Intl writes first. */
+const on = (moment: string) => `${/^(sábado|domingo)/u.test(moment) ? "no" : "na"} ${moment}`;
+
 export const home = {
   title: "Me conta o que aconteceu.",
   greeting: (part: keyof typeof PARTS, name: string | null) =>
@@ -31,7 +34,7 @@ export const home = {
   unfinishedLink: "Continuar de onde parou",
   earlier: "Conversas anteriores",
   untitled: "Uma conversa",
-  started: (when: string) => `Iniciada em ${when}`,
+  started: (when: string) => `Iniciada ${on(when)}`,
   newConversation: "Nova conversa",
   deleteTitle: "Apagar esta conversa",
   deleteBody:
