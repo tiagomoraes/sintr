@@ -137,9 +137,15 @@ function createGuard(show: (what: string[] | null) => void, setDirty: (dirty: bo
     return asking;
   }
 
-  /** The dialog closed: to leave, or to stay (its Stay button, Escape, a tap beside it). */
+  /**
+   * The person answered: to leave, or to stay (its Stay button, Escape, a tap beside it). Told as
+   * they answer, not when the dialog's close event comes: Chromium fires it at its next frame, and
+   * a click before then would get this question's promise instead of its own (DECISIONS 141). An
+   * answer when nothing is asked does nothing.
+   */
   function answered(leave: boolean) {
     const resolve = answer;
+    if (!resolve) return;
     answer = null;
     asking = null;
     if (leave) released = true;
@@ -148,7 +154,7 @@ function createGuard(show: (what: string[] | null) => void, setDirty: (dirty: bo
     if (!leave && opener instanceof HTMLElement && opener.isConnected && document.activeElement !== opener) {
       opener.focus({ preventScroll: true });
     }
-    resolve?.(leave);
+    resolve(leave);
   }
 
   function mayLeave(): Promise<boolean> {
@@ -331,6 +337,12 @@ export function UnsavedGuard({ children }: { children: ReactNode }) {
     element.showModal();
   }, [what]);
 
+  /** Close the question and tell the guard in the same step, so the next click is asked about again. */
+  const answer = (leave: boolean) => {
+    dialog.current?.close(leave ? "leave" : "stay");
+    guard.answered(leave);
+  };
+
   return (
     <GuardContext value={guard}>
       {children}
@@ -339,10 +351,15 @@ export function UnsavedGuard({ children }: { children: ReactNode }) {
         role="alertdialog"
         aria-labelledby={sentence}
         className="sintr-ask"
-        onClose={() => guard.answered(dialog.current?.returnValue === "leave")}
+        // Escape (or a phone's back gesture) stays; the dialog would close itself right after.
+        onCancel={() => answer(false)}
+        // Closed some other way. A close event that comes once the question has opened again was the last one's.
+        onClose={() => {
+          if (!dialog.current?.open) guard.answered(dialog.current?.returnValue === "leave");
+        }}
         onClick={(event) => {
           // A tap on the backdrop (beside the question) stays.
-          if (event.target === dialog.current) dialog.current.close("stay");
+          if (event.target === dialog.current) answer(false);
         }}
       >
         <div className="sintr-ask__body">
@@ -350,10 +367,10 @@ export function UnsavedGuard({ children }: { children: ReactNode }) {
             {what ? t.changes(formatList(what, language)) : null}
           </p>
           <div className="sintr-ask__actions">
-            <Button type="button" onClick={() => dialog.current?.close("stay")}>
+            <Button type="button" onClick={() => answer(false)}>
               {t.stay}
             </Button>
-            <Button type="button" variant="outline" onClick={() => dialog.current?.close("leave")}>
+            <Button type="button" variant="outline" onClick={() => answer(true)}>
               {t.leave}
             </Button>
           </div>

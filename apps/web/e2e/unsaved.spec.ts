@@ -134,29 +134,67 @@ test.describe("leaving Settings with a change not saved", () => {
     await page.goto("/settings");
     await changeZone(page);
     const link = nav(page).getByRole("link", { name: "Therapy" });
+    const asked = question(page);
+    const stay = asked.getByRole("button", { name: "Stay on this page" });
     await link.focus();
     await page.keyboard.press("Enter");
-    const asked = question(page);
     await expect(asked).toBeVisible();
-    await expect(asked.getByRole("button", { name: "Stay on this page" })).toBeFocused();
+    await expect(stay).toBeFocused();
     await page.keyboard.press("Escape");
     await expect(asked).toBeHidden();
     await expect(link).toBeFocused();
     await expect(page).toHaveURL(/\/settings$/);
 
-    // Enter on Stay stays; Tab, then Enter, leaves. Each key waits for the question to have the focus.
+    // Escape, or Enter on Stay, stays, and the link's Enter right after it asks again: nothing is
+    // waited for in between (DECISIONS 141). Each answer waits for the question to have the focus.
     await page.keyboard.press("Enter");
     await expect(asked).toBeVisible();
-    await expect(asked.getByRole("button", { name: "Stay on this page" })).toBeFocused();
-    await page.keyboard.press("Enter");
-    await expect(asked).toBeHidden();
-    await expect(link).toBeFocused();
+    await expect(stay).toBeFocused();
+    await page.keyboard.press("Escape");
     await page.keyboard.press("Enter");
     await expect(asked).toBeVisible();
-    await expect(asked.getByRole("button", { name: "Stay on this page" })).toBeFocused();
+    await expect(stay).toBeFocused();
+    await page.keyboard.press("Enter");
+    await page.keyboard.press("Enter");
+    await expect(asked).toBeVisible();
+    await expect(stay).toBeFocused();
+
+    // Tab, then Enter, leaves.
     await page.keyboard.press("Tab");
     await expect(asked.getByRole("button", { name: "Leave without saving" })).toBeFocused();
     await page.keyboard.press("Enter");
+    await expect(page.getByRole("heading", { level: 1, name: "Your therapy" })).toBeVisible();
+  });
+
+  test("asks again at once after staying, before the page has been drawn again", async ({ page }) => {
+    await signUpQuietly(page, newEmail("unsaved-again"));
+    await page.goto("/settings");
+    const { zone, chosen } = await changeZone(page);
+    const link = nav(page).getByRole("link", { name: "Therapy" });
+    const asked = question(page);
+    const stay = asked.getByRole("button", { name: "Stay on this page" });
+    await link.click();
+    await expect(asked).toHaveAccessibleName(UNSAVED_ZONE);
+
+    // Stay, then the same link, in one go: Chromium tells the page the question closed only at its
+    // next frame, and a click may come before it, as it does on a busy machine (DECISIONS 141).
+    for (const [answer, target] of [
+      ["Stay", stay],
+      ["a tap beside it", asked],
+    ] as const) {
+      await link.evaluate(
+        (element: HTMLElement, staying) => {
+          (staying as HTMLElement).click();
+          element.click();
+        },
+        await target.elementHandle(),
+      );
+      await expect(asked, `asked again after ${answer}`).toHaveAccessibleName(UNSAVED_ZONE);
+      await expect(page).toHaveURL(/\/settings$/);
+      await expect(zone).toHaveValue(chosen);
+    }
+
+    await asked.getByRole("button", { name: "Leave without saving" }).click();
     await expect(page.getByRole("heading", { level: 1, name: "Your therapy" })).toBeVisible();
   });
 
