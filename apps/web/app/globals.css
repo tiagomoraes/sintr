@@ -111,6 +111,22 @@
     background: var(--color-paper);
     box-shadow: 0 1px 0 var(--color-rule);
   }
+  /*
+   * Above it, the paper goes on up past the top of the page (F13). Telegram's
+   * browser on iOS starts the page just under its own bar but does not clip
+   * it there, so what has scrolled past the top stays drawn behind the bar:
+   * there, the header's paper now shows instead. A browser that clips at the
+   * top never shows this strip. It belongs to the header, not to the page,
+   * so it moves with it and is painted with it (DECISIONS 137 to 140).
+   */
+  .sintr-header--sticky[data-scrolled]::before {
+    content: "";
+    position: absolute;
+    inset: auto 0 100%;
+    height: 160px;
+    background: var(--color-paper);
+    pointer-events: none;
+  }
 }
 
 /*
